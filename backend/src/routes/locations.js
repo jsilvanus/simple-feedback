@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 /**
  * GET /api/locations/:slug/questionnaire
  * Get active questionnaire for a location
  */
-router.get('/:slug/questionnaire', async (req, res, next) => {
+router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
   try {
     const { slug } = req.params;
 

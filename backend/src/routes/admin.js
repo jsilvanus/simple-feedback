@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
+const { loginLimiter, apiLimiter } = require('../middleware/rateLimiter');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -29,7 +30,7 @@ const authenticate = (req, res, next) => {
  * POST /api/admin/login
  * Admin login (simplified - no user table for now)
  */
-router.post('/login', async (req, res, next) => {
+router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
@@ -58,8 +59,9 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// All routes below require authentication
+// All routes below require authentication and rate limiting
 router.use(authenticate);
+router.use(apiLimiter);
 
 /**
  * GET /api/admin/locations

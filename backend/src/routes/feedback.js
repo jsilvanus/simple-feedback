@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { feedbackLimiter } = require('../middleware/rateLimiter');
 
 /**
  * POST /api/feedback
@@ -15,7 +16,7 @@ const db = require('../db');
  *   ]
  * }
  */
-router.post('/', async (req, res, next) => {
+router.post('/', feedbackLimiter, async (req, res, next) => {
   const client = await db.pool.connect();
   
   try {
