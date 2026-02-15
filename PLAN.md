@@ -1,207 +1,177 @@
-### Feedback App – Architecture & Development Plan
+# Feedback App – Architecture & Development Plan
+
 ## 1. Product Overview
 
 The system is a configurable feedback application designed for:
 
-Standalone tablets running in kiosk mode
+- Standalone tablets running in kiosk mode
+- Mobile browsers via shared links
 
-Mobile browsers via shared links
-
-Each tablet or link is tied to a location (/:locationSlug).
+Each tablet or link is tied to a location (`/:locationSlug`).
 
 The system supports:
 
-Multiple locations
-
-Configurable questionnaires
-
-Configurable question types and answer scales
-
-Scheduled questionnaires per location
-
-Admin reporting and exports
+- Multiple locations
+- Configurable questionnaires
+- Configurable question types and answer scales
+- Scheduled questionnaires per location
+- Admin reporting and exports
 
 ## 2. Core Concepts
-Location
 
-Represents a physical or logical place (e.g. “Lobby”, “Church Hall”, “Event Booth”).
+### Location
 
-Question
+Represents a physical or logical place (e.g. "Lobby", "Church Hall", "Event Booth").
+
+### Question
 
 A single feedback prompt.
 
-Types:
+**Types:**
 
-Scale (buttons)
+- Scale (buttons)
+- Free text
+- Word cloud selection
 
-Free text
-
-Word cloud selection
-
-Questionnaire
+### Questionnaire
 
 A grouped set of questions shown together to the user.
 
-Contains:
+**Contains:**
 
-One or more questions
+- One or more questions
+- Page structure (1+ pages)
+- Optional text input questions
+- Optional word cloud questions
 
-Page structure (1+ pages)
-
-Optional text input questions
-
-Optional word cloud questions
-
-Schedule
+### Schedule
 
 Defines:
 
-Which questionnaire is active
+- Which questionnaire is active
+- At which location
+- During which time window
 
-At which location
+## 3. User Interfaces
 
-During which time window
+### 3.1 Feedback UI (Public)
 
-3. User Interfaces
-3.1 Feedback UI (Public)
+**Route:**
 
-Route:
-
+```
 /:locationSlug
+```
 
+**Features:**
 
-Features:
+- Loads active questionnaire for location
+- Displays:
+  - 1–4 buttons by default (configurable)
+  - red → green color scale (configurable)
+  - text input if configured
+  - word cloud selection if configured
+- Supports:
+  - multi-page questionnaires
+  - auto-reset after submission
+- Touch-optimized
+- No login required
 
-Loads active questionnaire for location
+### 3.2 Admin UI
 
-Displays:
+**Routes:**
 
-1–4 buttons by default (configurable)
-
-red → green color scale (configurable)
-
-text input if configured
-
-word cloud selection if configured
-
-Supports:
-
-multi-page questionnaires
-
-auto-reset after submission
-
-Touch-optimized
-
-No login required
-
-3.2 Admin UI
-
-Routes:
-
+```
 /admin
 /admin/locations
 /admin/questions
 /admin/questionnaires
 /admin/schedules
 /admin/results
+```
 
+**Admin capabilities:**
 
-Admin capabilities:
+- Create/edit locations
+- Create/edit questions
+- Group questions into questionnaires
+- Define:
+  - pages
+  - answer scales
+- Schedule questionnaires to locations
+- View results
+- Filter results
+- Export data
 
-Create/edit locations
+## 4. Backend Architecture
 
-Create/edit questions
+### Stack
 
-Group questions into questionnaires
+- Node.js + Express/Fastify
+- PostgreSQL
+- REST API with OpenAPI specification
+- JWT authentication for admin
 
-Define:
+### Responsibilities
 
-pages
+- Provide questionnaire data for locations
+- Accept feedback submissions
+- Store feedback sessions and answers
+- Provide analytics and exports
+- Manage admin authentication
 
-answer scales
+## 5. Database Model (Logical)
 
-Schedule questionnaires to locations
+### `locations`
+- `id`
+- `slug`
+- `name`
+- `active`
 
-View results
+### `questions`
+- `id`
+- `text`
+- `type` (scale | text | wordcloud)
 
-Filter results
+### `answer_scales`
+- `id`
+- `name`
+- `buttons` (json: label, value, color)
 
-Export data
+### `questionnaires`
+- `id`
+- `name`
+- `description`
 
-4. Backend Architecture
-Stack
+### `questionnaire_questions`
+- `questionnaire_id`
+- `question_id`
+- `page_number`
+- `answer_scale_id` (nullable)
 
-Node.js + Express/Fastify
+### `schedules`
+- `id`
+- `location_id`
+- `questionnaire_id`
+- `start_time`
+- `end_time`
 
-PostgreSQL
+### `feedback_sessions`
+- `id`
+- `location_id`
+- `questionnaire_id`
+- `timestamp`
 
-REST API with OpenAPI specification
+### `feedback_answers`
+- `session_id`
+- `question_id`
+- `value`
+- `text_value` (nullable)
 
-JWT authentication for admin
+## 6. API Design (OpenAPI First)
 
-Responsibilities
+**Core endpoints:**
 
-Provide questionnaire data for locations
-
-Accept feedback submissions
-
-Store feedback sessions and answers
-
-Provide analytics and exports
-
-Manage admin authentication
-
-5. Database Model (Logical)
-locations
-id
-slug
-name
-active
-
-questions
-id
-text
-type (scale | text | wordcloud)
-
-answer_scales
-id
-name
-buttons (json: label, value, color)
-
-questionnaires
-id
-name
-description
-
-questionnaire_questions
-questionnaire_id
-question_id
-page_number
-answer_scale_id (nullable)
-
-schedules
-id
-location_id
-questionnaire_id
-start_time
-end_time
-
-feedback_sessions
-id
-location_id
-questionnaire_id
-timestamp
-
-feedback_answers
-session_id
-question_id
-value
-text_value (nullable)
-
-6. API Design (OpenAPI First)
-
-Core endpoints:
-
+```
 GET    /api/locations/{slug}/questionnaire
 POST   /api/feedback
 
@@ -211,220 +181,175 @@ POST   /api/admin/questionnaires
 POST   /api/admin/schedules
 GET    /api/admin/results
 GET    /api/admin/export
+```
 
+**Development rule:**
 
-Development rule:
+- OpenAPI spec written before frontend
+- Frontend generated or validated against spec
+- Mock server used early
 
-OpenAPI spec written before frontend
+## 7. Testing Strategy
 
-Frontend generated or validated against spec
+### 7.1 Pre-Code Tests
 
-Mock server used early
+- User stories
+- Acceptance tests per feature
 
-7. Testing Strategy
-7.1 Pre-Code Tests
+**Example:**
 
-User stories
+- When questionnaire has 2 pages, user must see next page button
+- When scale has 3 buttons, exactly 3 buttons are shown
 
-Acceptance tests per feature
+### 7.2 Backend Tests
 
-Example:
+**Unit tests:**
 
-When questionnaire has 2 pages, user must see next page button
+- schedule resolution
+- answer validation
 
-When scale has 3 buttons, exactly 3 buttons are shown
+**Integration tests:**
 
-7.2 Backend Tests
+- submit feedback
+- fetch results
 
-Unit tests:
+### 7.3 Frontend Tests
 
-schedule resolution
+- UI rendering tests
+- Flow tests:
+  - multi-page submission
+  - auto-reset
+- Kiosk behavior tests
 
-answer validation
+## 8. Documentation Strategy
 
-Integration tests:
+**Docs maintained in `/docs`:**
 
-submit feedback
+- Architecture diagram
+- Database schema
+- API reference
+- Deployment guide
+- Tablet kiosk setup
+- Admin user manual
 
-fetch results
+**OpenAPI provides:**
 
-7.3 Frontend Tests
+- API documentation
+- Contract between frontend and backend
 
-UI rendering tests
+## 9. Development Milestones
 
-Flow tests:
+### Milestone 1 – Foundations
 
-multi-page submission
+**Define:**
 
-auto-reset
+- data model
+- questionnaires
+- schedules
 
-Kiosk behavior tests
+**Tasks:**
 
-8. Documentation Strategy
+- Write OpenAPI spec
+- Write acceptance tests
+- Setup repository and CI
+- Create backend skeleton
 
-Docs maintained in /docs:
+**Deliverables:**
 
-Architecture diagram
+- OpenAPI spec
+- Empty frontend apps
+- Test framework ready
 
-Database schema
+### Milestone 2 – Feedback UI
 
-API reference
+**Tasks:**
 
-Deployment guide
+- Location routing
+- Load questionnaire from API
+- Render:
+  - button scales
+  - pages
+- Submit feedback
+- Reset behavior
 
-Tablet kiosk setup
+**Deliverable:**
 
-Admin user manual
+- Working kiosk feedback UI
 
-OpenAPI provides:
+### Milestone 3 – Admin Core
 
-API documentation
+**Tasks:**
 
-Contract between frontend and backend
+- Authentication
+- CRUD:
+  - locations
+  - questions
+  - answer scales
+  - questionnaires
+- Questionnaire builder UI
+- Scheduling UI
 
-9. Development Milestones
-Milestone 1 – Foundations
+**Deliverable:**
 
-Define:
+- Fully configurable questionnaires
 
-data model
+### Milestone 4 – Results & Analytics
 
-questionnaires
+**Tasks:**
 
-schedules
+- Result aggregation
+- Charts per question
+- Filters:
+  - location
+  - date
+  - questionnaire
+- Export CSV/Excel
 
-Write OpenAPI spec
+**Deliverable:**
 
-Write acceptance tests
+- Usable admin dashboard
 
-Setup repository and CI
+### Milestone 5 – Advanced Inputs
 
-Create backend skeleton
+**Tasks:**
 
-Deliverables:
+- Text answers
+- Word cloud answers
+- Word cloud visualization
 
-OpenAPI spec
+**Deliverable:**
 
-Empty frontend apps
+- Rich input support
 
-Test framework ready
+### Milestone 6 – Production Hardening
 
-Milestone 2 – Feedback UI
+**Tasks:**
 
-Location routing
+- Error handling
+- Security
+- Rate limiting
+- Backups
+- Offline cache
+- Kiosk watchdog reload
 
-Load questionnaire from API
+**Deliverable:**
 
-Render:
+- Production-ready system
 
-button scales
+## 10. Design Principles
 
-pages
+- Location defines context
+- Questionnaire defines structure
+- Schedule defines timing
+- Feedback UI is stateless
+- Admin UI isolated from public UI
+- API-first development
 
-Submit feedback
+## 11. Optional Future Features
 
-Reset behavior
-
-Deliverable:
-
-Working kiosk feedback UI
-
-Milestone 3 – Admin Core
-
-Authentication
-
-CRUD:
-
-locations
-
-questions
-
-answer scales
-
-questionnaires
-
-Questionnaire builder UI
-
-Scheduling UI
-
-Deliverable:
-
-Fully configurable questionnaires
-
-Milestone 4 – Results & Analytics
-
-Result aggregation
-
-Charts per question
-
-Filters:
-
-location
-
-date
-
-questionnaire
-
-Export CSV/Excel
-
-Deliverable:
-
-Usable admin dashboard
-
-Milestone 5 – Advanced Inputs
-
-Text answers
-
-Word cloud answers
-
-Word cloud visualization
-
-Deliverable:
-
-Rich input support
-
-Milestone 6 – Production Hardening
-
-Error handling
-
-Security
-
-Rate limiting
-
-Backups
-
-Offline cache
-
-Kiosk watchdog reload
-
-Deliverable:
-
-Production-ready system
-
-10. Design Principles
-
-Location defines context
-
-Questionnaire defines structure
-
-Schedule defines timing
-
-Feedback UI is stateless
-
-Admin UI isolated from public UI
-
-API-first development
-
-11. Optional Future Features
-
-QR code generator per location
-
-Live dashboard
-
-Multi-language support
-
-Theme per location
-
-Alerts (Slack/email)
-
-Role-based admin access
+- QR code generator per location
+- Live dashboard
+- Multi-language support
+- Theme per location
+- Alerts (Slack/email)
+- Role-based admin access
