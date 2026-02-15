@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import AdminLocations from '../components/AdminLocations';
+import AdminQuestions from '../components/AdminQuestions';
+import AdminAnswerScales from '../components/AdminAnswerScales';
+import AdminQuestionnaires from '../components/AdminQuestionnaires';
+import AdminSchedules from '../components/AdminSchedules';
+import AdminResults from '../components/AdminResults';
 import './AdminPage.css';
 
 export default function AdminPage() {
@@ -88,6 +94,12 @@ export default function AdminPage() {
             Questions
           </button>
           <button 
+            className={activeTab === 'answer-scales' ? 'active' : ''} 
+            onClick={() => setActiveTab('answer-scales')}
+          >
+            Answer Scales
+          </button>
+          <button 
             className={activeTab === 'questionnaires' ? 'active' : ''} 
             onClick={() => setActiveTab('questionnaires')}
           >
@@ -137,14 +149,12 @@ export default function AdminPage() {
             </div>
           )}
 
-          {activeTab !== 'overview' && (
-            <div className="admin-section">
-              <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h2>
-              <p className="placeholder-text">
-                This section is under development. Full CRUD functionality will be implemented soon.
-              </p>
-            </div>
-          )}
+          {activeTab === 'locations' && <AdminLocations />}
+          {activeTab === 'questions' && <AdminQuestions />}
+          {activeTab === 'answer-scales' && <AdminAnswerScales />}
+          {activeTab === 'questionnaires' && <AdminQuestionnaires />}
+          {activeTab === 'schedules' && <AdminSchedules />}
+          {activeTab === 'results' && <AdminResults />}
         </div>
       </div>
     </div>

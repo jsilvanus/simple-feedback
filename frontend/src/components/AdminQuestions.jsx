@@ -1,0 +1,147 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '../api';
+import './AdminCrud.css';
+
+export default function AdminQuestions() {
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    text: '',
+    type: 'scale',
+  });
+
+  useEffect(() => {
+    loadQuestions();
+  }, []);
+
+  const loadQuestions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.adminRequest('/questions');
+      setQuestions(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.adminRequest('/questions', {
+        method: 'POST',
+        body: JSON.stringify(formData),
+      });
+      setShowForm(false);
+      setFormData({ text: '', type: 'scale' });
+      loadQuestions();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
+    setFormData({ text: '', type: 'scale' });
+  };
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'scale': return '📊';
+      case 'text': return '📝';
+      case 'wordcloud': return '☁️';
+      default: return '❓';
+    }
+  };
+
+  if (loading) return <div className="loading">Loading questions...</div>;
+  if (error) return <div className="error">Error: {error}</div>;
+
+  return (
+    <div className="admin-crud-section">
+      <div className="section-header">
+        <h2>Questions</h2>
+        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+          + Add Question
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="form-modal">
+          <div className="form-container">
+            <h3>Add New Question</h3>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Question Text *</label>
+                <textarea
+                  value={formData.text}
+                  onChange={(e) => setFormData({ ...formData, text: e.target.value })}
+                  placeholder="e.g., How satisfied are you with our service?"
+                  required
+                  rows={3}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Question Type *</label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  required
+                >
+                  <option value="scale">Scale (buttons)</option>
+                  <option value="text">Text input</option>
+                  <option value="wordcloud">Word cloud</option>
+                </select>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="data-list">
+        {questions.length === 0 ? (
+          <div className="empty-state">
+            <p>No questions yet. Add your first question to get started.</p>
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Question</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {questions.map((question) => (
+                <tr key={question.id}>
+                  <td>
+                    <span className="type-badge" title={question.type}>
+                      {getTypeIcon(question.type)} {question.type}
+                    </span>
+                  </td>
+                  <td>{question.text}</td>
+                  <td>{new Date(question.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
