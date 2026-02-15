@@ -134,7 +134,7 @@ export default function AdminQuestionnaires() {
                       <option value="">Select question...</option>
                       {questions.map((question) => (
                         <option key={question.id} value={question.id}>
-                          {question.text.substring(0, 50)}...
+                          {question.text.length > 50 ? question.text.substring(0, 50) + '...' : question.text}
                         </option>
                       ))}
                     </select>

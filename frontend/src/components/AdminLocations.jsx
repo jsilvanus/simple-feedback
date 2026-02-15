@@ -47,13 +47,8 @@ export default function AdminLocations() {
   };
 
   const handleEdit = (location) => {
-    setEditingId(location.id);
-    setFormData({
-      slug: location.slug,
-      name: location.name,
-      active: location.active,
-    });
-    setShowForm(true);
+    // TODO: Implement edit functionality when backend PUT endpoint is added
+    alert('Edit functionality coming soon. For now, you can create new locations.');
   };
 
   const handleCancel = () => {

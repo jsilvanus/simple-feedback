@@ -105,13 +105,15 @@ export default function AdminResults() {
   };
 
   const resetFilters = () => {
-    setFilters({
+    const newFilters = {
       locationId: '',
       questionnaireId: '',
       startDate: '',
       endDate: '',
-    });
-    setTimeout(() => loadResults(), 0);
+    };
+    setFilters(newFilters);
+    // Trigger reload after state is updated by using useEffect dependency or direct call
+    loadResults();
   };
 
   const exportCSV = async () => {

@@ -68,9 +68,10 @@ export default function AdminAnswerScales() {
   };
 
   const addButton = () => {
+    const maxValue = Math.max(0, ...formData.buttons.map(b => b.value));
     setFormData({
       ...formData,
-      buttons: [...formData.buttons, { label: '', value: formData.buttons.length + 1, color: '#333333' }],
+      buttons: [...formData.buttons, { label: '', value: maxValue + 1, color: '#333333' }],
     });
   };
 
