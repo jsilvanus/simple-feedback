@@ -1,0 +1,669 @@
+openapi: 3.0.3
+info:
+  title: Simple Feedback API
+  description: API for the Simple Feedback application - a configurable feedback system for tablets and mobile browsers
+  version: 1.0.0
+  contact:
+    name: Simple Feedback
+    
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+    
+tags:
+  - name: Public
+    description: Public endpoints for feedback submission
+  - name: Admin
+    description: Admin endpoints for management (requires authentication)
+
+paths:
+  /health:
+    get:
+      tags:
+        - Public
+      summary: Health check
+      description: Check if the API server is running
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/locations/{slug}/questionnaire:
+    get:
+      tags:
+        - Public
+      summary: Get active questionnaire for a location
+      description: Retrieves the currently active questionnaire for a given location slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Location slug identifier
+          schema:
+            type: string
+            example: lobby
+      responses:
+        '200':
+          description: Questionnaire data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireResponse'
+        '404':
+          description: Location not found or no active questionnaire
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/feedback:
+    post:
+      tags:
+        - Public
+      summary: Submit feedback
+      description: Submit answers to a questionnaire
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackSubmission'
+      responses:
+        '201':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  sessionId:
+                    type: integer
+                  message:
+                    type: string
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/login:
+    post:
+      tags:
+        - Admin
+      summary: Admin login
+      description: Authenticate and receive a JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  token:
+                    type: string
+                  expiresIn:
+                    type: integer
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/locations:
+    get:
+      tags:
+        - Admin
+      summary: List all locations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Location'
+    post:
+      tags:
+        - Admin
+      summary: Create a new location
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - slug
+                - name
+              properties:
+                slug:
+                  type: string
+                name:
+                  type: string
+                active:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Location created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+
+  /api/admin/questions:
+    get:
+      tags:
+        - Admin
+      summary: List all questions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Question'
+    post:
+      tags:
+        - Admin
+      summary: Create a new question
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+                - type
+              properties:
+                text:
+                  type: string
+                type:
+                  type: string
+                  enum: [scale, text, wordcloud]
+      responses:
+        '201':
+          description: Question created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+
+  /api/admin/answer-scales:
+    get:
+      tags:
+        - Admin
+      summary: List all answer scales
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of answer scales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnswerScale'
+    post:
+      tags:
+        - Admin
+      summary: Create a new answer scale
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - buttons
+              properties:
+                name:
+                  type: string
+                buttons:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      label:
+                        type: string
+                      value:
+                        type: integer
+                      color:
+                        type: string
+      responses:
+        '201':
+          description: Answer scale created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerScale'
+
+  /api/admin/questionnaires:
+    get:
+      tags:
+        - Admin
+      summary: List all questionnaires
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of questionnaires
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Questionnaire'
+    post:
+      tags:
+        - Admin
+      summary: Create a new questionnaire
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                questions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      questionId:
+                        type: integer
+                      pageNumber:
+                        type: integer
+                      answerScaleId:
+                        type: integer
+                      orderIndex:
+                        type: integer
+      responses:
+        '201':
+          description: Questionnaire created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Questionnaire'
+
+  /api/admin/schedules:
+    get:
+      tags:
+        - Admin
+      summary: List all schedules
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Schedule'
+    post:
+      tags:
+        - Admin
+      summary: Create a new schedule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - locationId
+                - questionnaireId
+                - startTime
+                - endTime
+              properties:
+                locationId:
+                  type: integer
+                questionnaireId:
+                  type: integer
+                startTime:
+                  type: string
+                  format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+
+  /api/admin/results:
+    get:
+      tags:
+        - Admin
+      summary: Get feedback results
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: integer
+        - name: questionnaireId
+          in: query
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Feedback results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeedbackResult'
+
+  /api/admin/export:
+    get:
+      tags:
+        - Admin
+      summary: Export results as CSV
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: integer
+        - name: questionnaireId
+          in: query
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: CSV export file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            status:
+              type: integer
+
+    Location:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Question:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        type:
+          type: string
+          enum: [scale, text, wordcloud]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AnswerScale:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        buttons:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              value:
+                type: integer
+              color:
+                type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Questionnaire:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: integer
+        location_id:
+          type: integer
+        questionnaire_id:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    QuestionnaireResponse:
+      type: object
+      properties:
+        location:
+          type: object
+          properties:
+            id:
+              type: integer
+            slug:
+              type: string
+            name:
+              type: string
+        questionnaire:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            description:
+              type: string
+            pages:
+              type: array
+              items:
+                type: object
+                properties:
+                  number:
+                    type: integer
+                  questions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        text:
+                          type: string
+                        type:
+                          type: string
+                        answerScale:
+                          $ref: '#/components/schemas/AnswerScale'
+
+    FeedbackSubmission:
+      type: object
+      required:
+        - locationId
+        - questionnaireId
+        - answers
+      properties:
+        locationId:
+          type: integer
+        questionnaireId:
+          type: integer
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId:
+                type: integer
+              value:
+                type: integer
+              textValue:
+                type: string
+
+    FeedbackResult:
+      type: object
+      properties:
+        session_id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        location_name:
+          type: string
+        questionnaire_name:
+          type: string
+        question_id:
+          type: integer
+        question_text:
+          type: string
+        question_type:
+          type: string
+        value:
+          type: integer
+        text_value:
+          type: string
