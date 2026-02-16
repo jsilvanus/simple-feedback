@@ -86,10 +86,10 @@ export default function AdminResults() {
         byQuestion[result.question_text].values.push(result.value);
       }
       if (result.text_value) {
-        // For word cloud, translate words to Finnish for analytics
+        // For word cloud, normalize words to Finnish for analytics
         if (result.question_type === 'wordcloud' && result.word_cloud_words) {
-          const translatedText = translateToFinnish(result.text_value, result.word_cloud_words);
-          byQuestion[result.question_text].texts.push(translatedText);
+          const normalizedText = normalizeToFinnish(result.text_value, result.word_cloud_words);
+          byQuestion[result.question_text].texts.push(normalizedText);
         } else {
           byQuestion[result.question_text].texts.push(result.text_value);
         }
@@ -103,8 +103,8 @@ export default function AdminResults() {
     });
   };
 
-  // Helper function to translate word cloud answers to Finnish
-  const translateToFinnish = (textValue, wordCloudWords) => {
+  // Helper function to normalize word cloud answers to Finnish for consistent admin analytics
+  const normalizeToFinnish = (textValue, wordCloudWords) => {
     if (!textValue || !wordCloudWords) return textValue;
     
     try {
@@ -130,11 +130,11 @@ export default function AdminResults() {
       
       // Split the stored text and translate each word
       const selectedWords = textValue.split(',').map(w => w.trim());
-      const translatedWords = selectedWords.map(word => translationMap[word] || word);
+      const normalizedWords = selectedWords.map(word => translationMap[word] || word);
       
-      return translatedWords.join(', ');
+      return normalizedWords.join(', ');
     } catch (e) {
-      console.error('Error translating word cloud text:', e);
+      console.error('Error normalizing word cloud text to Finnish:', textValue, e);
       return textValue;
     }
   };
