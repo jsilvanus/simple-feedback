@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './RadarChart.css';
 
-export default function RadarChart({ question, value, onChange }) {
+export default function RadarChart({ question, value, onChange, readOnly = false }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const onChangeRef = useRef(onChange);
   const [dimensions, setDimensions] = useState({ width: 400, height: 400 });
 
   const scaleButtons = question.answerScale?.buttons || [];
@@ -46,10 +47,16 @@ export default function RadarChart({ question, value, onChange }) {
 
   const numAxes = axes.length;
 
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   // Update parent component when values change
   useEffect(() => {
-    onChange(values);
-  }, [values, onChange]);
+    if (!readOnly && typeof onChangeRef.current === 'function') {
+      onChangeRef.current(values);
+    }
+  }, [values, readOnly]);
 
   // Handle responsive sizing
   useEffect(() => {
@@ -334,6 +341,8 @@ export default function RadarChart({ question, value, onChange }) {
   };
 
   const handleCanvasClick = (e) => {
+    if (readOnly) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -458,7 +467,7 @@ export default function RadarChart({ question, value, onChange }) {
         ref={canvasRef}
         width={dimensions.width}
         height={dimensions.height}
-        onClick={handleCanvasClick}
+        onClick={readOnly ? undefined : handleCanvasClick}
         className="radar-chart-canvas"
       />
     </div>

@@ -1227,6 +1227,9 @@ router.get('/results', async (req, res, next) => {
         quest.type as question_type,
         fa.value,
         fa.text_value,
+        quest.answer_scale_id,
+        a.buttons as answer_scale_buttons,
+        quest.continuous_axes,
         quest.word_cloud_options_id,
         wco.words as word_cloud_words
       FROM feedback_sessions fs
@@ -1234,6 +1237,7 @@ router.get('/results', async (req, res, next) => {
       JOIN questionnaires q ON fs.questionnaire_id = q.id
       JOIN feedback_answers fa ON fs.id = fa.session_id
       JOIN questions quest ON fa.question_id = quest.id
+      LEFT JOIN answer_scales a ON quest.answer_scale_id = a.id
       LEFT JOIN word_cloud_options wco ON quest.word_cloud_options_id = wco.id
       WHERE 1=1
     `;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
+import RadarChart from './RadarChart';
 import './AdminResults.css';
 
 export default function AdminResults() {
@@ -81,6 +82,9 @@ export default function AdminResults() {
           type: result.question_type,
           values: [],
           texts: [],
+          continuousAnswers: [],
+          answerScaleButtons: result.answer_scale_buttons || [],
+          continuousAxes: result.continuous_axes || [],
           wordCloudWords: result.word_cloud_words || null,
         };
       }
@@ -88,6 +92,21 @@ export default function AdminResults() {
         byQuestion[result.question_text].values.push(result.value);
       }
       if (result.text_value) {
+        if (result.question_type === 'continuous_scale') {
+          try {
+            const parsed = typeof result.text_value === 'string'
+              ? JSON.parse(result.text_value)
+              : result.text_value;
+
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              byQuestion[result.question_text].continuousAnswers.push(parsed);
+            }
+          } catch (parseError) {
+            console.error('Error parsing continuous scale answer:', result.text_value, parseError);
+          }
+          return;
+        }
+
         // For word cloud, normalize words to Finnish for analytics
         if (result.question_type === 'wordcloud' && result.word_cloud_words) {
           const normalizedText = normalizeToFinnish(result.text_value, result.word_cloud_words);
@@ -224,6 +243,31 @@ export default function AdminResults() {
 
     const ratio = (count - 1) / (maxCount - 1);
     return Math.round(minSize + ratio * (maxSize - minSize));
+  };
+
+  const getContinuousAverages = (answers) => {
+    const axisTotals = {};
+    const axisCounts = {};
+
+    answers.forEach((answer) => {
+      Object.entries(answer).forEach(([axisId, rawValue]) => {
+        const numericValue = Number(rawValue);
+        if (Number.isNaN(numericValue)) return;
+
+        axisTotals[axisId] = (axisTotals[axisId] || 0) + numericValue;
+        axisCounts[axisId] = (axisCounts[axisId] || 0) + 1;
+      });
+    });
+
+    const averages = {};
+    Object.keys(axisTotals).forEach((axisId) => {
+      averages[axisId] = axisTotals[axisId] / axisCounts[axisId];
+    });
+
+    return {
+      averages,
+      counts: axisCounts,
+    };
   };
 
   if (loading) return <div className="loading">{t('admin.loadingResults')}</div>;
@@ -405,6 +449,54 @@ export default function AdminResults() {
                     );
                   })()}
                 </div>
+              </div>
+            )}
+
+            {data.type === 'continuous_scale' && data.continuousAnswers.length > 0 && (
+              <div className="continuous-analytics">
+                <div className="stat-row">
+                  <span>Total Responses:</span>
+                  <strong>{data.continuousAnswers.length}</strong>
+                </div>
+
+                {(() => {
+                  const { averages, counts } = getContinuousAverages(data.continuousAnswers);
+                  const fallbackAxes = Object.keys(averages).map((axisId, index) => ({
+                    id: axisId,
+                    label: `Axis ${index + 1}`,
+                  }));
+                  const axes = Array.isArray(data.continuousAxes) && data.continuousAxes.length > 0
+                    ? data.continuousAxes
+                    : fallbackAxes;
+
+                  return (
+                    <>
+                      <div className="continuous-chart-wrapper">
+                        <RadarChart
+                          question={{
+                            answerScale: { buttons: data.answerScaleButtons || [] },
+                            continuousAxes: axes,
+                          }}
+                          value={averages}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      </div>
+
+                      <div className="continuous-axis-list">
+                        {axes.map((axis) => (
+                          <div key={axis.id} className="continuous-axis-item">
+                            <span>{axis.label || axis.id}</span>
+                            <strong>
+                              {averages[axis.id] !== undefined ? averages[axis.id].toFixed(2) : '-'}
+                              {counts[axis.id] ? ` (${counts[axis.id]})` : ''}
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
