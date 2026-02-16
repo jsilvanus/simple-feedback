@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Scale / Radar Chart Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .demo-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .demo-section h2 {
+            margin-top: 0;
+            color: #0066ff;
+            border-bottom: 2px solid #0066ff;
+            padding-bottom: 10px;
+        }
+        
+        .demo-section p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        canvas {
+            display: block;
+            margin: 20px auto;
+            cursor: pointer;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        canvas:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .values-display {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: monospace;
+        }
+        
+        .values-display h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .value-item {
+            padding: 5px 0;
+            color: #666;
+        }
+        
+        .instructions {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📡 Continuous Scale / Radar Chart Demo</h1>
+    
+    <div class="demo-section">
+        <h2>1️⃣ Single Axis - Line with Gradient</h2>
+        <p>Click anywhere on the line to set your satisfaction level (0-100).</p>
+        <div class="instructions">
+            <strong>Try it:</strong> Click on different parts of the line to see the value change.
+        </div>
+        <canvas id="canvas1" width="600" height="200"></canvas>
+        <div class="values-display">
+            <h3>Current Values:</h3>
+            <div id="values1" class="value-item">Overall Satisfaction: 0</div>
+        </div>
+    </div>
+    
+    <div class="demo-section">
+        <h2>2️⃣ Two Axes - V Shape</h2>
+        <p>Click on either line to rate Quality or Speed independently (1-10).</p>
+        <div class="instructions">
+            <strong>Try it:</strong> Click on the left line to adjust Quality, or the right line to adjust Speed.
+        </div>
+        <canvas id="canvas2" width="600" height="500"></canvas>
+        <div class="values-display">
+            <h3>Current Values:</h3>
+            <div id="values2">
+                <div class="value-item">Quality: 1</div>
+                <div class="value-item">Speed: 1</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="demo-section">
+        <h2>3️⃣ Three Axes - Triangle Radar</h2>
+        <p>Click near any axis to rate that dimension (0-10).</p>
+        <div class="instructions">
+            <strong>Try it:</strong> Click near any of the three axes to adjust that value.
+        </div>
+        <canvas id="canvas3" width="500" height="500"></canvas>
+        <div class="values-display">
+            <h3>Current Values:</h3>
+            <div id="values3">
+                <div class="value-item">Product Quality: 0</div>
+                <div class="value-item">Customer Service: 0</div>
+                <div class="value-item">Value for Money: 0</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="demo-section">
+        <h2>5️⃣ Five Axes - Full Radar Chart</h2>
+        <p>Click near any axis to rate different aspects of the restaurant experience (0-10).</p>
+        <div class="instructions">
+            <strong>Try it:</strong> Build your feedback polygon by clicking near each axis to set values.
+        </div>
+        <canvas id="canvas5" width="600" height="600"></canvas>
+        <div class="values-display">
+            <h3>Current Values:</h3>
+            <div id="values5">
+                <div class="value-item">Food Quality: 0</div>
+                <div class="value-item">Service: 0</div>
+                <div class="value-item">Atmosphere: 0</div>
+                <div class="value-item">Value: 0</div>
+                <div class="value-item">Cleanliness: 0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Demo 1: Single axis line
+        class SingleAxisChart {
+            constructor(canvasId, valueDisplayId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.valueDisplay = document.getElementById(valueDisplayId);
+                this.value = 0;
+                this.min = 0;
+                this.max = 100;
+                
+                this.canvas.addEventListener('click', (e) => this.handleClick(e));
+                this.draw();
+            }
+            
+            draw() {
+                const ctx = this.ctx;
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+                const centerY = height / 2;
+                const lineWidth = width - 80;
+                const startX = 40;
+                const lineHeight = 40;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                // Draw gradient background
+                const gradient = ctx.createLinearGradient(startX, centerY, startX + lineWidth, centerY);
+                gradient.addColorStop(0, '#ff4444');
+                gradient.addColorStop(0.5, '#ffcc00');
+                gradient.addColorStop(1, '#44ff44');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(startX, centerY - lineHeight/2, lineWidth, lineHeight);
+                
+                // Draw scale marks
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                for (let i = 0; i <= 10; i++) {
+                    const x = startX + (lineWidth * i / 10);
+                    ctx.beginPath();
+                    ctx.moveTo(x, centerY - lineHeight/2 - 5);
+                    ctx.lineTo(x, centerY + lineHeight/2 + 5);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#333';
+                    ctx.font = '12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(i * 10, x, centerY + lineHeight/2 + 20);
+                }
+                
+                // Draw current value marker
+                const ratio = this.value / this.max;
+                const markerX = startX + lineWidth * ratio;
+                
+                ctx.fillStyle = '#0066ff';
+                ctx.beginPath();
+                ctx.arc(markerX, centerY, 12, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(markerX, centerY, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Update display
+                this.valueDisplay.textContent = `Overall Satisfaction: ${Math.round(this.value)}`;
+            }
+            
+            handleClick(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const startX = 40;
+                const lineWidth = this.canvas.width - 80;
+                
+                if (x >= startX && x <= startX + lineWidth) {
+                    const ratio = (x - startX) / lineWidth;
+                    this.value = this.min + (this.max - this.min) * ratio;
+                    this.draw();
+                }
+            }
+        }
+        
+        // Demo 2: V-shape (two axes)
+        class VShapeChart {
+            constructor(canvasId, valueDisplayId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.valueDisplay = document.getElementById(valueDisplayId);
+                this.values = { quality: 1, speed: 1 };
+                this.min = 1;
+                this.max = 10;
+                
+                this.canvas.addEventListener('click', (e) => this.handleClick(e));
+                this.draw();
+            }
+            
+            draw() {
+                const ctx = this.ctx;
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+                const centerX = width / 2;
+                const centerY = 100;
+                const angle = Math.PI / 4;
+                const length = 300;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                const leftEndX = centerX - Math.cos(angle) * length;
+                const leftEndY = centerY + Math.sin(angle) * length;
+                const rightEndX = centerX + Math.cos(angle) * length;
+                const rightEndY = centerY + Math.sin(angle) * length;
+                
+                // Draw background lines
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 20;
+                ctx.lineCap = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(leftEndX, leftEndY);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(rightEndX, rightEndY);
+                ctx.stroke();
+                
+                // Draw value lines with gradient
+                const drawValueLine = (startX, startY, endX, endY, value) => {
+                    const ratio = (value - this.min) / (this.max - this.min);
+                    const valueX = startX + (endX - startX) * ratio;
+                    const valueY = startY + (endY - startY) * ratio;
+                    
+                    const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+                    gradient.addColorStop(0, '#ff4444');
+                    gradient.addColorStop(0.5, '#ffcc00');
+                    gradient.addColorStop(1, '#44ff44');
+                    
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = 18;
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(valueX, valueY);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#0066ff';
+                    ctx.beginPath();
+                    ctx.arc(valueX, valueY, 12, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(valueX, valueY, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+                };
+                
+                drawValueLine(centerX, centerY, leftEndX, leftEndY, this.values.quality);
+                drawValueLine(centerX, centerY, rightEndX, rightEndY, this.values.speed);
+                
+                // Draw labels
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Quality', leftEndX, leftEndY + 30);
+                ctx.fillText('Speed', rightEndX, rightEndY + 30);
+                
+                // Update display
+                this.valueDisplay.innerHTML = `
+                    <div class="value-item">Quality: ${this.values.quality.toFixed(1)}</div>
+                    <div class="value-item">Speed: ${this.values.speed.toFixed(1)}</div>
+                `;
+            }
+            
+            handleClick(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = this.canvas.width / 2;
+                const centerY = 100;
+                const angle = Math.PI / 4;
+                const length = 300;
+                
+                const leftEndX = centerX - Math.cos(angle) * length;
+                const leftEndY = centerY + Math.sin(angle) * length;
+                const rightEndX = centerX + Math.cos(angle) * length;
+                const rightEndY = centerY + Math.sin(angle) * length;
+                
+                const distToLeft = this.distanceToLine(x, y, centerX, centerY, leftEndX, leftEndY);
+                const distToRight = this.distanceToLine(x, y, centerX, centerY, rightEndX, rightEndY);
+                
+                if (distToLeft < 30) {
+                    const ratio = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)) / length;
+                    this.values.quality = Math.max(this.min, Math.min(this.max, this.min + (this.max - this.min) * ratio));
+                    this.draw();
+                } else if (distToRight < 30) {
+                    const ratio = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)) / length;
+                    this.values.speed = Math.max(this.min, Math.min(this.max, this.min + (this.max - this.min) * ratio));
+                    this.draw();
+                }
+            }
+            
+            distanceToLine(px, py, x1, y1, x2, y2) {
+                const A = px - x1;
+                const B = py - y1;
+                const C = x2 - x1;
+                const D = y2 - y1;
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                let param = lenSq !== 0 ? dot / lenSq : -1;
+                
+                let xx, yy;
+                if (param < 0) {
+                    xx = x1; yy = y1;
+                } else if (param > 1) {
+                    xx = x2; yy = y2;
+                } else {
+                    xx = x1 + param * C;
+                    yy = y1 + param * D;
+                }
+                
+                return Math.sqrt(Math.pow(px - xx, 2) + Math.pow(py - yy, 2));
+            }
+        }
+        
+        // Demo 3 & 5: Radar chart
+        class RadarChart {
+            constructor(canvasId, valueDisplayId, axes) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.valueDisplay = document.getElementById(valueDisplayId);
+                this.axes = axes;
+                this.values = {};
+                
+                axes.forEach(axis => {
+                    this.values[axis.id] = axis.min;
+                });
+                
+                this.canvas.addEventListener('click', (e) => this.handleClick(e));
+                this.draw();
+            }
+            
+            draw() {
+                const ctx = this.ctx;
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const maxRadius = Math.min(width, height) * 0.35;
+                const numAxes = this.axes.length;
+                const angleStep = (2 * Math.PI) / numAxes;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                // Draw background circles
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                for (let i = 1; i <= 5; i++) {
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, (maxRadius * i) / 5, 0, 2 * Math.PI);
+                    ctx.stroke();
+                }
+                
+                // Draw axes lines
+                ctx.strokeStyle = '#ccc';
+                ctx.lineWidth = 2;
+                this.axes.forEach((axis, i) => {
+                    const angle = i * angleStep - Math.PI / 2;
+                    const x = centerX + Math.cos(angle) * maxRadius;
+                    const y = centerY + Math.sin(angle) * maxRadius;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                });
+                
+                // Draw value polygon
+                ctx.fillStyle = 'rgba(0, 102, 255, 0.3)';
+                ctx.strokeStyle = '#0066ff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                this.axes.forEach((axis, i) => {
+                    const angle = i * angleStep - Math.PI / 2;
+                    const value = this.values[axis.id];
+                    const ratio = (value - axis.min) / (axis.max - axis.min);
+                    const radius = maxRadius * ratio;
+                    
+                    const x = centerX + Math.cos(angle) * radius;
+                    const y = centerY + Math.sin(angle) * radius;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                // Draw value points and labels
+                this.axes.forEach((axis, i) => {
+                    const angle = i * angleStep - Math.PI / 2;
+                    const value = this.values[axis.id];
+                    const ratio = (value - axis.min) / (axis.max - axis.min);
+                    const radius = maxRadius * ratio;
+                    
+                    const x = centerX + Math.cos(angle) * radius;
+                    const y = centerY + Math.sin(angle) * radius;
+                    
+                    ctx.fillStyle = '#0066ff';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    const labelRadius = maxRadius + 30;
+                    const labelX = centerX + Math.cos(angle) * labelRadius;
+                    const labelY = centerY + Math.sin(angle) * labelRadius;
+                    
+                    ctx.fillStyle = '#333';
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(axis.label, labelX, labelY);
+                    
+                    ctx.font = '11px sans-serif';
+                    ctx.fillText(value.toFixed(1), labelX, labelY + 15);
+                });
+                
+                // Update display
+                let html = '';
+                this.axes.forEach(axis => {
+                    html += `<div class="value-item">${axis.label}: ${this.values[axis.id].toFixed(1)}</div>`;
+                });
+                this.valueDisplay.innerHTML = html;
+            }
+            
+            handleClick(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                const maxRadius = Math.min(this.canvas.width, this.canvas.height) * 0.35;
+                
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                let clickAngle = Math.atan2(dy, dx) + Math.PI / 2;
+                if (clickAngle < 0) clickAngle += 2 * Math.PI;
+                
+                const angleStep = (2 * Math.PI) / this.axes.length;
+                const closestAxisIndex = Math.round(clickAngle / angleStep) % this.axes.length;
+                const axis = this.axes[closestAxisIndex];
+                
+                const ratio = Math.min(distance / maxRadius, 1);
+                this.values[axis.id] = axis.min + (axis.max - axis.min) * ratio;
+                
+                this.draw();
+            }
+        }
+        
+        // Initialize demos
+        new SingleAxisChart('canvas1', 'values1');
+        new VShapeChart('canvas2', 'values2');
+        
+        new RadarChart('canvas3', 'values3', [
+            { id: 1, label: 'Product Quality', min: 0, max: 10 },
+            { id: 2, label: 'Customer Service', min: 0, max: 10 },
+            { id: 3, label: 'Value for Money', min: 0, max: 10 }
+        ]);
+        
+        new RadarChart('canvas5', 'values5', [
+            { id: 1, label: 'Food Quality', min: 0, max: 10 },
+            { id: 2, label: 'Service', min: 0, max: 10 },
+            { id: 3, label: 'Atmosphere', min: 0, max: 10 },
+            { id: 4, label: 'Value', min: 0, max: 10 },
+            { id: 5, label: 'Cleanliness', min: 0, max: 10 }
+        ]);
+    </script>
+</body>
+</html>

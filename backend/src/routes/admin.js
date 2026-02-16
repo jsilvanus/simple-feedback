@@ -48,101 +48,111 @@ router.use(apiLimiter);
  * Get all locations
  */
 router.get('/locations', async (req, res, next) => {
-  try {
-    const result = await db.query(
-      'SELECT * FROM locations ORDER BY name'
-    );
-    res.json(result.rows);
-  } catch (error) {
-    next(error);
-  }
-});
+  /**
+   * PUT /api/admin/answer-scales/:id
+   * Update an answer scale
+   */
+  router.put('/answer-scales/:id', async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { name, buttons } = req.body;
 
-/**
- * POST /api/admin/locations
- * Create a new location
- */
-router.post('/locations', async (req, res, next) => {
-  try {
-    const { slug, name, active, password, passwordRequired } = req.body;
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
 
-    if (!slug || !name) {
-      return res.status(400).json({ error: { message: 'Slug and name are required' } });
-    }
-
-    let passwordHash = null;
-    if (password) {
-      passwordHash = await bcrypt.hash(password, 10);
-    }
-
-    const result = await db.query(
-      'INSERT INTO locations (slug, name, active, password_hash, password_required) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [slug, name, active !== undefined ? active : true, passwordHash, passwordRequired || false]
-    );
-
-    // Don't return password hash in response
-    const location = { ...result.rows[0] };
-    delete location.password_hash;
-
-    res.status(201).json(location);
-  } catch (error) {
-    if (error.code === '23505') { // Unique violation
-      return res.status(409).json({ error: { message: 'Location with this slug already exists' } });
-    }
-    next(error);
-  }
-});
-
-/**
- * PUT /api/admin/locations/:id
- * Update a location
- */
-router.put('/locations/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { slug, name, active, password, passwordRequired } = req.body;
-
-    // Build update query dynamically based on provided fields
-    const updates = [];
-    const values = [];
-    let paramCount = 1;
-
-    if (slug !== undefined) {
-      updates.push(`slug = $${paramCount++}`);
-      values.push(slug);
-    }
-    if (name !== undefined) {
-      updates.push(`name = $${paramCount++}`);
-      values.push(name);
-    }
-    if (active !== undefined) {
-      updates.push(`active = $${paramCount++}`);
-      values.push(active);
-    }
-    if (passwordRequired !== undefined) {
-      updates.push(`password_required = $${paramCount++}`);
-      values.push(passwordRequired);
-    }
-    if (password !== undefined) {
-      if (password === null || password === '') {
-        // Clear password
-        updates.push(`password_hash = NULL`);
-        updates.push(`password_required = false`);
-      } else {
-        // Set new password
-        const passwordHash = await bcrypt.hash(password, 10);
-        updates.push(`password_hash = $${paramCount++}`);
-        values.push(passwordHash);
+      if (name !== undefined) {
+        updates.push(`name = $${paramCount++}`);
+        values.push(name);
       }
+      if (buttons !== undefined) {
+        if (!Array.isArray(buttons)) {
+          return res.status(400).json({ error: { message: 'Buttons must be an array' } });
+        }
+        updates.push(`buttons = $${paramCount++}`);
+        values.push(JSON.stringify(buttons));
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({ error: { message: 'No fields to update' } });
+      }
+
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(id);
+
+      const query = `UPDATE answer_scales SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+      const result = await db.query(query, values);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: { message: 'Answer scale not found' } });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      next(error);
     }
+  });
 
-    if (updates.length === 0) {
-      return res.status(400).json({ error: { message: 'No fields to update' } });
+  /**
+   * DELETE /api/admin/answer-scales/:id
+   * Delete an answer scale
+   */
+  router.delete('/answer-scales/:id', async (req, res, next) => {
+    try {
+      const { id } = req.params;
+
+      const result = await db.query(
+        'DELETE FROM answer_scales WHERE id = $1 RETURNING id',
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: { message: 'Answer scale not found' } });
+      }
+
+      res.json({ success: true, message: 'Answer scale deleted successfully' });
+    } catch (error) {
+      next(error);
     }
+  });
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    values.push(id);
+  /**
+   * GET /api/admin/word-cloud-options
+   * Get all word cloud options
+   */
+  router.get('/word-cloud-options', async (req, res, next) => {
+    try {
+      const result = await db.query(
+        'SELECT * FROM word_cloud_options ORDER BY name'
+      );
+      res.json(result.rows);
+    } catch (error) {
+      next(error);
+    }
+  });
 
+  /**
+   * POST /api/admin/word-cloud-options
+   * Create a new word cloud option set
+   */
+  router.post('/word-cloud-options', async (req, res, next) => {
+    try {
+      const { name, words } = req.body;
+
+      if (!name || !words || !Array.isArray(words)) {
+        return res.status(400).json({ error: { message: 'Name and words array are required' } });
+      }
+
+      const result = await db.query(
+        'INSERT INTO word_cloud_options (name, words) VALUES ($1, $2) RETURNING *',
+        [name, JSON.stringify(words)]
+      );
+
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      next(error);
+    }
+  });
     const query = `UPDATE locations SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
     const result = await db.query(query, values);
 
@@ -159,6 +169,137 @@ router.put('/locations/:id', async (req, res, next) => {
     if (error.code === '23505') {
       return res.status(409).json({ error: { message: 'Location with this slug already exists' } });
     }
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/locations/:id
+ * Delete a location
+ */
+router.delete('/locations/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM locations WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location not found' } });
+    }
+
+    res.json({ success: true, message: 'Location deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/location-groups
+ * Get all location groups
+ */
+router.get('/location-groups', async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM location_groups ORDER BY name'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/location-groups
+ * Create a new location group
+ */
+router.post('/location-groups', async (req, res, next) => {
+  try {
+    const { name, description, active } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: { message: 'Name is required' } });
+    }
+
+    const result = await db.query(
+      'INSERT INTO location_groups (name, description, active) VALUES ($1, $2, $3) RETURNING *',
+      [name, description, active !== undefined ? active : true]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/location-groups/:id
+ * Update a location group
+ */
+router.put('/location-groups/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, description, active } = req.body;
+
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramCount++}`);
+      values.push(description);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const query = `UPDATE location_groups SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location group not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/location-groups/:id
+ * Delete a location group
+ */
+router.delete('/location-groups/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM location_groups WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location group not found' } });
+    }
+
+    res.json({ success: true, message: 'Location group deleted successfully' });
+  } catch (error) {
     next(error);
   }
 });
@@ -196,7 +337,7 @@ router.post('/questions', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Text and type are required' } });
     }
 
-    if (!['scale', 'text', 'wordcloud'].includes(type)) {
+    if (!['scale', 'text', 'wordcloud', 'continuous_scale'].includes(type)) {
       return res.status(400).json({ error: { message: 'Invalid question type' } });
     }
 
@@ -206,6 +347,51 @@ router.post('/questions', async (req, res, next) => {
     );
 
     res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/questions/:id
+ * Update a question
+ */
+router.put('/questions/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { text, type } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (text !== undefined) {
+      updates.push(`text = $${paramCount++}`);
+      values.push(text);
+    }
+    if (type !== undefined) {
+      if (!['scale', 'text', 'wordcloud', 'continuous_scale'].includes(type)) {
+        return res.status(400).json({ error: { message: 'Invalid question type' } });
+      }
+      updates.push(`type = $${paramCount++}`);
+      values.push(type);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const query = `UPDATE questions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Question not found' } });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
     next(error);
   }
@@ -269,44 +455,6 @@ router.post('/answer-scales', async (req, res, next) => {
     const result = await db.query(
       'INSERT INTO answer_scales (name, buttons) VALUES ($1, $2) RETURNING *',
       [name, JSON.stringify(buttons)]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * GET /api/admin/word-cloud-options
- * Get all word cloud options
- */
-router.get('/word-cloud-options', async (req, res, next) => {
-  try {
-    const result = await db.query(
-      'SELECT * FROM word_cloud_options ORDER BY name'
-    );
-    res.json(result.rows);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * POST /api/admin/word-cloud-options
- * Create a new word cloud option set
- */
-router.post('/word-cloud-options', async (req, res, next) => {
-  try {
-    const { name, words } = req.body;
-
-    if (!name || !words || !Array.isArray(words)) {
-      return res.status(400).json({ error: { message: 'Name and words array are required' } });
-    }
-
-    const result = await db.query(
-      'INSERT INTO word_cloud_options (name, words) VALUES ($1, $2) RETURNING *',
-      [name, JSON.stringify(words)]
     );
 
     res.status(201).json(result.rows[0]);
@@ -382,19 +530,132 @@ router.post('/questionnaires', async (req, res, next) => {
 });
 
 /**
+ * PUT /api/admin/questionnaires/:id
+ * Update a questionnaire
+ */
+router.put('/questionnaires/:id', async (req, res, next) => {
+  const client = await db.pool.connect();
+  
+  try {
+    const { id } = req.params;
+    const { name, description, questions } = req.body;
+
+    await client.query('BEGIN');
+
+    // Update questionnaire basic info
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramCount++}`);
+      values.push(description);
+    }
+
+    if (updates.length > 0) {
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(id);
+
+      const query = `UPDATE questionnaires SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+      const result = await client.query(query, values);
+
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: { message: 'Questionnaire not found' } });
+      }
+    }
+
+    // Update questions if provided
+    if (questions !== undefined && Array.isArray(questions)) {
+      // Delete existing questions
+      await client.query(
+        'DELETE FROM questionnaire_questions WHERE questionnaire_id = $1',
+        [id]
+      );
+
+      // Add new questions
+      for (const q of questions) {
+        await client.query(
+          'INSERT INTO questionnaire_questions (questionnaire_id, question_id, page_number, answer_scale_id, word_cloud_options_id, max_selections, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [
+            id,
+            q.questionId,
+            q.pageNumber || 1,
+            q.answerScaleId || null,
+            q.wordCloudOptionsId || null,
+            q.maxSelections || 3,
+            q.orderIndex || 0,
+          ]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    // Fetch updated questionnaire
+    const result = await db.query('SELECT * FROM questionnaires WHERE id = $1', [id]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+/**
  * GET /api/admin/schedules
- * Get all schedules
+ * Get all schedules with their questionnaires
  */
 router.get('/schedules', async (req, res, next) => {
   try {
-    const result = await db.query(
-      `SELECT s.*, l.name as location_name, q.name as questionnaire_name
+    // Get all schedules with location and location group info
+    const schedulesResult = await db.query(
+      `SELECT s.*, 
+              l.name as location_name, l.slug as location_slug,
+              lg.name as location_group_name
        FROM schedules s
-       JOIN locations l ON s.location_id = l.id
-       JOIN questionnaires q ON s.questionnaire_id = q.id
+       LEFT JOIN locations l ON s.location_id = l.id
+       LEFT JOIN location_groups lg ON s.location_group_id = lg.id
        ORDER BY s.start_time DESC`
     );
-    res.json(result.rows);
+
+    // For each schedule, get associated questionnaires
+    const schedules = await Promise.all(
+      schedulesResult.rows.map(async (schedule) => {
+        // Try to get questionnaires from junction table first
+        let questionnairesResult = await db.query(
+          `SELECT q.id, q.name, sq.display_order
+           FROM schedule_questionnaires sq
+           JOIN questionnaires q ON sq.questionnaire_id = q.id
+           WHERE sq.schedule_id = $1
+           ORDER BY sq.display_order`,
+          [schedule.id]
+        );
+
+        // If no questionnaires in junction table and legacy questionnaire_id exists, use that
+        if (questionnairesResult.rows.length === 0 && schedule.questionnaire_id) {
+          const legacyResult = await db.query(
+            'SELECT id, name FROM questionnaires WHERE id = $1',
+            [schedule.questionnaire_id]
+          );
+          questionnairesResult.rows = legacyResult.rows.map(q => ({ ...q, display_order: 0 }));
+        }
+
+        return {
+          ...schedule,
+          questionnaires: questionnairesResult.rows,
+          // For backward compatibility
+          questionnaire_name: questionnairesResult.rows[0]?.name || null,
+        };
+      })
+    );
+
+    res.json(schedules);
   } catch (error) {
     next(error);
   }
@@ -433,21 +694,227 @@ router.patch('/questionnaires/:id/archive', async (req, res, next) => {
  * Create a new schedule
  */
 router.post('/schedules', async (req, res, next) => {
+  const client = await db.pool.connect();
+  
   try {
-    const { locationId, questionnaireId, startTime, endTime } = req.body;
+    const { 
+      locationId,
+      locationGroupId,  // NEW: Support for location groups
+      questionnaireIds, // Array of questionnaire IDs
+      scheduleType,     // 'date_based' or 'recurring_weekday'
+      startTime,        // For date_based
+      endTime,          // For date_based
+      weekdayPattern,   // For recurring_weekday: {days: [1,2,3], start_hour: "09:00", end_hour: "17:00"}
+      showOnlyOne       // Boolean
+    } = req.body;
 
-    if (!locationId || !questionnaireId || !startTime || !endTime) {
+    // Must have either locationId or locationGroupId, but not both
+    if (!locationId && !locationGroupId) {
       return res.status(400).json({ 
-        error: { message: 'locationId, questionnaireId, startTime, and endTime are required' } 
+        error: { message: 'Either locationId or locationGroupId is required' } 
       });
     }
 
-    const result = await db.query(
-      'INSERT INTO schedules (location_id, questionnaire_id, start_time, end_time) VALUES ($1, $2, $3, $4) RETURNING *',
-      [locationId, questionnaireId, startTime, endTime]
+    if (locationId && locationGroupId) {
+      return res.status(400).json({ 
+        error: { message: 'Cannot specify both locationId and locationGroupId' } 
+      });
+    }
+
+    if (!questionnaireIds || !Array.isArray(questionnaireIds) || questionnaireIds.length === 0) {
+      return res.status(400).json({ 
+        error: { message: 'questionnaireIds array is required and must not be empty' } 
+      });
+    }
+
+    const type = scheduleType || 'date_based';
+
+    // Validate based on schedule type
+    if (type === 'date_based') {
+      if (!startTime || !endTime) {
+        return res.status(400).json({ 
+          error: { message: 'startTime and endTime are required for date_based schedules' } 
+        });
+      }
+    } else if (type === 'recurring_weekday') {
+      if (!weekdayPattern || !weekdayPattern.days || !weekdayPattern.start_hour || !weekdayPattern.end_hour) {
+        return res.status(400).json({ 
+          error: { message: 'weekdayPattern with days, start_hour, and end_hour is required for recurring_weekday schedules' } 
+        });
+      }
+    } else {
+      return res.status(400).json({ 
+        error: { message: 'scheduleType must be either date_based or recurring_weekday' } 
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Create schedule
+    const scheduleResult = await client.query(
+      `INSERT INTO schedules 
+       (location_id, location_group_id, schedule_type, start_time, end_time, weekday_pattern, show_only_one) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+       RETURNING *`,
+      [
+        locationId || null,
+        locationGroupId || null,
+        type,
+        type === 'date_based' ? startTime : null,
+        type === 'date_based' ? endTime : null,
+        type === 'recurring_weekday' ? JSON.stringify(weekdayPattern) : null,
+        showOnlyOne || false
+      ]
     );
 
-    res.status(201).json(result.rows[0]);
+    const scheduleId = scheduleResult.rows[0].id;
+
+    // Add questionnaires to junction table
+    for (let i = 0; i < questionnaireIds.length; i++) {
+      await client.query(
+        'INSERT INTO schedule_questionnaires (schedule_id, questionnaire_id, display_order) VALUES ($1, $2, $3)',
+        [scheduleId, questionnaireIds[i], i]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json(scheduleResult.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * PUT /api/admin/schedules/:id
+ * Update a schedule
+ */
+router.put('/schedules/:id', async (req, res, next) => {
+  const client = await db.pool.connect();
+  
+  try {
+    const { id } = req.params;
+    const { 
+      locationId,
+      locationGroupId, // NEW: Support for location groups
+      questionnaireIds,
+      scheduleType,
+      startTime,
+      endTime,
+      weekdayPattern,
+      showOnlyOne
+    } = req.body;
+
+    await client.query('BEGIN');
+
+    // Build update query
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (locationId !== undefined) {
+      updates.push(`location_id = $${paramCount++}`);
+      const cleanLocationId = locationId === '' || locationId === null ? null : locationId;
+      values.push(cleanLocationId);
+      // If setting locationId to a non-null value, clear locationGroupId
+      if (cleanLocationId !== null) {
+        updates.push(`location_group_id = NULL`);
+      }
+    }
+    if (locationGroupId !== undefined) {
+      updates.push(`location_group_id = $${paramCount++}`);
+      const cleanLocationGroupId = locationGroupId === '' || locationGroupId === null ? null : locationGroupId;
+      values.push(cleanLocationGroupId);
+      // If setting locationGroupId to a non-null value, clear locationId
+      if (cleanLocationGroupId !== null) {
+        updates.push(`location_id = NULL`);
+      }
+    }
+    if (scheduleType !== undefined) {
+      updates.push(`schedule_type = $${paramCount++}`);
+      values.push(scheduleType);
+    }
+    if (startTime !== undefined) {
+      updates.push(`start_time = $${paramCount++}`);
+      values.push(startTime);
+    }
+    if (endTime !== undefined) {
+      updates.push(`end_time = $${paramCount++}`);
+      values.push(endTime);
+    }
+    if (weekdayPattern !== undefined) {
+      updates.push(`weekday_pattern = $${paramCount++}`);
+      values.push(weekdayPattern ? JSON.stringify(weekdayPattern) : null);
+    }
+    if (showOnlyOne !== undefined) {
+      updates.push(`show_only_one = $${paramCount++}`);
+      values.push(showOnlyOne);
+    }
+
+    if (updates.length > 0) {
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(id);
+
+      const query = `UPDATE schedules SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+      const result = await client.query(query, values);
+
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: { message: 'Schedule not found' } });
+      }
+    }
+
+    // Update questionnaires if provided
+    if (questionnaireIds !== undefined && Array.isArray(questionnaireIds)) {
+      // Delete existing questionnaires
+      await client.query(
+        'DELETE FROM schedule_questionnaires WHERE schedule_id = $1',
+        [id]
+      );
+
+      // Add new questionnaires
+      for (let i = 0; i < questionnaireIds.length; i++) {
+        await client.query(
+          'INSERT INTO schedule_questionnaires (schedule_id, questionnaire_id, display_order) VALUES ($1, $2, $3)',
+          [id, questionnaireIds[i], i]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    // Fetch updated schedule
+    const result = await db.query('SELECT * FROM schedules WHERE id = $1', [id]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * DELETE /api/admin/schedules/:id
+ * Delete a schedule
+ */
+router.delete('/schedules/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM schedules WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Schedule not found' } });
+    }
+
+    res.json({ success: true, message: 'Schedule deleted successfully' });
   } catch (error) {
     next(error);
   }

@@ -46,5 +46,18 @@
     "results": "Resultat",
     "export": "Exportera",
     "answerScales": "Svarsskalor"
+  },
+  "settings": {
+    "title": "Inställningar",
+    "uiSize": "UI-storlek",
+    "increase": "Öka",
+    "decrease": "Minska",
+    "reset": "Återställ",
+    "contrastMode": "Kontrastläge",
+    "contrastModeDesc": "Högkontrastläge för bättre synlighet (svart bakgrund, vit text)",
+    "contrastOn": "Kontrastläge: PÅ",
+    "contrastOff": "Kontrastläge: AV",
+    "logoutDesc": "Håll knappen i 2 sekunder för att logga ut",
+    "logoutHold": "Fortsätt hålla..."
   }
 }

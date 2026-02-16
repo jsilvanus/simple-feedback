@@ -7,6 +7,7 @@ export default function AdminAnswerScales() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     buttons: [
@@ -37,11 +38,19 @@ export default function AdminAnswerScales() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.adminRequest('/answer-scales', {
-        method: 'POST',
-        body: JSON.stringify(formData),
-      });
+      if (editingId) {
+        await api.adminRequest(`/answer-scales/${editingId}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/answer-scales', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
       setShowForm(false);
+      setEditingId(null);
       setFormData({
         name: '',
         buttons: [
@@ -57,8 +66,41 @@ export default function AdminAnswerScales() {
     }
   };
 
+  const handleEdit = (scale) => {
+    setEditingId(scale.id);
+    setFormData({
+      name: scale.name,
+      buttons: scale.buttons,
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this answer scale?')) {
+      return;
+    }
+    try {
+      await api.adminRequest(`/answer-scales/${id}`, {
+        method: 'DELETE',
+      });
+      loadScales();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleCancel = () => {
     setShowForm(false);
+    setEditingId(null);
+    setFormData({
+      name: '',
+      buttons: [
+        { label: '😞', value: 1, color: '#e74c3c' },
+        { label: '😐', value: 2, color: '#f39c12' },
+        { label: '🙂', value: 3, color: '#3498db' },
+        { label: '😀', value: 4, color: '#2ecc71' },
+      ],
+    });
   };
 
   const updateButton = (index, field, value) => {
@@ -95,7 +137,7 @@ export default function AdminAnswerScales() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>Add New Answer Scale</h3>
+            <h3>{editingId ? 'Edit Answer Scale' : 'Add New Answer Scale'}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Scale Name *</label>
@@ -148,7 +190,7 @@ export default function AdminAnswerScales() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Create
+                  {editingId ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>
@@ -165,7 +207,17 @@ export default function AdminAnswerScales() {
           <div className="scales-grid">
             {scales.map((scale) => (
               <div key={scale.id} className="scale-card">
-                <h4>{scale.name}</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
+                  <h4>{scale.name}</h4>
+                  <div>
+                    <button className="btn-icon" onClick={() => handleEdit(scale)} title="Edit">
+                      ✏️
+                    </button>
+                    <button className="btn-icon" onClick={() => handleDelete(scale.id)} title="Delete">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
                 <div className="scale-buttons-preview">
                   {scale.buttons.map((button, index) => (
                     <div

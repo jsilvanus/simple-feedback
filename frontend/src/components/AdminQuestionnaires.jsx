@@ -13,6 +13,7 @@ export default function AdminQuestionnaires() {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -59,11 +60,19 @@ export default function AdminQuestionnaires() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.adminRequest('/questionnaires', {
-        method: 'POST',
-        body: JSON.stringify(formData),
-      });
+      if (editingId) {
+        await api.adminRequest(`/questionnaires/${editingId}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/questionnaires', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
       setShowForm(false);
+      setEditingId(null);
       setFormData({ name: '', description: '', questions: [] });
       loadData();
     } catch (err) {
@@ -71,8 +80,26 @@ export default function AdminQuestionnaires() {
     }
   };
 
+  const handleEdit = async (questionnaire) => {
+    // Fetch questionnaire details including questions
+    try {
+      // For now, we'll need to get questionnaire questions from the backend
+      // Since there's no dedicated endpoint, we'll construct it from questionnaire_questions
+      setEditingId(questionnaire.id);
+      setFormData({
+        name: questionnaire.name,
+        description: questionnaire.description || '',
+        questions: [], // TODO: Load existing questions from backend
+      });
+      setShowForm(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleCancel = () => {
     setShowForm(false);
+    setEditingId(null);
     setFormData({ name: '', description: '', questions: [] });
   };
 
@@ -129,7 +156,7 @@ export default function AdminQuestionnaires() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container large">
-            <h3>Add New Questionnaire</h3>
+            <h3>{editingId ? 'Edit Questionnaire' : 'Add New Questionnaire'}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Name *</label>
@@ -236,7 +263,7 @@ export default function AdminQuestionnaires() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Create
+                  {editingId ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>
@@ -258,13 +285,22 @@ export default function AdminQuestionnaires() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                   <h4>{questionnaire.name}</h4>
-                  <button
-                    className="btn-icon"
-                    onClick={() => handleArchiveToggle(questionnaire.id, questionnaire.archived)}
-                    title={questionnaire.archived ? 'Unarchive' : 'Archive'}
-                  >
-                    {questionnaire.archived ? '📤' : '📦'}
-                  </button>
+                  <div>
+                    <button
+                      className="btn-icon"
+                      onClick={() => handleEdit(questionnaire)}
+                      title="Edit"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="btn-icon"
+                      onClick={() => handleArchiveToggle(questionnaire.id, questionnaire.archived)}
+                      title={questionnaire.archived ? 'Unarchive' : 'Archive'}
+                    >
+                      {questionnaire.archived ? '📤' : '📦'}
+                    </button>
+                  </div>
                 </div>
                 {questionnaire.description && <p>{questionnaire.description}</p>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

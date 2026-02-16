@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { api } from '../api';
 import LanguageSelector from '../components/LanguageSelector';
+import SettingsButton from '../components/SettingsButton';
+import SettingsModal from '../components/SettingsModal';
+import RadarChart from '../components/RadarChart';
 import './FeedbackPage.css';
 
 export default function FeedbackPage() {
@@ -22,34 +25,57 @@ export default function FeedbackPage() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // Helper function to get word text in current language with Finnish fallback
-  const getWordText = (wordObj) => {
-    if (typeof wordObj === 'string') return wordObj;
-    const currentLang = i18n.language || 'fi';
-    return wordObj[currentLang] || wordObj.fi || wordObj.en || wordObj.sv || '';
-  };
-
   useEffect(() => {
+    // Check for contrast mode from URL param or localStorage
+    const contrastParam = searchParams.get('contrast');
+    const storedContrast = localStorage.getItem('contrastMode');
+    
+    if (contrastParam === 'true' || contrastParam === '1') {
+      setContrastMode(true);
+      localStorage.setItem('contrastMode', 'true');
+    } else if (storedContrast === 'true') {
+      setContrastMode(true);
+    }
+
+    // Load UI size from localStorage
+    const storedSize = localStorage.getItem('uiSize');
+    if (storedSize) {
+      setUISize(parseInt(storedSize, 10));
+    }
+
     checkAuthAndLoad();
   }, [locationSlug]);
 
-  const checkAuthAndLoad = async () => {
-    // Check URL param for password
-    const passParam = searchParams.get('pass');
-    if (passParam) {
-      await authenticateLocation(passParam);
-      // Clear password from URL
-      searchParams.delete('pass');
-      setSearchParams(searchParams, { replace: true });
-      return;
-    }
+  useEffect(() => {
+    // Apply contrast mode to body
+    if (contrastMode) {
+      document.body.classList.add('contrast-mode');
 
-    // Check if already authenticated
-    const storedAuth = sessionStorage.getItem(`location_auth_${locationSlug}`);
-    if (storedAuth) {
-      loadQuestionnaire();
-      return;
-    }
+      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
+        if (Array.isArray(answer.wordArray) && answer.wordArray.length > 0) {
+          return {
+            questionId: parseInt(questionId, 10),
+            value: null,
+            textValue: answer.wordArray.join(', '),
+          };
+        }
+
+        // For continuous_scale, the value is an object (not null, not array),
+        // so we store it as JSON in textValue.
+        if (typeof answer.value === 'object' && answer.value !== null && !Array.isArray(answer.value)) {
+          return {
+            questionId: parseInt(questionId, 10),
+            value: null,
+            textValue: JSON.stringify(answer.value),
+          };
+        }
+
+        return {
+          questionId: parseInt(questionId, 10),
+          value: answer.value,
+          textValue: answer.textValue,
+        };
+      });
 
     // Try loading without auth (in case password is not required)
     try {
@@ -88,6 +114,26 @@ export default function FeedbackPage() {
     setAnswers({});
     setCurrentPage(0);
     setAuthRequired(true);
+    setShowSettings(false);
+  };
+
+  const handleToggleContrast = () => {
+    const newMode = !contrastMode;
+    setContrastMode(newMode);
+    localStorage.setItem('contrastMode', newMode.toString());
+  };
+
+  const handleChangeUISize = (newSize) => {
+    setUISize(newSize);
+    localStorage.setItem('uiSize', newSize.toString());
+  };
+
+  const handleSettingsClick = () => {
+    setShowSettings(true);
+  };
+
+  const handleSettingsLongPress = () => {
+    handleToggleContrast();
   };
 
   const loadQuestionnaire = async () => {
@@ -131,7 +177,7 @@ export default function FeedbackPage() {
       const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => ({
         questionId: parseInt(questionId),
         value: answer.value,
-        textValue: answer.wordArray ? answer.wordArray.join(', ') : answer.textValue,
+        textValue: answer.textValue,
       }));
 
       await api.submitFeedback(
@@ -225,9 +271,20 @@ export default function FeedbackPage() {
 
   return (
     <div className="feedback-page">
-      <LanguageSelector 
-        onLongPress={handleLogout}
-        locationName={data?.location?.name}
+      <LanguageSelector />
+      <SettingsButton 
+        onClick={handleSettingsClick}
+        onLongPress={handleSettingsLongPress}
+      />
+      <SettingsModal 
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onLogout={handleLogout}
+        showLogout={data?.location?.passwordRequired || false}
+        contrastMode={contrastMode}
+        onToggleContrast={handleToggleContrast}
+        uiSize={uiSize}
+        onChangeUISize={handleChangeUISize}
       />
       <div className="feedback-container">
         <header className="feedback-header">
@@ -332,6 +389,14 @@ export default function FeedbackPage() {
                     </small>
                   </div>
                 </div>
+              )}
+
+              {question.type === 'continuous_scale' && question.answerScale && (
+                <RadarChart
+                  question={question}
+                  value={answers[question.id]?.value}
+                  onChange={(value) => handleAnswer(question.id, value)}
+                />
               )}
             </div>
           ))}

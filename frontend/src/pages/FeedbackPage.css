@@ -1,3 +1,7 @@
+:root {
+  --ui-scale: 1;
+}
+
 .feedback-page {
   min-height: 100vh;
   display: flex;
@@ -5,6 +9,71 @@
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
+}
+
+/* Contrast mode styles */
+body.contrast-mode .feedback-page {
+  background: #000;
+}
+
+body.contrast-mode .feedback-container {
+  background: #000;
+  border: 3px solid #fff;
+  color: #fff;
+}
+
+body.contrast-mode .feedback-header h1,
+body.contrast-mode .feedback-header h2,
+body.contrast-mode .feedback-header .description,
+body.contrast-mode .question h3,
+body.contrast-mode .page-indicator {
+  color: #fff;
+}
+
+body.contrast-mode .text-input {
+  background: #000;
+  color: #fff;
+  border: 3px solid #fff;
+}
+
+body.contrast-mode .answer-btn {
+  background: #000;
+  color: #fff;
+  border: 3px solid #fff;
+}
+
+body.contrast-mode .answer-btn.selected {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+body.contrast-mode .btn-primary {
+  background: #fff;
+  color: #000;
+  border: 3px solid #fff;
+}
+
+body.contrast-mode .btn-secondary {
+  background: #000;
+  color: #fff;
+  border: 3px solid #fff;
+}
+
+body.contrast-mode .form-group input {
+  background: #000;
+  color: #fff;
+  border: 3px solid #fff;
+}
+
+body.contrast-mode .form-group label {
+  color: #fff;
+}
+
+body.contrast-mode .wordcloud-placeholder {
+  background: #000;
+  border: 3px solid #fff;
+  color: #fff;
 }
 
 .feedback-page.loading,
@@ -68,13 +137,13 @@
 }
 
 .feedback-header h1 {
-  font-size: 32px;
+  font-size: calc(32px * var(--ui-scale));
   color: #333;
   margin-bottom: 10px;
 }
 
 .feedback-header h2 {
-  font-size: 24px;
+  font-size: calc(24px * var(--ui-scale));
   color: #666;
   font-weight: normal;
   margin-bottom: 10px;
@@ -82,13 +151,13 @@
 
 .feedback-header .description {
   color: #888;
-  font-size: 16px;
+  font-size: calc(16px * var(--ui-scale));
 }
 
 .page-indicator {
   text-align: center;
   color: #888;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale));
   margin-bottom: 30px;
 }
 
@@ -97,7 +166,7 @@
 }
 
 .question h3 {
-  font-size: 20px;
+  font-size: calc(20px * var(--ui-scale));
   color: #333;
   margin-bottom: 20px;
 }
@@ -111,8 +180,8 @@
 .answer-btn {
   flex: 1;
   min-width: 100px;
-  padding: 20px;
-  font-size: 18px;
+  padding: calc(20px * var(--ui-scale));
+  font-size: calc(18px * var(--ui-scale));
   font-weight: 600;
   border: 2px solid transparent;
   border-radius: 12px;
@@ -134,8 +203,8 @@
 
 .text-input {
   width: 100%;
-  padding: 15px;
-  font-size: 16px;
+  padding: calc(15px * var(--ui-scale));
+  font-size: calc(16px * var(--ui-scale));
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   resize: vertical;
@@ -212,8 +281,8 @@
 }
 
 .btn {
-  padding: 15px 40px;
-  font-size: 18px;
+  padding: calc(15px * var(--ui-scale)) calc(40px * var(--ui-scale));
+  font-size: calc(18px * var(--ui-scale));
   font-weight: 600;
   border: none;
   border-radius: 8px;

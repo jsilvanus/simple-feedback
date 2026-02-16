@@ -8,6 +8,7 @@ export default function AdminQuestions() {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     text: '',
     type: 'scale',
@@ -45,11 +46,19 @@ export default function AdminQuestions() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.adminRequest('/questions', {
-        method: 'POST',
-        body: JSON.stringify(formData),
-      });
+      if (editingId) {
+        await api.adminRequest(`/questions/${editingId}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/questions', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
       setShowForm(false);
+      setEditingId(null);
       setFormData({ text: '', type: 'scale' });
       loadQuestions();
     } catch (err) {
@@ -57,8 +66,18 @@ export default function AdminQuestions() {
     }
   };
 
+  const handleEdit = (question) => {
+    setEditingId(question.id);
+    setFormData({
+      text: question.text,
+      type: question.type,
+    });
+    setShowForm(true);
+  };
+
   const handleCancel = () => {
     setShowForm(false);
+    setEditingId(null);
     setFormData({ text: '', type: 'scale' });
   };
 
@@ -67,6 +86,7 @@ export default function AdminQuestions() {
       case 'scale': return '📊';
       case 'text': return '📝';
       case 'wordcloud': return '☁️';
+      case 'continuous_scale': return '📡';
       default: return '❓';
     }
   };
@@ -96,7 +116,7 @@ export default function AdminQuestions() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>Add New Question</h3>
+            <h3>{editingId ? 'Edit Question' : 'Add New Question'}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Question Text *</label>
@@ -119,6 +139,7 @@ export default function AdminQuestions() {
                   <option value="scale">Scale (buttons)</option>
                   <option value="text">Text input</option>
                   <option value="wordcloud">Word cloud</option>
+                  <option value="continuous_scale">Continuous Scale (Radar)</option>
                 </select>
               </div>
 
@@ -127,7 +148,7 @@ export default function AdminQuestions() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Create
+                  {editingId ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>
@@ -169,6 +190,13 @@ export default function AdminQuestions() {
                   </td>
                   <td>{new Date(question.created_at).toLocaleDateString()}</td>
                   <td>
+                    <button
+                      className="btn-icon"
+                      onClick={() => handleEdit(question)}
+                      title="Edit"
+                    >
+                      ✏️
+                    </button>
                     <button
                       className="btn-icon"
                       onClick={() => handleArchiveToggle(question.id, question.archived)}
