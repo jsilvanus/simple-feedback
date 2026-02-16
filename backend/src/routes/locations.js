@@ -26,75 +26,132 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
 
     // Get active schedule for this location
     const now = new Date();
+    const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentTime = now.toTimeString().substring(0, 5); // HH:MM format
+
+    // Query for active schedules (both date-based and recurring)
     const scheduleResult = await db.query(
-      `SELECT s.*, q.name, q.description
+      `SELECT s.*, s.schedule_type, s.weekday_pattern, s.show_only_one
        FROM schedules s
-       JOIN questionnaires q ON s.questionnaire_id = q.id
        WHERE s.location_id = $1 
-         AND s.start_time <= $2 
-         AND s.end_time >= $2
-       ORDER BY s.start_time DESC
-       LIMIT 1`,
+         AND (
+           (s.schedule_type = 'date_based' AND s.start_time <= $2 AND s.end_time >= $2)
+           OR (s.schedule_type = 'recurring_weekday')
+         )
+       ORDER BY s.created_at DESC
+       LIMIT 100`,
       [location.id, now]
     );
 
-    if (scheduleResult.rows.length === 0) {
+    // Filter recurring schedules based on current day and time
+    const activeSchedules = scheduleResult.rows.filter(schedule => {
+      if (schedule.schedule_type === 'date_based') {
+        return true; // Already filtered in SQL
+      } else if (schedule.schedule_type === 'recurring_weekday' && schedule.weekday_pattern) {
+        const pattern = schedule.weekday_pattern;
+        const isDayActive = pattern.days && pattern.days.includes(currentDayOfWeek);
+        const isTimeActive = currentTime >= pattern.start_hour && currentTime <= pattern.end_hour;
+        return isDayActive && isTimeActive;
+      }
+      return false;
+    });
+
+    if (activeSchedules.length === 0) {
       return res.status(404).json({ error: { message: 'No active questionnaire for this location' } });
     }
 
-    const schedule = scheduleResult.rows[0];
+    const schedule = activeSchedules[0];
 
-    // Get questions for this questionnaire
-    const questionsResult = await db.query(
-      `SELECT q.id, q.text, q.type, qq.page_number, qq.order_index, 
-              qq.answer_scale_id, a.name as scale_name, a.buttons
-       FROM questions q
-       JOIN questionnaire_questions qq ON q.id = qq.question_id
-       LEFT JOIN answer_scales a ON qq.answer_scale_id = a.id
-       WHERE qq.questionnaire_id = $1
-       ORDER BY qq.page_number, qq.order_index`,
-      [schedule.questionnaire_id]
+    // Get questionnaires for this schedule
+    let questionnairesResult = await db.query(
+      `SELECT q.id, q.name, q.description, sq.display_order
+       FROM schedule_questionnaires sq
+       JOIN questionnaires q ON sq.questionnaire_id = q.id
+       WHERE sq.schedule_id = $1
+       ORDER BY sq.display_order`,
+      [schedule.id]
     );
 
-    // Group questions by page
-    const pages = {};
-    questionsResult.rows.forEach((q) => {
-      if (!pages[q.page_number]) {
-        pages[q.page_number] = [];
-      }
-      pages[q.page_number].push({
-        id: q.id,
-        text: q.text,
-        type: q.type,
-        answerScale: q.buttons ? {
-          id: q.answer_scale_id,
-          name: q.scale_name,
-          buttons: q.buttons,
-        } : null,
-      });
-    });
+    // Fallback to legacy questionnaire_id if no questionnaires in junction table
+    if (questionnairesResult.rows.length === 0 && schedule.questionnaire_id) {
+      questionnairesResult = await db.query(
+        'SELECT id, name, description FROM questionnaires WHERE id = $1',
+        [schedule.questionnaire_id]
+      );
+    }
 
-    const questionnaire = {
-      id: schedule.questionnaire_id,
-      name: schedule.name,
-      description: schedule.description,
-      pages: Object.keys(pages)
-        .sort((a, b) => parseInt(a) - parseInt(b))
-        .map((pageNum) => ({
-          number: parseInt(pageNum),
-          questions: pages[pageNum],
-        })),
-    };
+    if (questionnairesResult.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'No questionnaires found for this schedule' } });
+    }
 
-    res.json({
+    // If show_only_one is true, return only the first questionnaire
+    const questionnairesToShow = schedule.show_only_one 
+      ? [questionnairesResult.rows[0]] 
+      : questionnairesResult.rows;
+
+    // Get questions for all questionnaires
+    const questionnaires = await Promise.all(
+      questionnairesToShow.map(async (q) => {
+        const questionsResult = await db.query(
+          `SELECT q.id, q.text, q.type, qq.page_number, qq.order_index, 
+                  qq.answer_scale_id, a.name as scale_name, a.buttons
+           FROM questions q
+           JOIN questionnaire_questions qq ON q.id = qq.question_id
+           LEFT JOIN answer_scales a ON qq.answer_scale_id = a.id
+           WHERE qq.questionnaire_id = $1
+           ORDER BY qq.page_number, qq.order_index`,
+          [q.id]
+        );
+
+        // Group questions by page
+        const pages = {};
+        questionsResult.rows.forEach((question) => {
+          if (!pages[question.page_number]) {
+            pages[question.page_number] = [];
+          }
+          pages[question.page_number].push({
+            id: question.id,
+            text: question.text,
+            type: question.type,
+            answerScale: question.buttons ? {
+              id: question.answer_scale_id,
+              name: question.scale_name,
+              buttons: question.buttons,
+            } : null,
+          });
+        });
+
+        return {
+          id: q.id,
+          name: q.name,
+          description: q.description,
+          pages: Object.keys(pages)
+            .sort((a, b) => parseInt(a) - parseInt(b))
+            .map((pageNum) => ({
+              number: parseInt(pageNum),
+              questions: pages[pageNum],
+            })),
+        };
+      })
+    );
+
+    // For backward compatibility, if only one questionnaire, return it directly
+    const response = {
       location: {
         id: location.id,
         slug: location.slug,
         name: location.name,
         passwordRequired: location.password_required || false,
       },
-      questionnaire,
-    });
+    };
+
+    if (questionnaires.length === 1) {
+      response.questionnaire = questionnaires[0];
+    } else {
+      response.questionnaires = questionnaires;
+    }
+
+    res.json(response);
   } catch (error) {
     next(error);
   }
