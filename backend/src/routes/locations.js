@@ -12,9 +12,9 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
   try {
     const { slug } = req.params;
 
-    // Get location
+    // Get location with group information
     const locationResult = await db.query(
-      'SELECT * FROM locations WHERE slug = $1 AND active = true',
+      'SELECT l.*, lg.id as group_id FROM locations l LEFT JOIN location_groups lg ON l.group_id = lg.id WHERE l.slug = $1 AND l.active = true',
       [slug]
     );
 
@@ -29,18 +29,20 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
     const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
     const currentTime = now.toTimeString().substring(0, 5); // HH:MM format
 
-    // Query for active schedules (both date-based and recurring)
+    // Query for active schedules (both location-specific and group-level)
+    // Priority: location-specific schedules first, then group-level schedules
     const scheduleResult = await db.query(
-      `SELECT s.*, s.schedule_type, s.weekday_pattern, s.show_only_one
+      `SELECT s.*, s.schedule_type, s.weekday_pattern, s.show_only_one,
+              CASE WHEN s.location_id IS NOT NULL THEN 1 ELSE 2 END as priority
        FROM schedules s
-       WHERE s.location_id = $1 
+       WHERE (s.location_id = $1 OR (s.location_group_id = $2 AND $2 IS NOT NULL))
          AND (
-           (s.schedule_type = 'date_based' AND s.start_time <= $2 AND s.end_time >= $2)
+           (s.schedule_type = 'date_based' AND s.start_time <= $3 AND s.end_time >= $3)
            OR (s.schedule_type = 'recurring_weekday')
          )
-       ORDER BY s.created_at DESC
+       ORDER BY priority, s.created_at DESC
        LIMIT 100`,
-      [location.id, now]
+      [location.id, location.group_id, now]
     );
 
     // Filter recurring schedules based on current day and time

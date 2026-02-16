@@ -5,13 +5,16 @@ import './AdminCrud.css';
 export default function AdminSchedules() {
   const [schedules, setSchedules] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [locationGroups, setLocationGroups] = useState([]);
   const [questionnaires, setQuestionnaires] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
+    destinationType: 'location', // 'location' or 'group'
     locationId: '',
+    locationGroupId: '',
     questionnaireIds: [],
     scheduleType: 'date_based',
     startTime: '',
@@ -32,13 +35,15 @@ export default function AdminSchedules() {
     try {
       setLoading(true);
       setError(null);
-      const [schedulesData, locationsData, questionnairesData] = await Promise.all([
+      const [schedulesData, locationsData, locationGroupsData, questionnairesData] = await Promise.all([
         api.adminRequest('/schedules'),
         api.adminRequest('/locations'),
+        api.adminRequest('/location-groups'),
         api.adminRequest('/questionnaires'),
       ]);
       setSchedules(schedulesData);
       setLocations(locationsData);
+      setLocationGroups(locationGroupsData);
       setQuestionnaires(questionnairesData);
     } catch (err) {
       setError(err.message);
@@ -51,11 +56,17 @@ export default function AdminSchedules() {
     e.preventDefault();
     try {
       const payload = {
-        locationId: parseInt(formData.locationId),
         questionnaireIds: formData.questionnaireIds.map(id => parseInt(id)),
         scheduleType: formData.scheduleType,
         showOnlyOne: formData.showOnlyOne,
       };
+
+      // Set either locationId or locationGroupId based on destinationType
+      if (formData.destinationType === 'location') {
+        payload.locationId = parseInt(formData.locationId);
+      } else {
+        payload.locationGroupId = parseInt(formData.locationGroupId);
+      }
 
       if (formData.scheduleType === 'date_based') {
         payload.startTime = formData.startTime;
@@ -86,8 +97,20 @@ export default function AdminSchedules() {
 
   const handleEdit = (schedule) => {
     setEditingId(schedule.id);
+    
+    // Determine destination type based on which field has a value
+    let destinationType = 'location'; // default
+    if (schedule.location_group_id) {
+      destinationType = 'group';
+    } else if (!schedule.location_id) {
+      // Neither is set - this shouldn't happen, but default to location
+      destinationType = 'location';
+    }
+    
     setFormData({
-      locationId: schedule.location_id.toString(),
+      destinationType,
+      locationId: schedule.location_id?.toString() || '',
+      locationGroupId: schedule.location_group_id?.toString() || '',
       questionnaireIds: schedule.questionnaires?.map(q => q.id.toString()) || 
                        (schedule.questionnaire_id ? [schedule.questionnaire_id.toString()] : []),
       scheduleType: schedule.schedule_type || 'date_based',
@@ -115,7 +138,9 @@ export default function AdminSchedules() {
 
   const resetFormData = () => {
     setFormData({
+      destinationType: 'location',
       locationId: '',
+      locationGroupId: '',
       questionnaireIds: [],
       scheduleType: 'date_based',
       startTime: '',
@@ -203,12 +228,37 @@ export default function AdminSchedules() {
             <h3>{editingId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Location *</label>
-                <select
-                  value={formData.locationId}
-                  onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-                  required
-                >
+                <label>Publish To *</label>
+                <div className="radio-group">
+                  <label>
+                    <input
+                      type="radio"
+                      value="location"
+                      checked={formData.destinationType === 'location'}
+                      onChange={(e) => setFormData({ ...formData, destinationType: e.target.value })}
+                    />
+                    Specific Location
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      value="group"
+                      checked={formData.destinationType === 'group'}
+                      onChange={(e) => setFormData({ ...formData, destinationType: e.target.value })}
+                    />
+                    Location Group
+                  </label>
+                </div>
+              </div>
+
+              {formData.destinationType === 'location' ? (
+                <div className="form-group">
+                  <label>Location *</label>
+                  <select
+                    value={formData.locationId}
+                    onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
+                    required
+                  >
                   <option value="">Select location...</option>
                   {locations.map((location) => (
                     <option key={location.id} value={location.id}>
@@ -217,6 +267,25 @@ export default function AdminSchedules() {
                   ))}
                 </select>
               </div>
+              ) : (
+                <div className="form-group">
+                  <label>Location Group *</label>
+                  <select
+                    value={formData.locationGroupId}
+                    onChange={(e) => setFormData({ ...formData, locationGroupId: e.target.value })}
+                    required
+                    aria-describedby="group-help-text"
+                  >
+                    <option value="">Select location group...</option>
+                    {locationGroups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small id="group-help-text">This schedule will apply to all locations in the selected group</small>
+                </div>
+              )}
               
               <div className="form-group">
                 <label>Questionnaires *</label>
@@ -356,7 +425,7 @@ export default function AdminSchedules() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Location</th>
+                <th>Destination</th>
                 <th>Questionnaires</th>
                 <th>Type</th>
                 <th>Schedule</th>
@@ -367,7 +436,21 @@ export default function AdminSchedules() {
             <tbody>
               {schedules.map((schedule) => (
                 <tr key={schedule.id}>
-                  <td>{schedule.location_name}</td>
+                  <td>
+                    {schedule.location_name ? (
+                      <div>
+                        <div><strong>{schedule.location_name}</strong></div>
+                        <small>/{schedule.location_slug}</small>
+                      </div>
+                    ) : schedule.location_group_name ? (
+                      <div>
+                        <div><strong>🏢 {schedule.location_group_name}</strong></div>
+                        <small>(Location Group)</small>
+                      </div>
+                    ) : (
+                      <span>N/A</span>
+                    )}
+                  </td>
                   <td>
                     {schedule.questionnaires && schedule.questionnaires.length > 0 ? (
                       <div>

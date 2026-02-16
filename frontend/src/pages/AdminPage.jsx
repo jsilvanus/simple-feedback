@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import AdminLocations from '../components/AdminLocations';
+import AdminLocationGroups from '../components/AdminLocationGroups';
 import AdminQuestions from '../components/AdminQuestions';
 import AdminAnswerScales from '../components/AdminAnswerScales';
 import AdminQuestionnaires from '../components/AdminQuestionnaires';
@@ -88,6 +89,12 @@ export default function AdminPage() {
             Locations
           </button>
           <button 
+            className={activeTab === 'location-groups' ? 'active' : ''} 
+            onClick={() => setActiveTab('location-groups')}
+          >
+            Location Groups
+          </button>
+          <button 
             className={activeTab === 'questions' ? 'active' : ''} 
             onClick={() => setActiveTab('questions')}
           >
@@ -150,6 +157,7 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'locations' && <AdminLocations />}
+          {activeTab === 'location-groups' && <AdminLocationGroups />}
           {activeTab === 'questions' && <AdminQuestions />}
           {activeTab === 'answer-scales' && <AdminAnswerScales />}
           {activeTab === 'questionnaires' && <AdminQuestionnaires />}
