@@ -458,6 +458,42 @@
   color: white;
 }
 
+.multi-entry-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.multi-entry-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafbff;
+  position: relative;
+}
+
+.multi-entry-label {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b6478;
+  background: #eef2ff;
+  border: 1px solid #d7def8;
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin-bottom: 10px;
+}
+
+.multi-entry-row .btn-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.multi-entry-row .form-row.two-columns {
+  padding-right: 40px;
+}
+
 .questionnaire-checkbox-card:hover {
   background: #f8fafc;
 }
@@ -502,6 +538,15 @@
 
   .toggle-button-group {
     flex-direction: column;
+  }
+
+  .multi-entry-row .form-row.two-columns {
+    padding-right: 0;
+  }
+
+  .multi-entry-row .btn-icon {
+    position: static;
+    margin-top: 6px;
   }
 
   .section-header > .btn-primary,

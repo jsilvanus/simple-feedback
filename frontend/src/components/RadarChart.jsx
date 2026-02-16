@@ -6,13 +6,30 @@ export default function RadarChart({ question, value, onChange }) {
   const containerRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 400, height: 400 });
 
-  // Parse configuration from answerScale
-  const config = question.answerScale?.buttons || [];
-  const axes = config.map(button => ({
-    label: button.label || `Axis ${button.value}`,
-    min: button.min || 0,
-    max: button.max || 10,
-    value: button.value || 0
+  const scaleButtons = question.answerScale?.buttons || [];
+  const axisConfig = Array.isArray(question.continuousAxes) ? question.continuousAxes : [];
+
+  const minFromScale = scaleButtons.length > 0
+    ? Math.min(...scaleButtons.map(button => {
+        if (typeof button.min === 'number') return button.min;
+        return Number(button.value);
+      }).filter(value => !Number.isNaN(value)))
+    : 0;
+  const maxFromScale = scaleButtons.length > 0
+    ? Math.max(...scaleButtons.map(button => {
+        if (typeof button.max === 'number') return button.max;
+        return Number(button.value);
+      }).filter(value => !Number.isNaN(value)))
+    : 10;
+
+  const resolvedMin = Number.isFinite(minFromScale) ? minFromScale : 0;
+  const resolvedMax = Number.isFinite(maxFromScale) && maxFromScale > resolvedMin ? maxFromScale : 10;
+
+  const axes = axisConfig.map((axis, index) => ({
+    label: axis.label || `Axis ${index + 1}`,
+    min: resolvedMin,
+    max: resolvedMax,
+    value: axis.id || `axis_${index + 1}`,
   }));
 
   // Initialize values state - each axis can have a separate value

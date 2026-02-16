@@ -3,14 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
-const DEFAULT_MAX_SELECTIONS = 3;
-
 export default function AdminQuestionnaires() {
   const { t } = useTranslation();
   const [questionnaires, setQuestionnaires] = useState([]);
   const [questions, setQuestions] = useState([]);
-  const [answerScales, setAnswerScales] = useState([]);
-  const [wordCloudOptions, setWordCloudOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -30,16 +26,12 @@ export default function AdminQuestionnaires() {
     try {
       setLoading(true);
       setError(null);
-      const [questionnairesData, questionsData, scalesData, wordCloudData] = await Promise.all([
+      const [questionnairesData, questionsData] = await Promise.all([
         api.adminRequest(`/questionnaires?includeArchived=${showArchived}`),
         api.adminRequest('/questions'),
-        api.adminRequest('/answer-scales'),
-        api.adminRequest('/word-cloud-options'),
       ]);
       setQuestionnaires(questionnairesData);
       setQuestions(questionsData);
-      setAnswerScales(scalesData);
-      setWordCloudOptions(wordCloudData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -93,9 +85,6 @@ export default function AdminQuestionnaires() {
         questions: (details.questions || []).map((q, index) => ({
           questionId: q.question_id,
           pageNumber: q.page_number || 1,
-          answerScaleId: q.answer_scale_id || null,
-          wordCloudOptionsId: q.word_cloud_options_id || null,
-          maxSelections: q.max_selections || DEFAULT_MAX_SELECTIONS,
           orderIndex: q.order_index ?? index,
         })),
       });
@@ -119,9 +108,6 @@ export default function AdminQuestionnaires() {
         {
           questionId: '',
           pageNumber: 1,
-          answerScaleId: '',
-          wordCloudOptionsId: '',
-          maxSelections: DEFAULT_MAX_SELECTIONS,
           orderIndex: formData.questions.length,
         },
       ],
@@ -190,9 +176,6 @@ export default function AdminQuestionnaires() {
               <div className="form-group">
                 <label>Questions</label>
                 {formData.questions.map((q, index) => {
-                  const selectedQuestion = questions.find(question => question.id === q.questionId);
-                  const questionType = selectedQuestion?.type;
-                  
                   return (
                     <div key={index} className="question-editor">
                       <select
@@ -215,45 +198,6 @@ export default function AdminQuestionnaires() {
                         min="1"
                         required
                       />
-                      
-                      {questionType === 'scale' && (
-                        <select
-                          value={q.answerScaleId ?? ''}
-                          onChange={(e) => updateQuestion(index, 'answerScaleId', e.target.value ? parseInt(e.target.value) : null)}
-                        >
-                          <option value="">No scale</option>
-                          {answerScales.map((scale) => (
-                            <option key={scale.id} value={scale.id}>
-                              {scale.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      
-                      {questionType === 'wordcloud' && (
-                        <>
-                          <select
-                            value={q.wordCloudOptionsId ?? ''}
-                            onChange={(e) => updateQuestion(index, 'wordCloudOptionsId', e.target.value ? parseInt(e.target.value) : null)}
-                          >
-                            <option value="">No word cloud options</option>
-                            {wordCloudOptions.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.name}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="number"
-                            value={q.maxSelections}
-                            onChange={(e) => updateQuestion(index, 'maxSelections', parseInt(e.target.value))}
-                            placeholder="Max selections"
-                            min="1"
-                            max="20"
-                            title="Maximum number of words users can select"
-                          />
-                        </>
-                      )}
                       
                       <button type="button" onClick={() => removeQuestion(index)} className="btn-icon">
                         ❌

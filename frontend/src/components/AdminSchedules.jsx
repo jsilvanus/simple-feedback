@@ -19,13 +19,8 @@ export default function AdminSchedules() {
     locationGroupId: '',
     questionnaireIds: [],
     scheduleType: 'date_based',
-    startTime: '',
-    endTime: '',
-    weekdayPattern: {
-      days: [],
-      start_hour: '09:00',
-      end_hour: '17:00',
-    },
+    dateRanges: [{ startTime: '', endTime: '' }],
+    weekdayRules: [{ days: [], start_hour: '09:00', end_hour: '17:00' }],
     showOnlyOne: false,
   });
 
@@ -37,16 +32,18 @@ export default function AdminSchedules() {
     try {
       setLoading(true);
       setError(null);
+
       const [schedulesData, locationsData, locationGroupsData, questionnairesData] = await Promise.all([
         api.adminRequest('/schedules'),
         api.adminRequest('/locations'),
         api.adminRequest('/location-groups'),
-        api.adminRequest('/questionnaires'),
+        api.adminRequest('/questionnaires?includeArchived=true'),
       ]);
-      setSchedules(schedulesData);
-      setLocations(locationsData);
-      setLocationGroups(locationGroupsData);
-      setQuestionnaires(questionnairesData);
+
+      setSchedules(schedulesData || []);
+      setLocations(locationsData || []);
+      setLocationGroups(locationGroupsData || []);
+      setQuestionnaires(questionnairesData || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -54,44 +51,74 @@ export default function AdminSchedules() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
     try {
-      const payload = {
-        questionnaireIds: formData.questionnaireIds.map(id => parseInt(id)),
+      setError(null);
+
+      const basePayload = {
+        questionnaireIds: formData.questionnaireIds.map((id) => Number.parseInt(id, 10)),
         scheduleType: formData.scheduleType,
         showOnlyOne: formData.showOnlyOne,
       };
 
-      // Set either locationId or locationGroupId based on destinationType
       if (formData.destinationType === 'location') {
-        payload.locationId = parseInt(formData.locationId);
+        basePayload.locationId = Number.parseInt(formData.locationId, 10);
       } else {
-        payload.locationGroupId = parseInt(formData.locationGroupId);
+        basePayload.locationGroupId = Number.parseInt(formData.locationGroupId, 10);
       }
 
-      if (formData.scheduleType === 'date_based') {
-        payload.startTime = formData.startTime;
-        payload.endTime = formData.endTime;
-      } else if (formData.scheduleType === 'recurring_weekday') {
-        payload.weekdayPattern = formData.weekdayPattern;
+      const scheduleEntries =
+        formData.scheduleType === 'date_based'
+          ? formData.dateRanges.filter((range) => range.startTime && range.endTime).map((range) => ({
+              ...basePayload,
+              startTime: range.startTime,
+              endTime: range.endTime,
+            }))
+          : formData.weekdayRules
+              .filter((rule) => rule.days && rule.days.length > 0 && rule.start_hour && rule.end_hour)
+              .map((rule) => ({
+                ...basePayload,
+                weekdayPattern: rule,
+              }));
+
+      if (scheduleEntries.length === 0) {
+        setError(t('admin.invalidScheduleEntries'));
+        return;
       }
 
       if (editingId) {
         await api.adminRequest(`/schedules/${editingId}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: JSON.stringify(scheduleEntries[0]),
         });
+
+        if (scheduleEntries.length > 1) {
+          await Promise.all(
+            scheduleEntries.slice(1).map((entry) =>
+              api.adminRequest('/schedules', {
+                method: 'POST',
+                body: JSON.stringify(entry),
+              })
+            )
+          );
+        }
       } else {
-        await api.adminRequest('/schedules', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
+        await Promise.all(
+          scheduleEntries.map((entry) =>
+            api.adminRequest('/schedules', {
+              method: 'POST',
+              body: JSON.stringify(entry),
+            })
+          )
+        );
       }
+
       setShowForm(false);
       setEditingId(null);
       resetFormData();
-      loadData();
+      await loadData();
     } catch (err) {
       setError(err.message);
     }
@@ -116,9 +143,11 @@ export default function AdminSchedules() {
       questionnaireIds: schedule.questionnaires?.map(q => q.id.toString()) || 
                        (schedule.questionnaire_id ? [schedule.questionnaire_id.toString()] : []),
       scheduleType: schedule.schedule_type || 'date_based',
-      startTime: schedule.start_time ? new Date(schedule.start_time).toISOString().slice(0, 16) : '',
-      endTime: schedule.end_time ? new Date(schedule.end_time).toISOString().slice(0, 16) : '',
-      weekdayPattern: schedule.weekday_pattern || { days: [], start_hour: '09:00', end_hour: '17:00' },
+      dateRanges: [{
+        startTime: schedule.start_time ? new Date(schedule.start_time).toISOString().slice(0, 16) : '',
+        endTime: schedule.end_time ? new Date(schedule.end_time).toISOString().slice(0, 16) : '',
+      }],
+      weekdayRules: [schedule.weekday_pattern || { days: [], start_hour: '09:00', end_hour: '17:00' }],
       showOnlyOne: schedule.show_only_one || false,
     });
     setShowForm(true);
@@ -145,13 +174,8 @@ export default function AdminSchedules() {
       locationGroupId: '',
       questionnaireIds: [],
       scheduleType: 'date_based',
-      startTime: '',
-      endTime: '',
-      weekdayPattern: {
-        days: [],
-        start_hour: '09:00',
-        end_hour: '17:00',
-      },
+      dateRanges: [{ startTime: '', endTime: '' }],
+      weekdayRules: [{ days: [], start_hour: '09:00', end_hour: '17:00' }],
       showOnlyOne: false,
     });
   };
@@ -162,17 +186,61 @@ export default function AdminSchedules() {
     resetFormData();
   };
 
-  const toggleWeekday = (day) => {
-    const days = [...formData.weekdayPattern.days];
+  const toggleWeekday = (ruleIndex, day) => {
+    const rules = [...formData.weekdayRules];
+    const days = [...rules[ruleIndex].days];
     const index = days.indexOf(day);
     if (index > -1) {
       days.splice(index, 1);
     } else {
       days.push(day);
     }
+    rules[ruleIndex] = { ...rules[ruleIndex], days };
     setFormData({
       ...formData,
-      weekdayPattern: { ...formData.weekdayPattern, days }
+      weekdayRules: rules,
+    });
+  };
+
+  const updateDateRange = (rangeIndex, field, value) => {
+    const ranges = [...formData.dateRanges];
+    ranges[rangeIndex] = { ...ranges[rangeIndex], [field]: value };
+    setFormData({ ...formData, dateRanges: ranges });
+  };
+
+  const addDateRange = () => {
+    setFormData({
+      ...formData,
+      dateRanges: [...formData.dateRanges, { startTime: '', endTime: '' }],
+    });
+  };
+
+  const removeDateRange = (rangeIndex) => {
+    if (formData.dateRanges.length === 1) return;
+    setFormData({
+      ...formData,
+      dateRanges: formData.dateRanges.filter((_, idx) => idx !== rangeIndex),
+    });
+  };
+
+  const updateWeekdayRule = (ruleIndex, field, value) => {
+    const rules = [...formData.weekdayRules];
+    rules[ruleIndex] = { ...rules[ruleIndex], [field]: value };
+    setFormData({ ...formData, weekdayRules: rules });
+  };
+
+  const addWeekdayRule = () => {
+    setFormData({
+      ...formData,
+      weekdayRules: [...formData.weekdayRules, { days: [], start_hour: '09:00', end_hour: '17:00' }],
+    });
+  };
+
+  const removeWeekdayRule = (ruleIndex) => {
+    if (formData.weekdayRules.length === 1) return;
+    setFormData({
+      ...formData,
+      weekdayRules: formData.weekdayRules.filter((_, idx) => idx !== ruleIndex),
     });
   };
 
@@ -194,12 +262,12 @@ export default function AdminSchedules() {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
-  const setStartNow = () => {
-    setFormData({ ...formData, startTime: formatDateTimeLocal(new Date()) });
+  const setStartNow = (rangeIndex) => {
+    updateDateRange(rangeIndex, 'startTime', formatDateTimeLocal(new Date()));
   };
 
-  const setEndNever = () => {
-    setFormData({ ...formData, endTime: '2099-12-31T23:59' });
+  const setEndNever = (rangeIndex) => {
+    updateDateRange(rangeIndex, 'endTime', '2099-12-31T23:59');
   };
 
   const isActive = (schedule) => {
@@ -242,63 +310,62 @@ export default function AdminSchedules() {
           <div className="form-container large">
             <h3>{editingId ? t('admin.editSchedule') : t('admin.addNewSchedule')}</h3>
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>{t('admin.publishTo')} *</label>
-                <div className="toggle-button-group">
-                  <button
-                    type="button"
-                    className={`toggle-btn ${formData.destinationType === 'location' ? 'active' : ''}`}
-                    onClick={() => setFormData({ ...formData, destinationType: 'location' })}
-                  >
-                    {t('admin.specificLocation')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`toggle-btn ${formData.destinationType === 'group' ? 'active' : ''}`}
-                    onClick={() => setFormData({ ...formData, destinationType: 'group' })}
-                  >
-                    {t('admin.locationGroup')}
-                  </button>
+              <div className="form-row schedule-destination-row">
+                <div className="form-group">
+                  <label>{t('admin.publishTo')} *</label>
+                  <div className="toggle-button-group">
+                    <button
+                      type="button"
+                      className={`toggle-btn ${formData.destinationType === 'location' ? 'active' : ''}`}
+                      onClick={() => setFormData({ ...formData, destinationType: 'location' })}
+                    >
+                      {t('admin.specificLocation')}
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${formData.destinationType === 'group' ? 'active' : ''}`}
+                      onClick={() => setFormData({ ...formData, destinationType: 'group' })}
+                    >
+                      {t('admin.locationGroup')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>{formData.destinationType === 'location' ? t('admin.locations') : t('admin.locationGroup')} *</label>
+                  {formData.destinationType === 'location' ? (
+                    <select
+                      value={formData.locationId}
+                      onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
+                      required
+                    >
+                      <option value="">{t('admin.selectLocation')}</option>
+                      {locations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.name} (/{location.slug})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <select
+                        value={formData.locationGroupId}
+                        onChange={(e) => setFormData({ ...formData, locationGroupId: e.target.value })}
+                        required
+                        aria-describedby="group-help-text"
+                      >
+                        <option value="">{t('admin.selectLocationGroup')}</option>
+                        {locationGroups.map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
+                          </option>
+                        ))}
+                      </select>
+                      <small id="group-help-text">{t('admin.scheduleAppliesToGroup')}</small>
+                    </>
+                  )}
                 </div>
               </div>
-
-              {formData.destinationType === 'location' && (
-                <div className="form-group">
-                  <label>{t('admin.locations')} *</label>
-                  <select
-                    value={formData.locationId}
-                    onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-                    required
-                  >
-                    <option value="">{t('admin.selectLocation')}</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name} (/{location.slug})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {formData.destinationType === 'group' && (
-                <div className="form-group">
-                  <label>{t('admin.locationGroup')} *</label>
-                  <select
-                    value={formData.locationGroupId}
-                    onChange={(e) => setFormData({ ...formData, locationGroupId: e.target.value })}
-                    required
-                    aria-describedby="group-help-text"
-                  >
-                    <option value="">{t('admin.selectLocationGroup')}</option>
-                    {locationGroups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                  <small id="group-help-text">{t('admin.scheduleAppliesToGroup')}</small>
-                </div>
-              )}
               
               <div className="form-group">
                 <label>{t('admin.questionnaires')} *</label>
@@ -354,86 +421,111 @@ export default function AdminSchedules() {
               </div>
 
               {formData.scheduleType === 'date_based' && (
-                <div className="form-row two-columns">
-                  <div className="form-group">
-                    <label>{t('admin.startTime')} *</label>
-                    <input
-                      type="datetime-local"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      required
-                    />
-                    <div className="quick-date-actions">
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={setStartNow}>
-                        {t('admin.now')}
-                      </button>
-                    </div>
-                  </div>
+                <div className="multi-entry-wrapper">
+                  {formData.dateRanges.map((range, index) => (
+                    <div key={index} className="multi-entry-row">
+                      <div className="multi-entry-label">{t('admin.rangeLabel', { number: index + 1 })}</div>
+                      <div className="form-row two-columns">
+                        <div className="form-group">
+                          <label>{t('admin.startTime')} *</label>
+                          <input
+                            type="datetime-local"
+                            value={range.startTime}
+                            onChange={(e) => updateDateRange(index, 'startTime', e.target.value)}
+                            required
+                          />
+                          <div className="quick-date-actions">
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setStartNow(index)}>
+                              {t('admin.now')}
+                            </button>
+                          </div>
+                        </div>
 
-                  <div className="form-group">
-                    <label>{t('admin.endTime')} *</label>
-                    <input
-                      type="datetime-local"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      required
-                    />
-                    <div className="quick-date-actions">
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={setEndNever}>
-                        {t('admin.never')}
-                      </button>
+                        <div className="form-group">
+                          <label>{t('admin.endTime')} *</label>
+                          <input
+                            type="datetime-local"
+                            value={range.endTime}
+                            onChange={(e) => updateDateRange(index, 'endTime', e.target.value)}
+                            required
+                          />
+                          <div className="quick-date-actions">
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEndNever(index)}>
+                              {t('admin.never')}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {formData.dateRanges.length > 1 && (
+                        <button type="button" className="btn-icon" onClick={() => removeDateRange(index)} title={t('common.delete')}>
+                          🗑️
+                        </button>
+                      )}
                     </div>
-                  </div>
+                  ))}
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={addDateRange}>
+                    + {t('admin.addTimeRange')}
+                  </button>
                 </div>
               )}
 
               {formData.scheduleType === 'recurring_weekday' && (
-                <>
-                  <div className="form-group">
-                    <label>{t('admin.activeDays')} *</label>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {weekdayNames.map((day, index) => (
-                        <label key={index} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <div className="multi-entry-wrapper">
+                  {formData.weekdayRules.map((rule, ruleIndex) => (
+                    <div key={ruleIndex} className="multi-entry-row">
+                      <div className="multi-entry-label">{t('admin.ruleLabel', { number: ruleIndex + 1 })}</div>
+                      <div className="form-group">
+                        <label>{t('admin.activeDays')} *</label>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                          {weekdayNames.map((day, dayIndex) => (
+                            <label key={dayIndex} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={rule.days.includes(dayIndex)}
+                                onChange={() => toggleWeekday(ruleIndex, dayIndex)}
+                              />
+                              {' '}{day}
+                            </label>
+                          ))}
+                        </div>
+                        {rule.days.length === 0 && (
+                          <small style={{ color: 'red' }}>{t('admin.selectAtLeastOneDay')}</small>
+                        )}
+                      </div>
+
+                      <div className="form-row two-columns">
+                        <div className="form-group">
+                          <label>{t('admin.startHour')} *</label>
                           <input
-                            type="checkbox"
-                            checked={formData.weekdayPattern.days.includes(index)}
-                            onChange={() => toggleWeekday(index)}
+                            type="time"
+                            value={rule.start_hour}
+                            onChange={(e) => updateWeekdayRule(ruleIndex, 'start_hour', e.target.value)}
+                            required
                           />
-                          {' '}{day}
-                        </label>
-                      ))}
+                        </div>
+
+                        <div className="form-group">
+                          <label>{t('admin.endHour')} *</label>
+                          <input
+                            type="time"
+                            value={rule.end_hour}
+                            onChange={(e) => updateWeekdayRule(ruleIndex, 'end_hour', e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {formData.weekdayRules.length > 1 && (
+                        <button type="button" className="btn-icon" onClick={() => removeWeekdayRule(ruleIndex)} title={t('common.delete')}>
+                          🗑️
+                        </button>
+                      )}
                     </div>
-                    {formData.weekdayPattern.days.length === 0 && (
-                      <small style={{ color: 'red' }}>{t('admin.selectAtLeastOneDay')}</small>
-                    )}
-                  </div>
-
-                  <div className="form-group">
-                    <label>{t('admin.startHour')} *</label>
-                    <input
-                      type="time"
-                      value={formData.weekdayPattern.start_hour}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        weekdayPattern: { ...formData.weekdayPattern, start_hour: e.target.value }
-                      })}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>{t('admin.endHour')} *</label>
-                    <input
-                      type="time"
-                      value={formData.weekdayPattern.end_hour}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        weekdayPattern: { ...formData.weekdayPattern, end_hour: e.target.value }
-                      })}
-                      required
-                    />
-                  </div>
-                </>
+                  ))}
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={addWeekdayRule}>
+                    + {t('admin.addWeekdayRule')}
+                  </button>
+                </div>
               )}
 
               <div className="form-actions">

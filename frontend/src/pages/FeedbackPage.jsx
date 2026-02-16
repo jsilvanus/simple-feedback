@@ -198,11 +198,17 @@ export default function FeedbackPage() {
     try {
       setSubmitting(true);
       
-      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => ({
-        questionId: parseInt(questionId),
-        value: answer.value,
-        textValue: answer.textValue,
-      }));
+      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
+        const normalizedTextValue = Array.isArray(answer.wordArray)
+          ? (answer.wordArray.length > 0 ? answer.wordArray.join(', ') : null)
+          : (answer.textValue || null);
+
+        return {
+          questionId: parseInt(questionId),
+          value: answer.value,
+          textValue: normalizedTextValue,
+        };
+      });
 
       await api.submitFeedback(
         data.location.id,

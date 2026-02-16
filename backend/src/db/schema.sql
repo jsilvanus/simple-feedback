@@ -39,6 +39,10 @@ CREATE TABLE IF NOT EXISTS questions (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL,
     type VARCHAR(50) NOT NULL CHECK (type IN ('scale', 'text', 'wordcloud', 'continuous_scale')),
+    answer_scale_id INTEGER REFERENCES answer_scales(id) ON DELETE SET NULL,
+    word_cloud_options_id INTEGER REFERENCES word_cloud_options(id) ON DELETE SET NULL,
+    max_selections INTEGER DEFAULT 3,
+    continuous_axes JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -55,9 +59,6 @@ CREATE TABLE IF NOT EXISTS questionnaire_questions (
     questionnaire_id INTEGER NOT NULL REFERENCES questionnaires(id) ON DELETE CASCADE,
     question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     page_number INTEGER NOT NULL DEFAULT 1,
-    answer_scale_id INTEGER REFERENCES answer_scales(id) ON DELETE SET NULL,
-    word_cloud_options_id INTEGER REFERENCES word_cloud_options(id) ON DELETE SET NULL,
-    max_selections INTEGER DEFAULT 3,
     order_index INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (questionnaire_id, question_id)
 );
@@ -127,7 +128,104 @@ WHERE questionnaire_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 
 ALTER TABLE questions
-ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false;
+ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS answer_scale_id INTEGER REFERENCES answer_scales(id) ON DELETE SET NULL,
+ADD COLUMN IF NOT EXISTS word_cloud_options_id INTEGER REFERENCES word_cloud_options(id) ON DELETE SET NULL,
+ADD COLUMN IF NOT EXISTS max_selections INTEGER DEFAULT 3,
+ADD COLUMN IF NOT EXISTS continuous_axes JSONB;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'questionnaire_questions'
+          AND column_name = 'answer_scale_id'
+    ) THEN
+        UPDATE questions q
+        SET answer_scale_id = qq.answer_scale_id
+        FROM (
+            SELECT DISTINCT ON (question_id) question_id, answer_scale_id
+            FROM questionnaire_questions
+            WHERE answer_scale_id IS NOT NULL
+            ORDER BY question_id, questionnaire_id
+        ) qq
+        WHERE q.id = qq.question_id
+          AND q.answer_scale_id IS NULL;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'questionnaire_questions'
+          AND column_name = 'word_cloud_options_id'
+    ) THEN
+        UPDATE questions q
+        SET word_cloud_options_id = qq.word_cloud_options_id
+        FROM (
+            SELECT DISTINCT ON (question_id) question_id, word_cloud_options_id
+            FROM questionnaire_questions
+            WHERE word_cloud_options_id IS NOT NULL
+            ORDER BY question_id, questionnaire_id
+        ) qq
+        WHERE q.id = qq.question_id
+          AND q.word_cloud_options_id IS NULL;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'questionnaire_questions'
+          AND column_name = 'max_selections'
+    ) THEN
+        UPDATE questions q
+        SET max_selections = qq.max_selections
+        FROM (
+            SELECT question_id, MAX(max_selections) AS max_selections
+            FROM questionnaire_questions
+            WHERE max_selections IS NOT NULL
+            GROUP BY question_id
+        ) qq
+        WHERE q.id = qq.question_id
+          AND q.max_selections IS NULL;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'questionnaire_questions'
+          AND column_name = 'answer_scale_id'
+    ) THEN
+        ALTER TABLE questionnaire_questions DROP COLUMN answer_scale_id;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'questionnaire_questions'
+          AND column_name = 'word_cloud_options_id'
+    ) THEN
+        ALTER TABLE questionnaire_questions DROP COLUMN word_cloud_options_id;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'questionnaire_questions'
+          AND column_name = 'max_selections'
+    ) THEN
+        ALTER TABLE questionnaire_questions DROP COLUMN max_selections;
+    END IF;
+END $$;
 
 ALTER TABLE questionnaires
 ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false;
@@ -142,8 +240,10 @@ CREATE INDEX IF NOT EXISTS idx_feedback_sessions_location ON feedback_sessions(l
 CREATE INDEX IF NOT EXISTS idx_feedback_sessions_timestamp ON feedback_sessions(timestamp);
 CREATE INDEX IF NOT EXISTS idx_feedback_answers_session ON feedback_answers(session_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_answers_question ON feedback_answers(question_id);
-CREATE INDEX IF NOT EXISTS idx_questionnaire_questions_wordcloud ON questionnaire_questions(word_cloud_options_id);
+DROP INDEX IF EXISTS idx_questionnaire_questions_wordcloud;
+CREATE INDEX IF NOT EXISTS idx_questions_wordcloud_options ON questions(word_cloud_options_id);
 CREATE INDEX IF NOT EXISTS idx_schedule_questionnaires_schedule ON schedule_questionnaires(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_schedules_type ON schedules(schedule_type);
 CREATE INDEX IF NOT EXISTS idx_questions_archived ON questions(archived);
+CREATE INDEX IF NOT EXISTS idx_questions_continuous_axes ON questions USING GIN(continuous_axes);
 CREATE INDEX IF NOT EXISTS idx_questionnaires_archived ON questionnaires(archived);

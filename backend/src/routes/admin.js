@@ -506,7 +506,7 @@ router.get('/questions', async (req, res, next) => {
  */
 router.post('/questions', async (req, res, next) => {
   try {
-    const { text, type } = req.body;
+    const { text, type, answerScaleId, wordCloudOptionsId, maxSelections, continuousAxes } = req.body;
 
     if (!text || !type) {
       return res.status(400).json({ error: { message: 'Text and type are required' } });
@@ -516,9 +516,32 @@ router.post('/questions', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Invalid question type' } });
     }
 
+    if (continuousAxes !== undefined && !Array.isArray(continuousAxes)) {
+      return res.status(400).json({ error: { message: 'continuousAxes must be an array' } });
+    }
+
+    if (type === 'continuous_scale') {
+      if (!answerScaleId) {
+        return res.status(400).json({ error: { message: 'answerScaleId is required for continuous_scale questions' } });
+      }
+      if (!Array.isArray(continuousAxes) || continuousAxes.length === 0) {
+        return res.status(400).json({ error: { message: 'continuousAxes must contain at least one axis for continuous_scale questions' } });
+      }
+    }
+
+    const scaleId = ['scale', 'continuous_scale'].includes(type) ? (answerScaleId || null) : null;
+    const cloudId = type === 'wordcloud' ? (wordCloudOptionsId || null) : null;
+    const normalizedMaxSelections = type === 'wordcloud' ? (maxSelections || 3) : 3;
+    const normalizedContinuousAxes = type === 'continuous_scale'
+      ? continuousAxes.map((axis, index) => ({
+          id: axis.id || `axis_${index + 1}`,
+          label: axis.label || `Axis ${index + 1}`,
+        }))
+      : null;
+
     const result = await db.query(
-      'INSERT INTO questions (text, type) VALUES ($1, $2) RETURNING *',
-      [text, type]
+      'INSERT INTO questions (text, type, answer_scale_id, word_cloud_options_id, max_selections, continuous_axes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [text, type, scaleId, cloudId, normalizedMaxSelections, normalizedContinuousAxes ? JSON.stringify(normalizedContinuousAxes) : null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -534,7 +557,31 @@ router.post('/questions', async (req, res, next) => {
 router.put('/questions/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { text, type } = req.body;
+    const { text, type, answerScaleId, wordCloudOptionsId, maxSelections, continuousAxes } = req.body;
+
+    const existingResult = await db.query('SELECT * FROM questions WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Question not found' } });
+    }
+
+    const existing = existingResult.rows[0];
+    const finalType = type !== undefined ? type : existing.type;
+
+    if (continuousAxes !== undefined && !Array.isArray(continuousAxes)) {
+      return res.status(400).json({ error: { message: 'continuousAxes must be an array' } });
+    }
+
+    const finalContinuousAxes = continuousAxes !== undefined ? continuousAxes : (existing.continuous_axes || []);
+
+    if (finalType === 'continuous_scale') {
+      const finalAnswerScale = answerScaleId !== undefined ? answerScaleId : existing.answer_scale_id;
+      if (!finalAnswerScale) {
+        return res.status(400).json({ error: { message: 'answerScaleId is required for continuous_scale questions' } });
+      }
+      if (!Array.isArray(finalContinuousAxes) || finalContinuousAxes.length === 0) {
+        return res.status(400).json({ error: { message: 'continuousAxes must contain at least one axis for continuous_scale questions' } });
+      }
+    }
 
     const updates = [];
     const values = [];
@@ -552,6 +599,45 @@ router.put('/questions/:id', async (req, res, next) => {
       values.push(type);
     }
 
+    if (answerScaleId !== undefined) {
+      updates.push(`answer_scale_id = $${paramCount++}`);
+      values.push(answerScaleId || null);
+    }
+
+    if (wordCloudOptionsId !== undefined) {
+      updates.push(`word_cloud_options_id = $${paramCount++}`);
+      values.push(wordCloudOptionsId || null);
+    }
+
+    if (maxSelections !== undefined) {
+      updates.push(`max_selections = $${paramCount++}`);
+      values.push(maxSelections || 3);
+    }
+
+    if (continuousAxes !== undefined) {
+      const normalizedAxes = continuousAxes.map((axis, index) => ({
+        id: axis.id || `axis_${index + 1}`,
+        label: axis.label || `Axis ${index + 1}`,
+      }));
+      updates.push(`continuous_axes = $${paramCount++}`);
+      values.push(JSON.stringify(normalizedAxes));
+    }
+
+    if (!['scale', 'continuous_scale'].includes(finalType) && answerScaleId === undefined) {
+      updates.push(`answer_scale_id = NULL`);
+    }
+    if (finalType !== 'wordcloud') {
+      if (wordCloudOptionsId === undefined) {
+        updates.push(`word_cloud_options_id = NULL`);
+      }
+      if (maxSelections === undefined) {
+        updates.push(`max_selections = 3`);
+      }
+    }
+    if (finalType !== 'continuous_scale' && continuousAxes === undefined) {
+      updates.push(`continuous_axes = NULL`);
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: { message: 'No fields to update' } });
     }
@@ -561,10 +647,6 @@ router.put('/questions/:id', async (req, res, next) => {
 
     const query = `UPDATE questions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
     const result = await db.query(query, values);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Question not found' } });
-    }
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -677,7 +759,7 @@ router.get('/questionnaires/:id', async (req, res, next) => {
     }
 
     const questionsResult = await db.query(
-      `SELECT question_id, page_number, answer_scale_id, word_cloud_options_id, max_selections, order_index
+      `SELECT question_id, page_number, order_index
        FROM questionnaire_questions
        WHERE questionnaire_id = $1
        ORDER BY page_number, order_index`,
@@ -721,8 +803,8 @@ router.post('/questionnaires', async (req, res, next) => {
     if (questions && Array.isArray(questions)) {
       for (const q of questions) {
         await client.query(
-          'INSERT INTO questionnaire_questions (questionnaire_id, question_id, page_number, answer_scale_id, word_cloud_options_id, max_selections, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [questionnaireId, q.questionId, q.pageNumber || 1, q.answerScaleId || null, q.wordCloudOptionsId || null, q.maxSelections || 3, q.orderIndex || 0]
+          'INSERT INTO questionnaire_questions (questionnaire_id, question_id, page_number, order_index) VALUES ($1, $2, $3, $4)',
+          [questionnaireId, q.questionId, q.pageNumber || 1, q.orderIndex || 0]
         );
       }
     }
@@ -789,14 +871,11 @@ router.put('/questionnaires/:id', async (req, res, next) => {
       // Add new questions
       for (const q of questions) {
         await client.query(
-          'INSERT INTO questionnaire_questions (questionnaire_id, question_id, page_number, answer_scale_id, word_cloud_options_id, max_selections, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          'INSERT INTO questionnaire_questions (questionnaire_id, question_id, page_number, order_index) VALUES ($1, $2, $3, $4)',
           [
             id,
             q.questionId,
             q.pageNumber || 1,
-            q.answerScaleId || null,
-            q.wordCloudOptionsId || null,
-            q.maxSelections || 3,
             q.orderIndex || 0,
           ]
         );
@@ -1148,15 +1227,14 @@ router.get('/results', async (req, res, next) => {
         quest.type as question_type,
         fa.value,
         fa.text_value,
-        qq.word_cloud_options_id,
+        quest.word_cloud_options_id,
         wco.words as word_cloud_words
       FROM feedback_sessions fs
       JOIN locations l ON fs.location_id = l.id
       JOIN questionnaires q ON fs.questionnaire_id = q.id
       JOIN feedback_answers fa ON fs.id = fa.session_id
       JOIN questions quest ON fa.question_id = quest.id
-      LEFT JOIN questionnaire_questions qq ON qq.questionnaire_id = fs.questionnaire_id AND qq.question_id = quest.id
-      LEFT JOIN word_cloud_options wco ON qq.word_cloud_options_id = wco.id
+      LEFT JOIN word_cloud_options wco ON quest.word_cloud_options_id = wco.id
       WHERE 1=1
     `;
 

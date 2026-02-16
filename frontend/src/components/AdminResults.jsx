@@ -202,6 +202,30 @@ export default function AdminResults() {
     return dist;
   };
 
+  const getWordFrequency = (texts) => {
+    const frequency = texts
+      .flatMap((text) => text.split(',').map((word) => word.trim()))
+      .filter(Boolean)
+      .reduce((acc, word) => {
+        acc[word] = (acc[word] || 0) + 1;
+        return acc;
+      }, {});
+
+    return Object.entries(frequency)
+      .map(([word, count]) => ({ word, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  const getWordCloudFontSize = (count, maxCount) => {
+    const minSize = 14;
+    const maxSize = 40;
+
+    if (!maxCount || maxCount <= 1) return minSize;
+
+    const ratio = (count - 1) / (maxCount - 1);
+    return Math.round(minSize + ratio * (maxSize - minSize));
+  };
+
   if (loading) return <div className="loading">{t('admin.loadingResults')}</div>;
   if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
@@ -361,23 +385,25 @@ export default function AdminResults() {
                 </div>
                 <div className="word-frequency">
                   <h5>Word Frequency (Finnish):</h5>
+                  {(() => {
+                    const wordFrequency = getWordFrequency(data.texts);
+                    const maxCount = wordFrequency.length > 0 ? wordFrequency[0].count : 1;
+
+                    return (
                   <div className="word-cloud-display">
-                    {Object.entries(
-                      data.texts
-                        .flatMap(text => text.split(',').map(w => w.trim()))
-                        .reduce((acc, word) => {
-                          acc[word] = (acc[word] || 0) + 1;
-                          return acc;
-                        }, {})
-                    )
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([word, count]) => (
-                        <div key={word} className="word-frequency-item">
-                          <span className="word-chip-result">{word}</span>
-                          <span className="frequency-badge">{count}x</span>
-                        </div>
-                      ))}
+                    {wordFrequency.map(({ word, count }) => (
+                      <span
+                        key={word}
+                        className="word-cloud-word"
+                        title={`${word}: ${count} responses`}
+                        style={{ fontSize: `${getWordCloudFontSize(count, maxCount)}px` }}
+                      >
+                        {word}
+                      </span>
+                    ))}
                   </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

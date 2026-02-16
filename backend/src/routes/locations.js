@@ -96,13 +96,13 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
       questionnairesToShow.map(async (q) => {
         const questionsResult = await db.query(
           `SELECT q.id, q.text, q.type, qq.page_number, qq.order_index,
-                  qq.answer_scale_id, a.name as scale_name, a.buttons,
-                  qq.word_cloud_options_id, wc.name as word_cloud_name, wc.words,
-                  qq.max_selections
+                  q.answer_scale_id, a.name as scale_name, a.buttons,
+                  q.word_cloud_options_id, wc.name as word_cloud_name, wc.words,
+                  q.max_selections, q.continuous_axes
            FROM questions q
            JOIN questionnaire_questions qq ON q.id = qq.question_id
-           LEFT JOIN answer_scales a ON qq.answer_scale_id = a.id
-           LEFT JOIN word_cloud_options wc ON qq.word_cloud_options_id = wc.id
+           LEFT JOIN answer_scales a ON q.answer_scale_id = a.id
+           LEFT JOIN word_cloud_options wc ON q.word_cloud_options_id = wc.id
            WHERE qq.questionnaire_id = $1
            ORDER BY qq.page_number, qq.order_index`,
           [q.id]
@@ -129,6 +129,7 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
               words: question.words,
             } : null,
             maxSelections: question.max_selections || 3,
+            continuousAxes: Array.isArray(question.continuous_axes) ? question.continuous_axes : [],
           });
         });
 
