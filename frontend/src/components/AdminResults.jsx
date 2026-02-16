@@ -19,6 +19,8 @@ export default function AdminResults() {
   });
   const [stats, setStats] = useState({
     totalSessions: 0,
+    totalQuestionsAnswered: 0,
+    totalQuestionnairesAnswered: 0,
     byLocation: {},
     byQuestion: {},
   });
@@ -66,15 +68,19 @@ export default function AdminResults() {
 
   const calculateStats = () => {
     const sessions = new Set(results.map(r => r.session_id));
-    const byLocation = {};
+    const byLocationAccumulator = {};
     const byQuestion = {};
 
     results.forEach(result => {
       // Count by location
-      if (!byLocation[result.location_name]) {
-        byLocation[result.location_name] = 0;
+      if (!byLocationAccumulator[result.location_name]) {
+        byLocationAccumulator[result.location_name] = {
+          questionsAnswered: 0,
+          sessionIds: new Set(),
+        };
       }
-      byLocation[result.location_name]++;
+      byLocationAccumulator[result.location_name].questionsAnswered++;
+      byLocationAccumulator[result.location_name].sessionIds.add(result.session_id);
 
       // Aggregate by question
       if (!byQuestion[result.question_text]) {
@@ -117,8 +123,20 @@ export default function AdminResults() {
       }
     });
 
+    const byLocation = Object.fromEntries(
+      Object.entries(byLocationAccumulator).map(([location, data]) => [
+        location,
+        {
+          questionsAnswered: data.questionsAnswered,
+          questionnairesAnswered: data.sessionIds.size,
+        },
+      ])
+    );
+
     setStats({
       totalSessions: sessions.size,
+      totalQuestionsAnswered: results.length,
+      totalQuestionnairesAnswered: sessions.size,
       byLocation,
       byQuestion,
     });
@@ -344,17 +362,29 @@ export default function AdminResults() {
 
       <div className="stats-section">
         <div className="stat-card">
-          <h4>{t('admin.totalResponses')}</h4>
-          <div className="stat-value">{stats.totalSessions}</div>
+          <h4>Total Questions Answered</h4>
+          <div className="stat-value">{stats.totalQuestionsAnswered}</div>
+        </div>
+
+        <div className="stat-card">
+          <h4>Total Questionnaires Answered</h4>
+          <div className="stat-value">{stats.totalQuestionnairesAnswered}</div>
         </div>
 
         <div className="stat-card">
           <h4>{t('admin.byLocation')}</h4>
           <div className="stat-list">
-            {Object.entries(stats.byLocation).map(([location, count]) => (
+            {Object.entries(stats.byLocation).map(([location, counts]) => (
               <div key={location} className="stat-item">
                 <span>{location}</span>
-                <span className="stat-badge">{count}</span>
+                <span>
+                  <span className="stat-badge" title="Questions Answered" style={{ marginRight: '6px' }}>
+                    Q: {counts.questionsAnswered}
+                  </span>
+                  <span className="stat-badge" title="Questionnaires Answered">
+                    QQ: {counts.questionnairesAnswered}
+                  </span>
+                </span>
               </div>
             ))}
           </div>
