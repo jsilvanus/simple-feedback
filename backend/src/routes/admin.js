@@ -278,6 +278,44 @@ router.post('/answer-scales', async (req, res, next) => {
 });
 
 /**
+ * GET /api/admin/word-cloud-options
+ * Get all word cloud options
+ */
+router.get('/word-cloud-options', async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM word_cloud_options ORDER BY name'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/word-cloud-options
+ * Create a new word cloud option set
+ */
+router.post('/word-cloud-options', async (req, res, next) => {
+  try {
+    const { name, words } = req.body;
+
+    if (!name || !words || !Array.isArray(words)) {
+      return res.status(400).json({ error: { message: 'Name and words array are required' } });
+    }
+
+    const result = await db.query(
+      'INSERT INTO word_cloud_options (name, words) VALUES ($1, $2) RETURNING *',
+      [name, JSON.stringify(words)]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/admin/questionnaires
  * Get all questionnaires
  */
@@ -326,8 +364,8 @@ router.post('/questionnaires', async (req, res, next) => {
     if (questions && Array.isArray(questions)) {
       for (const q of questions) {
         await client.query(
-          'INSERT INTO questionnaire_questions (questionnaire_id, question_id, page_number, answer_scale_id, order_index) VALUES ($1, $2, $3, $4, $5)',
-          [questionnaireId, q.questionId, q.pageNumber || 1, q.answerScaleId || null, q.orderIndex || 0]
+          'INSERT INTO questionnaire_questions (questionnaire_id, question_id, page_number, answer_scale_id, word_cloud_options_id, max_selections, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [questionnaireId, q.questionId, q.pageNumber || 1, q.answerScaleId || null, q.wordCloudOptionsId || null, q.maxSelections || 3, q.orderIndex || 0]
         );
       }
     }

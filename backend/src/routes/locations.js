@@ -47,10 +47,13 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
     // Get questions for this questionnaire
     const questionsResult = await db.query(
       `SELECT q.id, q.text, q.type, qq.page_number, qq.order_index, 
-              qq.answer_scale_id, a.name as scale_name, a.buttons
+              qq.answer_scale_id, a.name as scale_name, a.buttons,
+              qq.word_cloud_options_id, wc.name as word_cloud_name, wc.words,
+              qq.max_selections
        FROM questions q
        JOIN questionnaire_questions qq ON q.id = qq.question_id
        LEFT JOIN answer_scales a ON qq.answer_scale_id = a.id
+       LEFT JOIN word_cloud_options wc ON qq.word_cloud_options_id = wc.id
        WHERE qq.questionnaire_id = $1
        ORDER BY qq.page_number, qq.order_index`,
       [schedule.questionnaire_id]
@@ -71,6 +74,12 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
           name: q.scale_name,
           buttons: q.buttons,
         } : null,
+        wordCloudOptions: q.words ? {
+          id: q.word_cloud_options_id,
+          name: q.word_cloud_name,
+          words: q.words,
+        } : null,
+        maxSelections: q.max_selections || 3,
       });
     });
 

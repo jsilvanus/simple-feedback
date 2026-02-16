@@ -17,6 +17,14 @@ CREATE TABLE IF NOT EXISTS answer_scales (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS word_cloud_options (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    words JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS questions (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL,
@@ -38,6 +46,8 @@ CREATE TABLE IF NOT EXISTS questionnaire_questions (
     question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     page_number INTEGER NOT NULL DEFAULT 1,
     answer_scale_id INTEGER REFERENCES answer_scales(id) ON DELETE SET NULL,
+    word_cloud_options_id INTEGER REFERENCES word_cloud_options(id) ON DELETE SET NULL,
+    max_selections INTEGER DEFAULT 3,
     order_index INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (questionnaire_id, question_id)
 );
@@ -77,3 +87,4 @@ CREATE INDEX idx_feedback_sessions_location ON feedback_sessions(location_id);
 CREATE INDEX idx_feedback_sessions_timestamp ON feedback_sessions(timestamp);
 CREATE INDEX idx_feedback_answers_session ON feedback_answers(session_id);
 CREATE INDEX idx_feedback_answers_question ON feedback_answers(question_id);
+CREATE INDEX idx_questionnaire_questions_wordcloud ON questionnaire_questions(word_cloud_options_id);
