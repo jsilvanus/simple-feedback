@@ -68,6 +68,20 @@ export default function AdminLocations() {
     setShowForm(true);
   };
 
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this location? This will also delete all associated schedules and feedback.')) {
+      return;
+    }
+    try {
+      await api.adminRequest(`/locations/${id}`, {
+        method: 'DELETE',
+      });
+      loadLocations();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleCancel = () => {
     setShowForm(false);
     setEditingId(null);
@@ -203,6 +217,9 @@ export default function AdminLocations() {
                   <td>
                     <button className="btn-icon" onClick={() => handleEdit(location)} title="Edit">
                       ✏️
+                    </button>
+                    <button className="btn-icon" onClick={() => handleDelete(location.id)} title="Delete">
+                      🗑️
                     </button>
                   </td>
                 </tr>
