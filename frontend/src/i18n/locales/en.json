@@ -23,7 +23,8 @@
     "enterFeedback": "Enter your feedback here...",
     "noActiveQuestionnaire": "No active questionnaire for this location",
     "failedToSubmit": "Failed to submit feedback",
-    "locationNotFound": "Location not found or inactive"
+    "locationNotFound": "Location not found or inactive",
+    "selectUpTo": "Select up to {{max}} words"
   },
   "auth": {
     "login": "Login",

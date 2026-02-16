@@ -156,6 +156,54 @@
   color: #888;
 }
 
+.word-cloud-input {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.word-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.word-chip {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border: 2px solid transparent;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f0f0f0;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.word-chip:hover:not(.disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.word-chip.selected {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.word-chip.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.word-cloud-info {
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
 .feedback-actions {
   display: flex;
   gap: 15px;

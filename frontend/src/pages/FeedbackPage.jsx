@@ -95,10 +95,10 @@ export default function FeedbackPage() {
     }
   };
 
-  const handleAnswer = (questionId, value, textValue = null) => {
+  const handleAnswer = (questionId, value, textValue = null, wordArray = null) => {
     setAnswers(prev => ({
       ...prev,
-      [questionId]: { value, textValue },
+      [questionId]: { value, textValue, wordArray },
     }));
   };
 
@@ -123,7 +123,7 @@ export default function FeedbackPage() {
       const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => ({
         questionId: parseInt(questionId),
         value: answer.value,
-        textValue: answer.textValue,
+        textValue: answer.wordArray ? answer.wordArray.join(', ') : answer.textValue,
       }));
 
       await api.submitFeedback(
@@ -272,9 +272,53 @@ export default function FeedbackPage() {
                 />
               )}
 
-              {question.type === 'wordcloud' && (
-                <div className="wordcloud-placeholder">
-                  <p>Word cloud input (to be implemented)</p>
+              {question.type === 'wordcloud' && question.wordCloudOptions && (
+                <div className="word-cloud-input">
+                  <div className="word-chips">
+                    {question.wordCloudOptions.words.map((word, index) => {
+                      const selectedWords = answers[question.id]?.wordArray || [];
+                      const isSelected = selectedWords.includes(word.text);
+                      const maxReached = selectedWords.length >= question.maxSelections && !isSelected;
+                      
+                      return (
+                        <button
+                          key={index}
+                          className={`word-chip ${isSelected ? 'selected' : ''} ${maxReached ? 'disabled' : ''}`}
+                          style={{
+                            backgroundColor: isSelected ? word.color : '#f0f0f0',
+                            color: isSelected ? 'white' : '#333',
+                            opacity: maxReached ? 0.5 : 1,
+                          }}
+                          onClick={() => {
+                            const currentWords = answers[question.id]?.wordArray || [];
+                            let newWords;
+                            
+                            if (isSelected) {
+                              // Deselect word
+                              newWords = currentWords.filter(w => w !== word.text);
+                            } else if (currentWords.length < question.maxSelections) {
+                              // Select word
+                              newWords = [...currentWords, word.text];
+                            } else {
+                              // Max reached, don't add
+                              return;
+                            }
+                            
+                            handleAnswer(question.id, null, null, newWords);
+                          }}
+                          disabled={maxReached}
+                        >
+                          {word.text}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="word-cloud-info">
+                    <small>
+                      {t('feedback.selectUpTo', { max: question.maxSelections })} 
+                      {' '}({(answers[question.id]?.wordArray || []).length}/{question.maxSelections} selected)
+                    </small>
+                  </div>
                 </div>
               )}
             </div>

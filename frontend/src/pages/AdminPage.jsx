@@ -4,6 +4,7 @@ import { api } from '../api';
 import AdminLocations from '../components/AdminLocations';
 import AdminQuestions from '../components/AdminQuestions';
 import AdminAnswerScales from '../components/AdminAnswerScales';
+import AdminWordCloudOptions from '../components/AdminWordCloudOptions';
 import AdminQuestionnaires from '../components/AdminQuestionnaires';
 import AdminSchedules from '../components/AdminSchedules';
 import AdminResults from '../components/AdminResults';
@@ -100,6 +101,12 @@ export default function AdminPage() {
             Answer Scales
           </button>
           <button 
+            className={activeTab === 'word-cloud-options' ? 'active' : ''} 
+            onClick={() => setActiveTab('word-cloud-options')}
+          >
+            Word Cloud Options
+          </button>
+          <button 
             className={activeTab === 'questionnaires' ? 'active' : ''} 
             onClick={() => setActiveTab('questionnaires')}
           >
@@ -152,6 +159,7 @@ export default function AdminPage() {
           {activeTab === 'locations' && <AdminLocations />}
           {activeTab === 'questions' && <AdminQuestions />}
           {activeTab === 'answer-scales' && <AdminAnswerScales />}
+          {activeTab === 'word-cloud-options' && <AdminWordCloudOptions />}
           {activeTab === 'questionnaires' && <AdminQuestionnaires />}
           {activeTab === 'schedules' && <AdminSchedules />}
           {activeTab === 'results' && <AdminResults />}

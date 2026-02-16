@@ -23,7 +23,8 @@
     "enterFeedback": "Kirjoita palautteesi tähän...",
     "noActiveQuestionnaire": "Ei aktiivista kyselyä tälle sijainnille",
     "failedToSubmit": "Palautteen lähetys epäonnistui",
-    "locationNotFound": "Sijaintia ei löytynyt tai se ei ole aktiivinen"
+    "locationNotFound": "Sijaintia ei löytynyt tai se ei ole aktiivinen",
+    "selectUpTo": "Valitse enintään {{max}} sanaa"
   },
   "auth": {
     "login": "Kirjaudu sisään",

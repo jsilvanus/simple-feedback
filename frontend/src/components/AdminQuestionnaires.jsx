@@ -6,6 +6,7 @@ export default function AdminQuestionnaires() {
   const [questionnaires, setQuestionnaires] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [answerScales, setAnswerScales] = useState([]);
+  const [wordCloudOptions, setWordCloudOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -24,14 +25,16 @@ export default function AdminQuestionnaires() {
     try {
       setLoading(true);
       setError(null);
-      const [questionnairesData, questionsData, scalesData] = await Promise.all([
+      const [questionnairesData, questionsData, scalesData, wordCloudData] = await Promise.all([
         api.adminRequest(`/questionnaires?includeArchived=${showArchived}`),
         api.adminRequest('/questions'),
         api.adminRequest('/answer-scales'),
+        api.adminRequest('/word-cloud-options'),
       ]);
       setQuestionnaires(questionnairesData);
       setQuestions(questionsData);
       setAnswerScales(scalesData);
+      setWordCloudOptions(wordCloudData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -80,6 +83,8 @@ export default function AdminQuestionnaires() {
           questionId: '',
           pageNumber: 1,
           answerScaleId: '',
+          wordCloudOptionsId: '',
+          maxSelections: 3,
           orderIndex: formData.questions.length,
         },
       ],
@@ -147,44 +152,78 @@ export default function AdminQuestionnaires() {
 
               <div className="form-group">
                 <label>Questions</label>
-                {formData.questions.map((q, index) => (
-                  <div key={index} className="question-editor">
-                    <select
-                      value={q.questionId}
-                      onChange={(e) => updateQuestion(index, 'questionId', parseInt(e.target.value))}
-                      required
-                    >
-                      <option value="">Select question...</option>
-                      {questions.map((question) => (
-                        <option key={question.id} value={question.id}>
-                          {question.text.length > 50 ? question.text.substring(0, 50) + '...' : question.text}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      value={q.pageNumber}
-                      onChange={(e) => updateQuestion(index, 'pageNumber', parseInt(e.target.value))}
-                      placeholder="Page #"
-                      min="1"
-                      required
-                    />
-                    <select
-                      value={q.answerScaleId}
-                      onChange={(e) => updateQuestion(index, 'answerScaleId', e.target.value ? parseInt(e.target.value) : null)}
-                    >
-                      <option value="">No scale (text/wordcloud)</option>
-                      {answerScales.map((scale) => (
-                        <option key={scale.id} value={scale.id}>
-                          {scale.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" onClick={() => removeQuestion(index)} className="btn-icon">
-                      ❌
-                    </button>
-                  </div>
-                ))}
+                {formData.questions.map((q, index) => {
+                  const selectedQuestion = questions.find(question => question.id === q.questionId);
+                  const questionType = selectedQuestion?.type;
+                  
+                  return (
+                    <div key={index} className="question-editor">
+                      <select
+                        value={q.questionId}
+                        onChange={(e) => updateQuestion(index, 'questionId', parseInt(e.target.value))}
+                        required
+                      >
+                        <option value="">Select question...</option>
+                        {questions.map((question) => (
+                          <option key={question.id} value={question.id}>
+                            {question.text.length > 50 ? question.text.substring(0, 50) + '...' : question.text}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        value={q.pageNumber}
+                        onChange={(e) => updateQuestion(index, 'pageNumber', parseInt(e.target.value))}
+                        placeholder="Page #"
+                        min="1"
+                        required
+                      />
+                      
+                      {questionType === 'scale' && (
+                        <select
+                          value={q.answerScaleId}
+                          onChange={(e) => updateQuestion(index, 'answerScaleId', e.target.value ? parseInt(e.target.value) : null)}
+                        >
+                          <option value="">No scale</option>
+                          {answerScales.map((scale) => (
+                            <option key={scale.id} value={scale.id}>
+                              {scale.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      
+                      {questionType === 'wordcloud' && (
+                        <>
+                          <select
+                            value={q.wordCloudOptionsId}
+                            onChange={(e) => updateQuestion(index, 'wordCloudOptionsId', e.target.value ? parseInt(e.target.value) : null)}
+                          >
+                            <option value="">No word cloud options</option>
+                            {wordCloudOptions.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            value={q.maxSelections}
+                            onChange={(e) => updateQuestion(index, 'maxSelections', parseInt(e.target.value))}
+                            placeholder="Max selections"
+                            min="1"
+                            max="20"
+                            title="Maximum number of words users can select"
+                          />
+                        </>
+                      )}
+                      
+                      <button type="button" onClick={() => removeQuestion(index)} className="btn-icon">
+                        ❌
+                      </button>
+                    </div>
+                  );
+                })}
                 <button type="button" onClick={addQuestion} className="btn btn-secondary btn-sm">
                   + Add Question
                 </button>
