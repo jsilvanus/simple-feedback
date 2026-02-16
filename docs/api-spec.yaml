@@ -187,6 +187,109 @@ paths:
               schema:
                 $ref: '#/components/schemas/Location'
 
+  /api/admin/location-groups:
+    get:
+      tags:
+        - Admin
+      summary: List all location groups
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of location groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LocationGroup'
+    post:
+      tags:
+        - Admin
+      summary: Create a new location group
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Name of the location group
+                description:
+                  type: string
+                  description: Optional description
+                active:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Location group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationGroup'
+        '400':
+          description: Invalid input
+
+  /api/admin/location-groups/{id}:
+    put:
+      tags:
+        - Admin
+      summary: Update a location group
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Location group updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationGroup'
+        '404':
+          description: Location group not found
+    delete:
+      tags:
+        - Admin
+      summary: Delete a location group
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Location group deleted
+        '404':
+          description: Location group not found
+
   /api/admin/questions:
     get:
       tags:
@@ -493,6 +596,36 @@ components:
           type: string
         active:
           type: boolean
+        group_id:
+          type: integer
+          nullable: true
+          description: ID of the location group this location belongs to
+        group_name:
+          type: string
+          nullable: true
+          description: Name of the location group (when joined)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LocationGroup:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          description: Name of the location group
+        description:
+          type: string
+          nullable: true
+          description: Optional description of the group
+        active:
+          type: boolean
+          description: Whether the group is active
         created_at:
           type: string
           format: date-time
@@ -565,6 +698,12 @@ components:
           type: integer
         location_id:
           type: integer
+          nullable: true
+          description: ID of the specific location (null if targeting a group)
+        location_group_id:
+          type: integer
+          nullable: true
+          description: ID of the location group (null if targeting a specific location)
         questionnaire_id:
           type: integer
         start_time:
