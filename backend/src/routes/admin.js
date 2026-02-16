@@ -50,7 +50,10 @@ router.use(apiLimiter);
 router.get('/locations', async (req, res, next) => {
   try {
     const result = await db.query(
-      'SELECT * FROM locations ORDER BY name'
+      `SELECT l.*, lg.name as group_name
+       FROM locations l
+       LEFT JOIN location_groups lg ON l.group_id = lg.id
+       ORDER BY l.name`
     );
     res.json(result.rows);
   } catch (error) {
@@ -100,7 +103,7 @@ router.post('/locations', async (req, res, next) => {
 router.put('/locations/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { slug, name, active, password, passwordRequired } = req.body;
+    const { slug, name, active, password, passwordRequired, groupId } = req.body;
 
     // Build update query dynamically based on provided fields
     const updates = [];
@@ -118,6 +121,10 @@ router.put('/locations/:id', async (req, res, next) => {
     if (active !== undefined) {
       updates.push(`active = $${paramCount++}`);
       values.push(active);
+    }
+    if (groupId !== undefined) {
+      updates.push(`group_id = $${paramCount++}`);
+      values.push(groupId);
     }
     if (passwordRequired !== undefined) {
       updates.push(`password_required = $${paramCount++}`);
@@ -181,6 +188,114 @@ router.delete('/locations/:id', async (req, res, next) => {
     }
 
     res.json({ success: true, message: 'Location deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/location-groups
+ * Get all location groups
+ */
+router.get('/location-groups', async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM location_groups ORDER BY name'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/location-groups
+ * Create a new location group
+ */
+router.post('/location-groups', async (req, res, next) => {
+  try {
+    const { name, description, active } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: { message: 'Name is required' } });
+    }
+
+    const result = await db.query(
+      'INSERT INTO location_groups (name, description, active) VALUES ($1, $2, $3) RETURNING *',
+      [name, description, active !== undefined ? active : true]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/location-groups/:id
+ * Update a location group
+ */
+router.put('/location-groups/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, description, active } = req.body;
+
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramCount++}`);
+      values.push(description);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const query = `UPDATE location_groups SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location group not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/location-groups/:id
+ * Delete a location group
+ */
+router.delete('/location-groups/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM location_groups WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location group not found' } });
+    }
+
+    res.json({ success: true, message: 'Location group deleted successfully' });
   } catch (error) {
     next(error);
   }
@@ -555,11 +670,14 @@ router.put('/questionnaires/:id', async (req, res, next) => {
  */
 router.get('/schedules', async (req, res, next) => {
   try {
-    // Get all schedules with location info
+    // Get all schedules with location and location group info
     const schedulesResult = await db.query(
-      `SELECT s.*, l.name as location_name, l.slug as location_slug
+      `SELECT s.*, 
+              l.name as location_name, l.slug as location_slug,
+              lg.name as location_group_name
        FROM schedules s
-       JOIN locations l ON s.location_id = l.id
+       LEFT JOIN locations l ON s.location_id = l.id
+       LEFT JOIN location_groups lg ON s.location_group_id = lg.id
        ORDER BY s.start_time DESC`
     );
 
@@ -637,7 +755,8 @@ router.post('/schedules', async (req, res, next) => {
   
   try {
     const { 
-      locationId, 
+      locationId,
+      locationGroupId,  // NEW: Support for location groups
       questionnaireIds, // Array of questionnaire IDs
       scheduleType,     // 'date_based' or 'recurring_weekday'
       startTime,        // For date_based
@@ -646,9 +765,16 @@ router.post('/schedules', async (req, res, next) => {
       showOnlyOne       // Boolean
     } = req.body;
 
-    if (!locationId) {
+    // Must have either locationId or locationGroupId, but not both
+    if (!locationId && !locationGroupId) {
       return res.status(400).json({ 
-        error: { message: 'locationId is required' } 
+        error: { message: 'Either locationId or locationGroupId is required' } 
+      });
+    }
+
+    if (locationId && locationGroupId) {
+      return res.status(400).json({ 
+        error: { message: 'Cannot specify both locationId and locationGroupId' } 
       });
     }
 
@@ -684,11 +810,12 @@ router.post('/schedules', async (req, res, next) => {
     // Create schedule
     const scheduleResult = await client.query(
       `INSERT INTO schedules 
-       (location_id, schedule_type, start_time, end_time, weekday_pattern, show_only_one) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
+       (location_id, location_group_id, schedule_type, start_time, end_time, weekday_pattern, show_only_one) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
        RETURNING *`,
       [
-        locationId, 
+        locationId || null,
+        locationGroupId || null,
         type,
         type === 'date_based' ? startTime : null,
         type === 'date_based' ? endTime : null,
@@ -728,7 +855,8 @@ router.put('/schedules/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { 
-      locationId, 
+      locationId,
+      locationGroupId, // NEW: Support for location groups
       questionnaireIds,
       scheduleType,
       startTime,
@@ -747,6 +875,14 @@ router.put('/schedules/:id', async (req, res, next) => {
     if (locationId !== undefined) {
       updates.push(`location_id = $${paramCount++}`);
       values.push(locationId);
+      // If setting locationId, clear locationGroupId
+      updates.push(`location_group_id = NULL`);
+    }
+    if (locationGroupId !== undefined) {
+      updates.push(`location_group_id = $${paramCount++}`);
+      values.push(locationGroupId);
+      // If setting locationGroupId, clear locationId
+      updates.push(`location_id = NULL`);
     }
     if (scheduleType !== undefined) {
       updates.push(`schedule_type = $${paramCount++}`);
