@@ -51,6 +51,26 @@ const upload = multer({
   }
 });
 
+// Error handler for multer errors
+const handleUploadError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: { message: 'File size exceeds 5MB limit' } 
+      });
+    }
+    return res.status(400).json({ 
+      error: { message: `Upload error: ${err.message}` } 
+    });
+  }
+  if (err) {
+    return res.status(400).json({ 
+      error: { message: err.message } 
+    });
+  }
+  next();
+};
+
 /**
  * GET /api/admin/images
  * Get all images
@@ -70,7 +90,7 @@ router.get('/', async (req, res, next) => {
  * POST /api/admin/images
  * Upload a new image
  */
-router.post('/', upload.single('image'), async (req, res, next) => {
+router.post('/', upload.single('image'), handleUploadError, async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: { message: 'No image file provided' } });

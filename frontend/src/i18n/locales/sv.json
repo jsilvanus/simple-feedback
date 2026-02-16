@@ -13,7 +13,8 @@
     "no": "Nej",
     "previous": "Föregående",
     "next": "Nästa",
-    "submitting": "Skickar..."
+    "submitting": "Skickar...",
+    "location": "plats"
   },
   "feedback": {
     "thankYou": "Tack!",

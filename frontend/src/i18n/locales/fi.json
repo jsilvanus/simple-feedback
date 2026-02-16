@@ -13,12 +13,13 @@
     "no": "Ei",
     "previous": "Edellinen",
     "next": "Seuraava",
-    "submitting": "Lähetetään..."
+    "submitting": "Lähetetään...",
+    "location": "sijainti"
   },
   "feedback": {
     "thankYou": "Kiitos!",
     "feedbackSubmitted": "Palautteesi on vastaanotettu.",
-    "pageOf": "Sivu {{current}}/{{total}}",
+    "pageOf": "Sivu {{current}} / {{total}}",
     "enterFeedback": "Kirjoita palautteesi tähän...",
     "noActiveQuestionnaire": "Ei aktiivista kyselyä tälle sijainnille",
     "failedToSubmit": "Palautteen lähetys epäonnistui",

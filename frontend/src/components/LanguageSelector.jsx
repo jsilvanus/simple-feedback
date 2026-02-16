@@ -99,7 +99,7 @@ export default function LanguageSelector({ onLongPress, locationName }) {
         <div className="modal-overlay" onClick={() => setShowLogoutModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>{t('auth.logout')}</h2>
-            <p>{t('auth.logoutConfirm', { location: locationName || 'location' })}</p>
+            <p>{t('auth.logoutConfirm', { location: locationName || t('common.location') })}</p>
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setShowLogoutModal(false)}>
                 {t('common.no')}

@@ -126,7 +126,8 @@ router.put('/locations/:id', async (req, res, next) => {
     if (password !== undefined) {
       if (password === null || password === '') {
         // Clear password
-        updates.push(`password_hash = NULL, password_required = false`);
+        updates.push(`password_hash = NULL`);
+        updates.push(`password_required = false`);
       } else {
         // Set new password
         const passwordHash = await bcrypt.hash(password, 10);

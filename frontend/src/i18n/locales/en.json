@@ -13,7 +13,8 @@
     "no": "No",
     "previous": "Previous",
     "next": "Next",
-    "submitting": "Submitting..."
+    "submitting": "Submitting...",
+    "location": "location"
   },
   "feedback": {
     "thankYou": "Thank you!",
