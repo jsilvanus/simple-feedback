@@ -44,5 +44,18 @@
     "results": "Results",
     "export": "Export",
     "answerScales": "Answer Scales"
+  },
+  "settings": {
+    "title": "Settings",
+    "uiSize": "UI Size",
+    "increase": "Increase",
+    "decrease": "Decrease",
+    "reset": "Reset",
+    "contrastMode": "Contrast Mode",
+    "contrastModeDesc": "High contrast mode for better visibility (black background, white text)",
+    "contrastOn": "Contrast Mode: ON",
+    "contrastOff": "Contrast Mode: OFF",
+    "logoutDesc": "Hold the button for 2 seconds to logout",
+    "logoutHold": "Keep holding..."
   }
 }

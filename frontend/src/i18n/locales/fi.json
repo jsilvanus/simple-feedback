@@ -44,5 +44,18 @@
     "results": "Tulokset",
     "export": "Vie",
     "answerScales": "Vastausasteikot"
+  },
+  "settings": {
+    "title": "Asetukset",
+    "uiSize": "Käyttöliittymän koko",
+    "increase": "Suurenna",
+    "decrease": "Pienennä",
+    "reset": "Nollaa",
+    "contrastMode": "Kontrastit tila",
+    "contrastModeDesc": "Korkean kontrastin tila parempaa näkyvyyttä varten (musta tausta, valkoinen teksti)",
+    "contrastOn": "Kontrastit tila: PÄÄLLÄ",
+    "contrastOff": "Kontrastit tila: POIS",
+    "logoutDesc": "Pidä painiketta painettuna 2 sekuntia kirjautuaksesi ulos",
+    "logoutHold": "Pidä painettuna..."
   }
 }
