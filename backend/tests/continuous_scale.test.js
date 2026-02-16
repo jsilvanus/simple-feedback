@@ -25,17 +25,15 @@ describe('Continuous Scale Question Type', () => {
         type: 'continuous_scale'
       });
 
-    // Should succeed (201) or fail with validation error (not type error)
-    // We expect 201 if DB is available, otherwise we just check the type is accepted
+    // Should not fail with "Invalid question type" error
+    if (response.status === 400) {
+      expect(response.body.error?.message).not.toContain('Invalid question type');
+    }
+    
+    // If successful, verify the response
     if (response.status === 201) {
       expect(response.body).toHaveProperty('id');
       expect(response.body.type).toBe('continuous_scale');
-    } else {
-      // If it fails, it shouldn't be because of invalid type
-      expect(response.status).not.toBe(400);
-      if (response.status === 400) {
-        expect(response.body.error?.message).not.toContain('Invalid question type');
-      }
     }
   });
 

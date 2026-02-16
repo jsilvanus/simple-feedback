@@ -176,8 +176,9 @@ export default function FeedbackPage() {
       setSubmitting(true);
       
       const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
-        // For continuous_scale, the value is an object, so we store it as JSON in textValue
-        if (typeof answer.value === 'object' && answer.value !== null) {
+        // For continuous_scale, the value is an object (not null, not array), 
+        // so we store it as JSON in textValue
+        if (typeof answer.value === 'object' && answer.value !== null && !Array.isArray(answer.value)) {
           return {
             questionId: parseInt(questionId),
             value: null,

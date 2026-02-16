@@ -32,7 +32,7 @@ export default function RadarChart({ question, value, onChange }) {
   // Update parent component when values change
   useEffect(() => {
     onChange(values);
-  }, [values]);
+  }, [values, onChange]);
 
   // Handle responsive sizing
   useEffect(() => {
@@ -51,6 +51,7 @@ export default function RadarChart({ question, value, onChange }) {
   // Redraw canvas when values or dimensions change
   useEffect(() => {
     drawChart();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, dimensions, numAxes]);
 
   const drawChart = () => {

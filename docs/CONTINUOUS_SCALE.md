@@ -143,7 +143,7 @@ Where the keys are the axis `value` identifiers and the values are the selected 
 
 ## Migration
 
-To enable this feature on an existing database, run the migration:
+To enable this feature on an existing database, run the migration (replace `simple_feedback` with your database name):
 
 ```bash
 psql -h localhost -U postgres -f backend/src/db/migrations/002_add_continuous_scale_type.sql simple_feedback
