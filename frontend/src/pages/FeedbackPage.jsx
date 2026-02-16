@@ -5,6 +5,7 @@ import { api } from '../api';
 import LanguageSelector from '../components/LanguageSelector';
 import SettingsButton from '../components/SettingsButton';
 import SettingsModal from '../components/SettingsModal';
+import RadarChart from '../components/RadarChart';
 import './FeedbackPage.css';
 
 export default function FeedbackPage() {
@@ -174,11 +175,22 @@ export default function FeedbackPage() {
     try {
       setSubmitting(true);
       
-      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => ({
-        questionId: parseInt(questionId),
-        value: answer.value,
-        textValue: answer.textValue,
-      }));
+      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
+        // For continuous_scale, the value is an object (not null, not array), 
+        // so we store it as JSON in textValue
+        if (typeof answer.value === 'object' && answer.value !== null && !Array.isArray(answer.value)) {
+          return {
+            questionId: parseInt(questionId),
+            value: null,
+            textValue: JSON.stringify(answer.value),
+          };
+        }
+        return {
+          questionId: parseInt(questionId),
+          value: answer.value,
+          textValue: answer.textValue,
+        };
+      });
 
       await api.submitFeedback(
         data.location.id,
@@ -341,6 +353,14 @@ export default function FeedbackPage() {
                 <div className="wordcloud-placeholder">
                   <p>Word cloud input (to be implemented)</p>
                 </div>
+              )}
+
+              {question.type === 'continuous_scale' && question.answerScale && (
+                <RadarChart
+                  question={question}
+                  value={answers[question.id]?.value}
+                  onChange={(value) => handleAnswer(question.id, value)}
+                />
               )}
             </div>
           ))}

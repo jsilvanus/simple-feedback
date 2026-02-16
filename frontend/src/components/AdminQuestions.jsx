@@ -67,6 +67,7 @@ export default function AdminQuestions() {
       case 'scale': return '📊';
       case 'text': return '📝';
       case 'wordcloud': return '☁️';
+      case 'continuous_scale': return '📡';
       default: return '❓';
     }
   };
@@ -119,6 +120,7 @@ export default function AdminQuestions() {
                   <option value="scale">Scale (buttons)</option>
                   <option value="text">Text input</option>
                   <option value="wordcloud">Word cloud</option>
+                  <option value="continuous_scale">Continuous Scale (Radar)</option>
                 </select>
               </div>
 

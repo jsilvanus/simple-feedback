@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS answer_scales (
 CREATE TABLE IF NOT EXISTS questions (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('scale', 'text', 'wordcloud')),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('scale', 'text', 'wordcloud', 'continuous_scale')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
