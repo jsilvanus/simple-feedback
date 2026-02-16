@@ -268,6 +268,7 @@ export default function AdminSchedules() {
                     value={formData.locationGroupId}
                     onChange={(e) => setFormData({ ...formData, locationGroupId: e.target.value })}
                     required
+                    aria-describedby="group-help-text"
                   >
                     <option value="">Select location group...</option>
                     {locationGroups.map((group) => (
@@ -276,7 +277,7 @@ export default function AdminSchedules() {
                       </option>
                     ))}
                   </select>
-                  <small>This schedule will apply to all locations in the selected group</small>
+                  <small id="group-help-text">This schedule will apply to all locations in the selected group</small>
                 </div>
               )}
               

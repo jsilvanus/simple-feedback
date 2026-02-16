@@ -875,14 +875,18 @@ router.put('/schedules/:id', async (req, res, next) => {
     if (locationId !== undefined) {
       updates.push(`location_id = $${paramCount++}`);
       values.push(locationId);
-      // If setting locationId, clear locationGroupId
-      updates.push(`location_group_id = NULL`);
+      // If setting locationId to a non-null value, clear locationGroupId
+      if (locationId !== null) {
+        updates.push(`location_group_id = NULL`);
+      }
     }
     if (locationGroupId !== undefined) {
       updates.push(`location_group_id = $${paramCount++}`);
       values.push(locationGroupId);
-      // If setting locationGroupId, clear locationId
-      updates.push(`location_id = NULL`);
+      // If setting locationGroupId to a non-null value, clear locationId
+      if (locationGroupId !== null) {
+        updates.push(`location_id = NULL`);
+      }
     }
     if (scheduleType !== undefined) {
       updates.push(`schedule_type = $${paramCount++}`);
