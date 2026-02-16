@@ -27,6 +27,10 @@ export default function FeedbackPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [contrastMode, setContrastMode] = useState(false);
   const [uiSize, setUISize] = useState(100);
+  const [showLocationName, setShowLocationName] = useState(true);
+  const uiScaleStyle = { '--ui-scale': uiSize / 100 };
+  const uiSizeStorageKey = locationSlug ? `uiSize_${locationSlug}` : 'uiSize';
+  const showLocationNameStorageKey = locationSlug ? `showLocationName_${locationSlug}` : 'showLocationName';
 
   const loadQuestionnaire = async () => {
     try {
@@ -70,10 +74,17 @@ export default function FeedbackPage() {
       setContrastMode(true);
     }
 
-    // Load UI size from localStorage
-    const storedSize = localStorage.getItem('uiSize');
+    // Load UI size from localStorage (location-specific, with fallback)
+    const storedSize = localStorage.getItem(uiSizeStorageKey) || localStorage.getItem('uiSize');
     if (storedSize) {
       setUISize(parseInt(storedSize, 10));
+    }
+
+    const storedShowLocationName = localStorage.getItem(showLocationNameStorageKey);
+    if (storedShowLocationName !== null) {
+      setShowLocationName(storedShowLocationName === 'true');
+    } else {
+      setShowLocationName(true);
     }
 
     const initializePage = async () => {
@@ -81,7 +92,7 @@ export default function FeedbackPage() {
     };
 
     initializePage();
-  }, [locationSlug, searchParams]);
+  }, [locationSlug, searchParams, uiSizeStorageKey, showLocationNameStorageKey]);
 
   useEffect(() => {
     // Apply contrast mode to body
@@ -145,7 +156,13 @@ export default function FeedbackPage() {
 
   const handleChangeUISize = (newSize) => {
     setUISize(newSize);
-    localStorage.setItem('uiSize', newSize.toString());
+    localStorage.setItem(uiSizeStorageKey, newSize.toString());
+  };
+
+  const handleToggleLocationName = () => {
+    const nextValue = !showLocationName;
+    setShowLocationName(nextValue);
+    localStorage.setItem(showLocationNameStorageKey, nextValue.toString());
   };
 
   const handleSettingsClick = () => {
@@ -211,7 +228,7 @@ export default function FeedbackPage() {
   // Auth required view
   if (authRequired) {
     return (
-      <div className="feedback-page">
+      <div className="feedback-page" style={uiScaleStyle}>
         <LanguageSelector />
         <div className="feedback-container auth-container">
           <h1>{t('auth.loginRequired')}</h1>
@@ -239,7 +256,7 @@ export default function FeedbackPage() {
 
   if (loading) {
     return (
-      <div className="feedback-page loading">
+      <div className="feedback-page loading" style={uiScaleStyle}>
         <LanguageSelector />
         <div className="spinner"></div>
         <p>{t('common.loading')}</p>
@@ -249,7 +266,7 @@ export default function FeedbackPage() {
 
   if (error) {
     return (
-      <div className="feedback-page error">
+      <div className="feedback-page error" style={uiScaleStyle}>
         <LanguageSelector />
         <h1>{t('common.error')}</h1>
         <p>{error}</p>
@@ -260,7 +277,7 @@ export default function FeedbackPage() {
 
   if (success) {
     return (
-      <div className="feedback-page success">
+      <div className="feedback-page success" style={uiScaleStyle}>
         <LanguageSelector />
         <div className="success-icon">✓</div>
         <h1>{t('feedback.thankYou')}</h1>
@@ -277,7 +294,7 @@ export default function FeedbackPage() {
   const isLastPage = currentPage === data.questionnaire.pages.length - 1;
 
   return (
-    <div className="feedback-page">
+    <div className="feedback-page" style={uiScaleStyle}>
       <LanguageSelector />
       <SettingsButton 
         onClick={handleSettingsClick}
@@ -292,10 +309,12 @@ export default function FeedbackPage() {
         onToggleContrast={handleToggleContrast}
         uiSize={uiSize}
         onChangeUISize={handleChangeUISize}
+        showLocationName={showLocationName}
+        onToggleLocationName={handleToggleLocationName}
       />
       <div className="feedback-container">
         <header className="feedback-header">
-          <h1>{data.location.name}</h1>
+          {showLocationName && <h1>{data.location.name}</h1>}
           <h2>{data.questionnaire.name}</h2>
           {data.questionnaire.description && (
             <p className="description">{data.questionnaire.description}</p>
@@ -303,13 +322,6 @@ export default function FeedbackPage() {
         </header>
 
         <div className="feedback-content">
-          <div className="page-indicator">
-            {t('feedback.pageOf', { 
-              current: currentPage + 1, 
-              total: data.questionnaire.pages.length 
-            })}
-          </div>
-
           {currentPageData.questions.map(question => (
             <div key={question.id} className="question">
               <h3>{question.text}</h3>
@@ -421,13 +433,22 @@ export default function FeedbackPage() {
           )}
           
           <button 
-            className="btn btn-primary" 
+            className="btn btn-primary submit-btn" 
             onClick={handleNext}
             disabled={submitting}
           >
             {submitting ? t('common.submitting') : (isLastPage ? t('common.submit') : t('common.next'))}
           </button>
         </div>
+
+        {data.questionnaire.pages.length > 1 && (
+          <div className="page-indicator page-indicator-bottom">
+            {t('feedback.pageOf', {
+              current: currentPage + 1,
+              total: data.questionnaire.pages.length
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

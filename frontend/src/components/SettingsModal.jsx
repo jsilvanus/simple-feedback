@@ -10,7 +10,9 @@ export default function SettingsModal({
   contrastMode,
   onToggleContrast,
   uiSize,
-  onChangeUISize
+  onChangeUISize,
+  showLocationName,
+  onToggleLocationName
 }) {
   const { t } = useTranslation();
   const [logoutPressTime, setLogoutPressTime] = useState(0);
@@ -122,6 +124,18 @@ export default function SettingsModal({
               onClick={onToggleContrast}
             >
               {contrastMode ? t('settings.contrastOn') : t('settings.contrastOff')}
+            </button>
+          </div>
+
+          {/* Location Name Visibility */}
+          <div className="settings-section">
+            <h3>{t('settings.locationName')}</h3>
+            <p className="settings-description">{t('settings.locationNameDesc')}</p>
+            <button
+              className={`btn ${showLocationName ? 'btn-primary' : 'btn-secondary'} contrast-toggle`}
+              onClick={onToggleLocationName}
+            >
+              {showLocationName ? t('settings.locationNameOn') : t('settings.locationNameOff')}
             </button>
           </div>
 

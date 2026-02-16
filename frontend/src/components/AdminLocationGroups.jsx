@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
 export default function AdminLocationGroups() {
+  const { t } = useTranslation();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -84,25 +86,22 @@ export default function AdminLocationGroups() {
     setFormData({ name: '', description: '', active: true });
   };
 
-  if (loading) return <div className="loading">Loading location groups...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingLocationGroups')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-crud-section">
       <div className="section-header">
-        <h2>Location Groups</h2>
+        <h2>{t('admin.locationGroups')}</h2>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add Location Group
+          + {t('admin.addLocationGroup')}
         </button>
       </div>
 
       {showForm && (
-        <div className="crud-form-overlay">
-          <div className="crud-form">
-            <div className="form-header">
-              <h3>{editingId ? 'Edit Location Group' : 'Add New Location Group'}</h3>
-              <button className="btn-close" onClick={handleCancel}>×</button>
-            </div>
+        <div className="form-modal">
+          <div className="form-container">
+            <h3>{editingId ? t('admin.editLocationGroup') : t('admin.addNewLocationGroup')}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label htmlFor="name">Name *</label>
@@ -149,8 +148,8 @@ export default function AdminLocationGroups() {
         </div>
       )}
 
-      <div className="crud-table-container">
-        <table className="crud-table">
+      <div className="data-list">
+        <table className="data-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -163,7 +162,7 @@ export default function AdminLocationGroups() {
           <tbody>
             {groups.length === 0 ? (
               <tr>
-                <td colSpan="5" className="empty-message">No location groups found</td>
+                <td colSpan="5" className="empty-state">No location groups found</td>
               </tr>
             ) : (
               groups.map((group) => (
@@ -172,16 +171,16 @@ export default function AdminLocationGroups() {
                   <td>{group.name}</td>
                   <td>{group.description || '-'}</td>
                   <td>
-                    <span className={`status-badge ${group.active ? 'active' : 'inactive'}`}>
+                    <span className={`status ${group.active ? 'active' : 'inactive'}`}>
                       {group.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="actions">
-                    <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(group)}>
-                      Edit
+                  <td className="table-actions">
+                    <button className="btn-icon" onClick={() => handleEdit(group)} title="Edit">
+                      ✏️
                     </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(group.id)}>
-                      Delete
+                    <button className="btn-icon" onClick={() => handleDelete(group.id)} title="Delete">
+                      🗑️
                     </button>
                   </td>
                 </tr>

@@ -239,11 +239,11 @@ body.contrast-mode .wordcloud-placeholder {
 }
 
 .word-chip {
-  padding: 12px 24px;
-  font-size: 16px;
+  padding: calc(12px * var(--ui-scale)) calc(24px * var(--ui-scale));
+  font-size: calc(16px * var(--ui-scale));
   font-weight: 600;
   border: 2px solid transparent;
-  border-radius: 25px;
+  border-radius: calc(25px * var(--ui-scale));
   cursor: pointer;
   transition: all 0.3s ease;
   background: #f0f0f0;
@@ -270,7 +270,7 @@ body.contrast-mode .wordcloud-placeholder {
 .word-cloud-info {
   text-align: center;
   color: #666;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale));
 }
 
 .feedback-actions {
@@ -278,6 +278,16 @@ body.contrast-mode .wordcloud-placeholder {
   gap: 15px;
   justify-content: center;
   margin-top: 40px;
+}
+
+.submit-btn {
+  padding: calc(18px * var(--ui-scale)) calc(48px * var(--ui-scale));
+  font-size: calc(20px * var(--ui-scale));
+  min-width: calc(220px * var(--ui-scale));
+}
+
+.page-indicator-bottom {
+  margin-top: 14px;
 }
 
 .btn {

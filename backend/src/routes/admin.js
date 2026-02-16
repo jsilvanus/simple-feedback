@@ -62,6 +62,141 @@ router.get('/locations', async (req, res, next) => {
 });
 
 /**
+ * POST /api/admin/locations
+ * Create a new location
+ */
+router.post('/locations', async (req, res, next) => {
+  try {
+    const {
+      slug,
+      name,
+      active,
+      groupId,
+      password,
+      passwordRequired,
+    } = req.body;
+
+    if (!slug || !name) {
+      return res.status(400).json({ error: { message: 'Slug and name are required' } });
+    }
+
+    if (passwordRequired && !password) {
+      return res.status(400).json({ error: { message: 'Password is required when password protection is enabled' } });
+    }
+
+    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
+
+    const result = await db.query(
+      `INSERT INTO locations
+       (slug, name, active, group_id, password_hash, password_required)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        slug,
+        name,
+        active !== undefined ? active : true,
+        groupId || null,
+        passwordHash,
+        passwordRequired === true,
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: { message: 'Location slug already exists' } });
+    }
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/locations/:id
+ * Update a location
+ */
+router.put('/locations/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      slug,
+      name,
+      active,
+      groupId,
+      password,
+      passwordRequired,
+    } = req.body;
+
+    const existingResult = await db.query(
+      'SELECT id, password_hash, password_required FROM locations WHERE id = $1',
+      [id]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location not found' } });
+    }
+
+    const existing = existingResult.rows[0];
+    const finalPasswordRequired =
+      passwordRequired !== undefined ? passwordRequired : existing.password_required;
+
+    if (finalPasswordRequired && !password && !existing.password_hash) {
+      return res.status(400).json({ error: { message: 'Password is required when enabling password protection' } });
+    }
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (slug !== undefined) {
+      updates.push(`slug = $${paramCount++}`);
+      values.push(slug);
+    }
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+    if (groupId !== undefined) {
+      updates.push(`group_id = $${paramCount++}`);
+      values.push(groupId || null);
+    }
+    if (passwordRequired !== undefined) {
+      updates.push(`password_required = $${paramCount++}`);
+      values.push(passwordRequired);
+
+      if (passwordRequired === false) {
+        updates.push(`password_hash = NULL`);
+      }
+    }
+    if (password) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      updates.push(`password_hash = $${paramCount++}`);
+      values.push(passwordHash);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `UPDATE locations SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await db.query(query, values);
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: { message: 'Location slug already exists' } });
+    }
+    next(error);
+  }
+});
+
+/**
  * PUT /api/admin/answer-scales/:id
  * Update an answer scale
  */
@@ -162,6 +297,52 @@ router.post('/word-cloud-options', async (req, res, next) => {
     );
 
     res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/word-cloud-options/:id
+ * Update an existing word cloud option set
+ */
+router.put('/word-cloud-options/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, words } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+
+    if (words !== undefined) {
+      if (!Array.isArray(words)) {
+        return res.status(400).json({ error: { message: 'words must be an array' } });
+      }
+      updates.push(`words = $${paramCount++}`);
+      values.push(JSON.stringify(words));
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `UPDATE word_cloud_options SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Word cloud option set not found' } });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
     next(error);
   }
@@ -473,6 +654,40 @@ router.get('/questionnaires', async (req, res, next) => {
 
     const result = await db.query(query);
     res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/questionnaires/:id
+ * Get questionnaire details including assigned questions
+ */
+router.get('/questionnaires/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const questionnaireResult = await db.query(
+      'SELECT * FROM questionnaires WHERE id = $1',
+      [id]
+    );
+
+    if (questionnaireResult.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Questionnaire not found' } });
+    }
+
+    const questionsResult = await db.query(
+      `SELECT question_id, page_number, answer_scale_id, word_cloud_options_id, max_selections, order_index
+       FROM questionnaire_questions
+       WHERE questionnaire_id = $1
+       ORDER BY page_number, order_index`,
+      [id]
+    );
+
+    res.json({
+      ...questionnaireResult.rows[0],
+      questions: questionsResult.rows,
+    });
   } catch (error) {
     next(error);
   }

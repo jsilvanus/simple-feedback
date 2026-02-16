@@ -8,7 +8,7 @@ const LANGUAGES = [
   { code: 'sv', name: 'Svenska', flag: '🇸🇪' },
 ];
 
-export default function LanguageSelector() {
+export default function LanguageSelector({ inline = false }) {
   const { i18n, t } = useTranslation();
   const [showDropdown, setShowDropdown] = useState(false);
   const buttonRef = useRef(null);
@@ -39,8 +39,7 @@ export default function LanguageSelector() {
   }, [showDropdown]);
 
   return (
-    <>
-      <div className="language-selector" ref={buttonRef}>
+    <div className={`language-selector ${inline ? 'inline' : ''}`} ref={buttonRef}>
         <button
           className="language-btn"
           onClick={handleClick}
@@ -64,7 +63,6 @@ export default function LanguageSelector() {
             ))}
           </div>
         )}
-      </div>
-    </>
+    </div>
   );
 }

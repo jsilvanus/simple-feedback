@@ -7,11 +7,33 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .section-header h2 {
   margin: 0;
   color: #333;
+}
+
+.section-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-header > .btn-primary,
+.section-header > .btn-secondary {
+  width: auto;
+  max-width: 50%;
+  white-space: nowrap;
+}
+
+.section-controls .btn-primary,
+.section-controls .btn-secondary {
+  max-width: none;
+  white-space: normal;
 }
 
 .loading, .error {
@@ -159,11 +181,23 @@
 }
 
 .btn-icon {
-  background: none;
-  border: none;
+  background: #f4f6fb;
+  border: 1px solid #e5e7eb;
   cursor: pointer;
   font-size: 16px;
-  padding: 5px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+  background: #e9eef9;
+  border-color: #cfd8ea;
+  transform: translateY(-1px);
 }
 
 .data-list {
@@ -183,6 +217,7 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  table-layout: fixed;
 }
 
 .data-table thead {
@@ -200,10 +235,26 @@
 .data-table td {
   padding: 15px;
   border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+.data-table th {
+  vertical-align: middle;
 }
 
 .data-table tbody tr:hover {
   background: #f8f9fa;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .data-table code {
@@ -341,6 +392,87 @@
   flex: 1;
 }
 
+.form-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.questionnaire-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.questionnaire-checkbox-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.questionnaire-checkbox-card.selected {
+  border-color: #8ea2d8;
+  background: #f4f7ff;
+}
+
+.toggle-button-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toggle-btn {
+  border: 1px solid #d6dbe8;
+  background: #f8f9fc;
+  color: #334155;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  background: #edf1fb;
+  border-color: #bec8df;
+}
+
+.toggle-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.questionnaire-checkbox-card:hover {
+  background: #f8fafc;
+}
+
+.questionnaire-checkbox-card input {
+  width: auto;
+  margin: 0;
+}
+
+.quick-date-actions {
+  display: flex;
+  margin-top: 8px;
+  gap: 8px;
+}
+
 @media (max-width: 768px) {
   .section-header {
     flex-direction: column;
@@ -363,8 +495,18 @@
   }
 
   .button-editor,
-  .question-editor {
+  .question-editor,
+  .form-row {
     flex-direction: column;
+  }
+
+  .toggle-button-group {
+    flex-direction: column;
+  }
+
+  .section-header > .btn-primary,
+  .section-header > .btn-secondary {
+    max-width: 100%;
   }
 
   .button-editor input,

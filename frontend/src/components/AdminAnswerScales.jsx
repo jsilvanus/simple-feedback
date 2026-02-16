@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
 export default function AdminAnswerScales() {
+  const { t } = useTranslation();
   const [scales, setScales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -122,22 +124,22 @@ export default function AdminAnswerScales() {
     setFormData({ ...formData, buttons: newButtons });
   };
 
-  if (loading) return <div className="loading">Loading answer scales...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingAnswerScales')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-crud-section">
       <div className="section-header">
-        <h2>Answer Scales</h2>
+        <h2>{t('admin.answerScales')}</h2>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add Answer Scale
+          + {t('admin.addAnswerScale')}
         </button>
       </div>
 
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? 'Edit Answer Scale' : 'Add New Answer Scale'}</h3>
+            <h3>{editingId ? t('admin.editAnswerScale') : t('admin.addNewAnswerScale')}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Scale Name *</label>

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
 export default function AdminQuestions() {
+  const { t } = useTranslation();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -91,13 +93,13 @@ export default function AdminQuestions() {
     }
   };
 
-  if (loading) return <div className="loading">Loading questions...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingQuestions')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-crud-section">
       <div className="section-header">
-        <h2>Questions</h2>
+        <h2>{t('admin.questions')}</h2>
         <div>
           <label style={{ marginRight: '20px' }}>
             <input
@@ -105,10 +107,10 @@ export default function AdminQuestions() {
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
             />
-            {' '}Show Archived
+            {' '}{t('admin.showArchived')}
           </label>
           <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            + Add Question
+            + {t('admin.addQuestion')}
           </button>
         </div>
       </div>
@@ -116,7 +118,7 @@ export default function AdminQuestions() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? 'Edit Question' : 'Add New Question'}</h3>
+            <h3>{editingId ? t('admin.editQuestion') : t('admin.addNewQuestion')}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Question Text *</label>

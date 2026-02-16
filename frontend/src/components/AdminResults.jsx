@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminResults.css';
 
 export default function AdminResults() {
+  const { t } = useTranslation();
   const [results, setResults] = useState([]);
   const [locations, setLocations] = useState([]);
   const [questionnaires, setQuestionnaires] = useState([]);
@@ -183,7 +185,7 @@ export default function AdminResults() {
       a.click();
       a.remove();
     } catch (err) {
-      setError('Failed to export data');
+      setError(t('admin.failedToExportData'));
     }
   };
 
@@ -200,23 +202,23 @@ export default function AdminResults() {
     return dist;
   };
 
-  if (loading) return <div className="loading">Loading results...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingResults')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-results">
-      <h2>Feedback Results & Analytics</h2>
+      <h2>{t('admin.feedbackResultsAnalytics')}</h2>
 
       <div className="filters-section">
-        <h3>Filters</h3>
+        <h3>{t('admin.filters')}</h3>
         <div className="filters-grid">
           <div className="form-group">
-            <label>Location</label>
+            <label>{t('admin.locations')}</label>
             <select
               value={filters.locationId}
               onChange={(e) => handleFilterChange('locationId', e.target.value)}
             >
-              <option value="">All Locations</option>
+              <option value="">{t('admin.allLocations')}</option>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name}
@@ -226,12 +228,12 @@ export default function AdminResults() {
           </div>
 
           <div className="form-group">
-            <label>Questionnaire</label>
+            <label>{t('admin.questionnaire')}</label>
             <select
               value={filters.questionnaireId}
               onChange={(e) => handleFilterChange('questionnaireId', e.target.value)}
             >
-              <option value="">All Questionnaires</option>
+              <option value="">{t('admin.allQuestionnaires')}</option>
               {questionnaires.map((questionnaire) => (
                 <option key={questionnaire.id} value={questionnaire.id}>
                   {questionnaire.name}
@@ -241,7 +243,7 @@ export default function AdminResults() {
           </div>
 
           <div className="form-group">
-            <label>Start Date</label>
+            <label>{t('admin.startDate')}</label>
             <input
               type="date"
               value={filters.startDate}
@@ -250,7 +252,7 @@ export default function AdminResults() {
           </div>
 
           <div className="form-group">
-            <label>End Date</label>
+            <label>{t('admin.endDate')}</label>
             <input
               type="date"
               value={filters.endDate}
@@ -261,25 +263,25 @@ export default function AdminResults() {
 
         <div className="filter-actions">
           <button className="btn btn-primary" onClick={applyFilters}>
-            Apply Filters
+            {t('admin.applyFilters')}
           </button>
           <button className="btn btn-secondary" onClick={resetFilters}>
-            Reset
+            {t('common.reset')}
           </button>
           <button className="btn btn-success" onClick={exportCSV}>
-            📥 Export CSV
+            📥 {t('admin.exportCsv')}
           </button>
         </div>
       </div>
 
       <div className="stats-section">
         <div className="stat-card">
-          <h4>Total Responses</h4>
+          <h4>{t('admin.totalResponses')}</h4>
           <div className="stat-value">{stats.totalSessions}</div>
         </div>
 
         <div className="stat-card">
-          <h4>By Location</h4>
+          <h4>{t('admin.byLocation')}</h4>
           <div className="stat-list">
             {Object.entries(stats.byLocation).map(([location, count]) => (
               <div key={location} className="stat-item">
@@ -292,7 +294,7 @@ export default function AdminResults() {
       </div>
 
       <div className="analytics-section">
-        <h3>Question Analytics</h3>
+        <h3>{t('admin.questionAnalytics')}</h3>
         {Object.entries(stats.byQuestion).map(([question, data]) => (
           <div key={question} className="question-analytics">
             <h4>{question}</h4>
@@ -385,7 +387,7 @@ export default function AdminResults() {
 
       {results.length === 0 && (
         <div className="empty-state">
-          <p>No feedback data available for the selected filters.</p>
+          <p>{t('admin.noFeedbackDataForFilters')}</p>
         </div>
       )}
     </div>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
 const DEFAULT_MAX_SELECTIONS = 3;
 
 export default function AdminQuestionnaires() {
+  const { t } = useTranslation();
   const [questionnaires, setQuestionnaires] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [answerScales, setAnswerScales] = useState([]);
@@ -81,15 +83,21 @@ export default function AdminQuestionnaires() {
   };
 
   const handleEdit = async (questionnaire) => {
-    // Fetch questionnaire details including questions
     try {
-      // For now, we'll need to get questionnaire questions from the backend
-      // Since there's no dedicated endpoint, we'll construct it from questionnaire_questions
+      const details = await api.adminRequest(`/questionnaires/${questionnaire.id}`);
+
       setEditingId(questionnaire.id);
       setFormData({
-        name: questionnaire.name,
-        description: questionnaire.description || '',
-        questions: [], // TODO: Load existing questions from backend
+        name: details.name,
+        description: details.description || '',
+        questions: (details.questions || []).map((q, index) => ({
+          questionId: q.question_id,
+          pageNumber: q.page_number || 1,
+          answerScaleId: q.answer_scale_id || null,
+          wordCloudOptionsId: q.word_cloud_options_id || null,
+          maxSelections: q.max_selections || DEFAULT_MAX_SELECTIONS,
+          orderIndex: q.order_index ?? index,
+        })),
       });
       setShowForm(true);
     } catch (err) {
@@ -131,24 +139,24 @@ export default function AdminQuestionnaires() {
     setFormData({ ...formData, questions: newQuestions });
   };
 
-  if (loading) return <div className="loading">Loading questionnaires...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingQuestionnaires')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-crud-section">
       <div className="section-header">
-        <h2>Questionnaires</h2>
-        <div>
+        <h2>{t('admin.questionnaires')}</h2>
+        <div className="section-controls">
           <label style={{ marginRight: '20px' }}>
             <input
               type="checkbox"
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
             />
-            {' '}Show Archived
+            {' '}{t('admin.showArchived')}
           </label>
           <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            + Add Questionnaire
+            + {t('admin.addQuestionnaire')}
           </button>
         </div>
       </div>
@@ -156,7 +164,7 @@ export default function AdminQuestionnaires() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container large">
-            <h3>{editingId ? 'Edit Questionnaire' : 'Add New Questionnaire'}</h3>
+            <h3>{editingId ? t('admin.editQuestionnaire') : t('admin.addNewQuestionnaire')}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Name *</label>
@@ -188,7 +196,7 @@ export default function AdminQuestionnaires() {
                   return (
                     <div key={index} className="question-editor">
                       <select
-                        value={q.questionId}
+                        value={q.questionId ?? ''}
                         onChange={(e) => updateQuestion(index, 'questionId', parseInt(e.target.value))}
                         required
                       >
@@ -210,7 +218,7 @@ export default function AdminQuestionnaires() {
                       
                       {questionType === 'scale' && (
                         <select
-                          value={q.answerScaleId}
+                          value={q.answerScaleId ?? ''}
                           onChange={(e) => updateQuestion(index, 'answerScaleId', e.target.value ? parseInt(e.target.value) : null)}
                         >
                           <option value="">No scale</option>
@@ -225,7 +233,7 @@ export default function AdminQuestionnaires() {
                       {questionType === 'wordcloud' && (
                         <>
                           <select
-                            value={q.wordCloudOptionsId}
+                            value={q.wordCloudOptionsId ?? ''}
                             onChange={(e) => updateQuestion(index, 'wordCloudOptionsId', e.target.value ? parseInt(e.target.value) : null)}
                           >
                             <option value="">No word cloud options</option>
@@ -277,15 +285,30 @@ export default function AdminQuestionnaires() {
             <p>No questionnaires yet. Add your first questionnaire to get started.</p>
           </div>
         ) : (
-          <div className="questionnaires-grid">
-            {questionnaires.map((questionnaire) => (
-              <div 
-                key={questionnaire.id} 
-                className={`questionnaire-card ${questionnaire.archived ? 'archived-card' : ''}`}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <h4>{questionnaire.name}</h4>
-                  <div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {questionnaires.map((questionnaire) => (
+                <tr key={questionnaire.id} className={questionnaire.archived ? 'archived-row' : ''}>
+                  <td>{questionnaire.name}</td>
+                  <td>{questionnaire.description || '-'}</td>
+                  <td>{new Date(questionnaire.created_at).toLocaleDateString()}</td>
+                  <td>
+                    {questionnaire.archived ? (
+                      <span className="status inactive">📦 Archived</span>
+                    ) : (
+                      <span className="status active">✓ Active</span>
+                    )}
+                  </td>
+                  <td>
                     <button
                       className="btn-icon"
                       onClick={() => handleEdit(questionnaire)}
@@ -300,18 +323,11 @@ export default function AdminQuestionnaires() {
                     >
                       {questionnaire.archived ? '📤' : '📦'}
                     </button>
-                  </div>
-                </div>
-                {questionnaire.description && <p>{questionnaire.description}</p>}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <small>Created {new Date(questionnaire.created_at).toLocaleDateString()}</small>
-                  {questionnaire.archived && (
-                    <span className="status inactive" style={{ fontSize: '12px' }}>📦 Archived</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

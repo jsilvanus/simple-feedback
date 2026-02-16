@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
@@ -10,10 +11,12 @@ const DEFAULT_WORDS = [
 ];
 
 export default function AdminWordCloudOptions() {
+  const { t } = useTranslation();
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     words: DEFAULT_WORDS,
@@ -39,11 +42,19 @@ export default function AdminWordCloudOptions() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.adminRequest('/word-cloud-options', {
-        method: 'POST',
-        body: JSON.stringify(formData),
-      });
+      if (editingId) {
+        await api.adminRequest(`/word-cloud-options/${editingId}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/word-cloud-options', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
       setShowForm(false);
+      setEditingId(null);
       setFormData({
         name: '',
         words: DEFAULT_WORDS,
@@ -56,6 +67,20 @@ export default function AdminWordCloudOptions() {
 
   const handleCancel = () => {
     setShowForm(false);
+    setEditingId(null);
+    setFormData({
+      name: '',
+      words: DEFAULT_WORDS,
+    });
+  };
+
+  const handleEdit = (option) => {
+    setEditingId(option.id);
+    setFormData({
+      name: option.name,
+      words: option.words,
+    });
+    setShowForm(true);
   };
 
   const updateWord = (index, field, value) => {
@@ -96,22 +121,22 @@ export default function AdminWordCloudOptions() {
     setFormData({ ...formData, words: newWords });
   };
 
-  if (loading) return <div className="loading">Loading word cloud options...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingWordCloudOptions')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-crud-section">
       <div className="section-header">
-        <h2>Word Cloud Options</h2>
+        <h2>{t('admin.wordCloudOptions')}</h2>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add Word Cloud Option Set
+          + {t('admin.addWordCloudOptionSet')}
         </button>
       </div>
 
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>Add New Word Cloud Option Set</h3>
+            <h3>{editingId ? t('admin.editWordCloudOptionSet') : t('admin.addNewWordCloudOptionSet')}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Option Set Name *</label>
@@ -183,16 +208,16 @@ export default function AdminWordCloudOptions() {
                   </div>
                 ))}
                 <button type="button" onClick={addWord} className="btn btn-secondary btn-sm">
-                  + Add Word
+                  + {t('admin.addWord')}
                 </button>
               </div>
 
               <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Create
+                  {editingId ? t('common.update') : t('common.create')}
                 </button>
               </div>
             </form>
@@ -209,7 +234,12 @@ export default function AdminWordCloudOptions() {
           <div className="scales-grid">
             {options.map((option) => (
               <div key={option.id} className="scale-card">
-                <h4>{option.name}</h4>
+                <div className="table-actions" style={{ justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <h4 style={{ margin: 0 }}>{option.name}</h4>
+                  <button className="btn-icon" onClick={() => handleEdit(option)} title={t('common.edit')}>
+                    ✏️
+                  </button>
+                </div>
                 <div className="wordcloud-preview">
                   {option.words.map((word, index) => {
                     // Display Finnish by default, or the first available translation

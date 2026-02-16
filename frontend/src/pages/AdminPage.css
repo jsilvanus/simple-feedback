@@ -79,6 +79,12 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .admin-header h1 {
   color: #333;
   font-size: 28px;
@@ -124,6 +130,21 @@
   padding: 30px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   min-height: 400px;
+}
+
+.admin-grouped-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.admin-group-section {
+  padding-top: 8px;
+}
+
+.admin-group-section + .admin-group-section {
+  border-top: 1px solid #eee;
+  padding-top: 28px;
 }
 
 .admin-section h2 {
@@ -189,6 +210,9 @@
 .btn-primary {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+}
+
+.login-container .btn-primary {
   width: 100%;
 }
 
@@ -210,6 +234,11 @@
   .admin-header {
     flex-direction: column;
     gap: 15px;
+  }
+
+  .admin-header-actions {
+    width: 100%;
+    justify-content: center;
   }
 
   .admin-nav {

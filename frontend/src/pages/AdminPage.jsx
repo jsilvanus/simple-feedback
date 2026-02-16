@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
+import LanguageSelector from '../components/LanguageSelector';
 import AdminLocations from '../components/AdminLocations';
 import AdminLocationGroups from '../components/AdminLocationGroups';
 import AdminQuestions from '../components/AdminQuestions';
@@ -13,6 +15,7 @@ import './AdminPage.css';
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [loggedIn, setLoggedIn] = useState(!!localStorage.getItem('adminToken'));
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
@@ -41,27 +44,27 @@ export default function AdminPage() {
     return (
       <div className="admin-page">
         <div className="login-container">
-          <h1>Admin Login</h1>
+          <h1>{t('admin.login')}</h1>
           <form onSubmit={handleLogin}>
             {loginError && <div className="error-message">{loginError}</div>}
             <input
               type="text"
-              placeholder="Username"
+              placeholder={t('auth.username')}
               value={loginForm.username}
               onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
               required
             />
             <input
               type="password"
-              placeholder="Password"
+              placeholder={t('auth.password')}
               value={loginForm.password}
               onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
               required
             />
-            <button type="submit" className="btn btn-primary">Login</button>
+            <button type="submit" className="btn btn-primary">{t('auth.login')}</button>
           </form>
           <div className="back-link">
-            <button onClick={() => navigate('/')}>← Back to Home</button>
+            <button onClick={() => navigate('/')}>← {t('admin.backToHome')}</button>
           </div>
         </div>
       </div>
@@ -72,8 +75,11 @@ export default function AdminPage() {
     <div className="admin-page">
       <div className="admin-container">
         <header className="admin-header">
-          <h1>Admin Dashboard</h1>
-          <button onClick={handleLogout} className="btn btn-secondary">Logout</button>
+          <h1>{t('admin.dashboard')}</h1>
+          <div className="admin-header-actions">
+            <LanguageSelector inline />
+            <button onClick={handleLogout} className="btn btn-secondary">{t('auth.logout')}</button>
+          </div>
         </header>
 
         <nav className="admin-nav">
@@ -81,95 +87,100 @@ export default function AdminPage() {
             className={activeTab === 'overview' ? 'active' : ''} 
             onClick={() => setActiveTab('overview')}
           >
-            Overview
-          </button>
-          <button 
-            className={activeTab === 'locations' ? 'active' : ''} 
-            onClick={() => setActiveTab('locations')}
-          >
-            Locations
-          </button>
-          <button 
-            className={activeTab === 'location-groups' ? 'active' : ''} 
-            onClick={() => setActiveTab('location-groups')}
-          >
-            Location Groups
+            {t('admin.overview')}
           </button>
           <button 
             className={activeTab === 'questions' ? 'active' : ''} 
             onClick={() => setActiveTab('questions')}
           >
-            Questions
+            {t('admin.questions')}
           </button>
           <button 
-            className={activeTab === 'answer-scales' ? 'active' : ''} 
-            onClick={() => setActiveTab('answer-scales')}
+            className={activeTab === 'locations' ? 'active' : ''} 
+            onClick={() => setActiveTab('locations')}
           >
-            Answer Scales
-          </button>
-          <button 
-            className={activeTab === 'word-cloud-options' ? 'active' : ''} 
-            onClick={() => setActiveTab('word-cloud-options')}
-          >
-            Word Cloud Options
-          </button>
-          <button 
-            className={activeTab === 'questionnaires' ? 'active' : ''} 
-            onClick={() => setActiveTab('questionnaires')}
-          >
-            Questionnaires
+            {t('admin.locations')}
           </button>
           <button 
             className={activeTab === 'schedules' ? 'active' : ''} 
             onClick={() => setActiveTab('schedules')}
           >
-            Schedules
+            {t('admin.schedules')}
           </button>
           <button 
             className={activeTab === 'results' ? 'active' : ''} 
             onClick={() => setActiveTab('results')}
           >
-            Results
+            {t('admin.results')}
           </button>
         </nav>
 
         <div className="admin-content">
           {activeTab === 'overview' && (
             <div className="admin-section">
-              <h2>Welcome to Simple Feedback Admin</h2>
-              <p>Use the navigation above to manage your feedback system.</p>
+              <h2>{t('admin.welcomeTitle')}</h2>
+              <p>{t('admin.welcomeDesc')}</p>
               <div className="feature-grid">
                 <div className="feature-card">
-                  <h3>Locations</h3>
-                  <p>Manage physical or logical places where feedback is collected</p>
+                  <h3>{t('admin.locations')}</h3>
+                  <p>{t('admin.locationsDesc')}</p>
                 </div>
                 <div className="feature-card">
-                  <h3>Questions</h3>
-                  <p>Create and manage feedback questions</p>
+                  <h3>{t('admin.questions')}</h3>
+                  <p>{t('admin.questionsDesc')}</p>
                 </div>
                 <div className="feature-card">
-                  <h3>Questionnaires</h3>
-                  <p>Build questionnaires by grouping questions</p>
+                  <h3>{t('admin.questionnaires')}</h3>
+                  <p>{t('admin.questionnairesDesc')}</p>
                 </div>
                 <div className="feature-card">
-                  <h3>Schedules</h3>
-                  <p>Schedule questionnaires at specific locations</p>
+                  <h3>{t('admin.schedules')}</h3>
+                  <p>{t('admin.schedulesDesc')}</p>
                 </div>
                 <div className="feature-card">
-                  <h3>Results</h3>
-                  <p>View and export feedback data</p>
+                  <h3>{t('admin.results')}</h3>
+                  <p>{t('admin.resultsDesc')}</p>
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab === 'locations' && <AdminLocations />}
-          {activeTab === 'location-groups' && <AdminLocationGroups />}
-          {activeTab === 'questions' && <AdminQuestions />}
-          {activeTab === 'answer-scales' && <AdminAnswerScales />}
-          {activeTab === 'word-cloud-options' && <AdminWordCloudOptions />}
-          {activeTab === 'questionnaires' && <AdminQuestionnaires />}
-          {activeTab === 'schedules' && <AdminSchedules />}
+          {activeTab === 'questions' && (
+            <div className="admin-grouped-sections">
+              <section className="admin-group-section">
+                <AdminQuestions />
+              </section>
+              <section className="admin-group-section">
+                <AdminAnswerScales />
+              </section>
+              <section className="admin-group-section">
+                <AdminWordCloudOptions />
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'locations' && (
+            <div className="admin-grouped-sections">
+              <section className="admin-group-section">
+                <AdminLocations />
+              </section>
+              <section className="admin-group-section">
+                <AdminLocationGroups />
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'schedules' && (
+            <div className="admin-grouped-sections">
+              <section className="admin-group-section">
+                <AdminQuestionnaires />
+              </section>
+              <section className="admin-group-section">
+                <AdminSchedules />
+              </section>
+            </div>
+          )}
+
           {activeTab === 'results' && <AdminResults />}
         </div>
       </div>

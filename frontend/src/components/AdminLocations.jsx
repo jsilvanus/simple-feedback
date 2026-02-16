@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
 export default function AdminLocations() {
+  const { t } = useTranslation();
   const [locations, setLocations] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,22 +103,22 @@ export default function AdminLocations() {
     setFormData({ slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false });
   };
 
-  if (loading) return <div className="loading">Loading locations...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingLocations')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-crud-section">
       <div className="section-header">
-        <h2>Locations</h2>
+        <h2>{t('admin.locations')}</h2>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add Location
+          + {t('admin.addLocation')}
         </button>
       </div>
 
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? 'Edit Location' : 'Add New Location'}</h3>
+            <h3>{editingId ? t('admin.editLocation') : t('admin.addNewLocation')}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Slug *</label>

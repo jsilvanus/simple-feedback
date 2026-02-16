@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
 export default function AdminSchedules() {
+  const { t } = useTranslation();
   const [schedules, setSchedules] = useState([]);
   const [locations, setLocations] = useState([]);
   const [locationGroups, setLocationGroups] = useState([]);
@@ -123,7 +125,7 @@ export default function AdminSchedules() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this schedule?')) {
+    if (!confirm(t('admin.confirmDeleteSchedule'))) {
       return;
     }
     try {
@@ -187,6 +189,19 @@ export default function AdminSchedules() {
 
   const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+  const formatDateTimeLocal = (date) => {
+    const pad = (value) => value.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const setStartNow = () => {
+    setFormData({ ...formData, startTime: formatDateTimeLocal(new Date()) });
+  };
+
+  const setEndNever = () => {
+    setFormData({ ...formData, endTime: '2099-12-31T23:59' });
+  };
+
   const isActive = (schedule) => {
     if (schedule.schedule_type === 'recurring_weekday') {
       // For recurring schedules, check if today matches
@@ -210,142 +225,172 @@ export default function AdminSchedules() {
     }
   };
 
-  if (loading) return <div className="loading">Loading schedules...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('admin.loadingSchedules')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="admin-crud-section">
       <div className="section-header">
-        <h2>Schedules</h2>
+        <h2>{t('admin.schedules')}</h2>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add Schedule
+          + {t('admin.addSchedule')}
         </button>
       </div>
 
       {showForm && (
         <div className="form-modal">
           <div className="form-container large">
-            <h3>{editingId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
+            <h3>{editingId ? t('admin.editSchedule') : t('admin.addNewSchedule')}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Publish To *</label>
-                <div className="radio-group">
-                  <label>
-                    <input
-                      type="radio"
-                      value="location"
-                      checked={formData.destinationType === 'location'}
-                      onChange={(e) => setFormData({ ...formData, destinationType: e.target.value })}
-                    />
-                    Specific Location
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      value="group"
-                      checked={formData.destinationType === 'group'}
-                      onChange={(e) => setFormData({ ...formData, destinationType: e.target.value })}
-                    />
-                    Location Group
-                  </label>
+                <label>{t('admin.publishTo')} *</label>
+                <div className="toggle-button-group">
+                  <button
+                    type="button"
+                    className={`toggle-btn ${formData.destinationType === 'location' ? 'active' : ''}`}
+                    onClick={() => setFormData({ ...formData, destinationType: 'location' })}
+                  >
+                    {t('admin.specificLocation')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${formData.destinationType === 'group' ? 'active' : ''}`}
+                    onClick={() => setFormData({ ...formData, destinationType: 'group' })}
+                  >
+                    {t('admin.locationGroup')}
+                  </button>
                 </div>
               </div>
 
-              {formData.destinationType === 'location' ? (
+              {formData.destinationType === 'location' && (
                 <div className="form-group">
-                  <label>Location *</label>
+                  <label>{t('admin.locations')} *</label>
                   <select
                     value={formData.locationId}
                     onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
                     required
                   >
-                  <option value="">Select location...</option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name} (/{location.slug})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              ) : (
+                    <option value="">{t('admin.selectLocation')}</option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name} (/{location.slug})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formData.destinationType === 'group' && (
                 <div className="form-group">
-                  <label>Location Group *</label>
+                  <label>{t('admin.locationGroup')} *</label>
                   <select
                     value={formData.locationGroupId}
                     onChange={(e) => setFormData({ ...formData, locationGroupId: e.target.value })}
                     required
                     aria-describedby="group-help-text"
                   >
-                    <option value="">Select location group...</option>
+                    <option value="">{t('admin.selectLocationGroup')}</option>
                     {locationGroups.map((group) => (
                       <option key={group.id} value={group.id}>
                         {group.name}
                       </option>
                     ))}
                   </select>
-                  <small id="group-help-text">This schedule will apply to all locations in the selected group</small>
+                  <small id="group-help-text">{t('admin.scheduleAppliesToGroup')}</small>
                 </div>
               )}
               
               <div className="form-group">
-                <label>Questionnaires *</label>
-                <div style={{ border: '1px solid #ddd', padding: '10px', borderRadius: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                <label>{t('admin.questionnaires')} *</label>
+                <div className="questionnaire-cards-grid">
                   {questionnaires.map((questionnaire) => (
-                    <label key={questionnaire.id} style={{ display: 'block', marginBottom: '5px' }}>
+                    <label
+                      key={questionnaire.id}
+                      className={`questionnaire-checkbox-card ${formData.questionnaireIds.includes(questionnaire.id.toString()) ? 'selected' : ''}`}
+                    >
                       <input
                         type="checkbox"
                         checked={formData.questionnaireIds.includes(questionnaire.id.toString())}
                         onChange={() => toggleQuestionnaire(questionnaire.id.toString())}
                       />
-                      {' '}{questionnaire.name}
+                      <span>{questionnaire.name}</span>
                     </label>
                   ))}
                 </div>
                 {formData.questionnaireIds.length === 0 && (
-                  <small style={{ color: 'red' }}>Select at least one questionnaire</small>
+                  <small style={{ color: 'red' }}>{t('admin.selectAtLeastOneQuestionnaire')}</small>
                 )}
               </div>
 
               <div className="form-group">
-                <label>Schedule Type *</label>
-                <select
-                  value={formData.scheduleType}
-                  onChange={(e) => setFormData({ ...formData, scheduleType: e.target.value })}
-                  required
+                <button
+                  type="button"
+                  className={`toggle-btn ${formData.showOnlyOne ? 'active' : ''}`}
+                  onClick={() => setFormData({ ...formData, showOnlyOne: !formData.showOnlyOne })}
                 >
-                  <option value="date_based">Date-based (specific dates/times)</option>
-                  <option value="recurring_weekday">Recurring (weekdays/times)</option>
-                </select>
+                  {t('admin.showOnlyFirstQuestionnaire')}: {formData.showOnlyOne ? t('common.yes') : t('common.no')}
+                </button>
+                <small>{t('admin.showOnlyFirstQuestionnaireDesc')}</small>
+              </div>
+
+              <div className="form-group">
+                <label>{t('admin.scheduleType')} *</label>
+                <div className="toggle-button-group">
+                  <button
+                    type="button"
+                    className={`toggle-btn ${formData.scheduleType === 'date_based' ? 'active' : ''}`}
+                    onClick={() => setFormData({ ...formData, scheduleType: 'date_based' })}
+                  >
+                    {t('admin.dateBasedScheduleType')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${formData.scheduleType === 'recurring_weekday' ? 'active' : ''}`}
+                    onClick={() => setFormData({ ...formData, scheduleType: 'recurring_weekday' })}
+                  >
+                    {t('admin.recurringScheduleType')}
+                  </button>
+                </div>
               </div>
 
               {formData.scheduleType === 'date_based' && (
-                <>
+                <div className="form-row two-columns">
                   <div className="form-group">
-                    <label>Start Time *</label>
+                    <label>{t('admin.startTime')} *</label>
                     <input
                       type="datetime-local"
                       value={formData.startTime}
                       onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                       required
                     />
+                    <div className="quick-date-actions">
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={setStartNow}>
+                        {t('admin.now')}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="form-group">
-                    <label>End Time *</label>
+                    <label>{t('admin.endTime')} *</label>
                     <input
                       type="datetime-local"
                       value={formData.endTime}
                       onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                       required
                     />
+                    <div className="quick-date-actions">
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={setEndNever}>
+                        {t('admin.never')}
+                      </button>
+                    </div>
                   </div>
-                </>
+                </div>
               )}
 
               {formData.scheduleType === 'recurring_weekday' && (
                 <>
                   <div className="form-group">
-                    <label>Active Days *</label>
+                    <label>{t('admin.activeDays')} *</label>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       {weekdayNames.map((day, index) => (
                         <label key={index} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
@@ -359,12 +404,12 @@ export default function AdminSchedules() {
                       ))}
                     </div>
                     {formData.weekdayPattern.days.length === 0 && (
-                      <small style={{ color: 'red' }}>Select at least one day</small>
+                      <small style={{ color: 'red' }}>{t('admin.selectAtLeastOneDay')}</small>
                     )}
                   </div>
 
                   <div className="form-group">
-                    <label>Start Hour *</label>
+                    <label>{t('admin.startHour')} *</label>
                     <input
                       type="time"
                       value={formData.weekdayPattern.start_hour}
@@ -377,7 +422,7 @@ export default function AdminSchedules() {
                   </div>
 
                   <div className="form-group">
-                    <label>End Hour *</label>
+                    <label>{t('admin.endHour')} *</label>
                     <input
                       type="time"
                       value={formData.weekdayPattern.end_hour}
@@ -391,24 +436,12 @@ export default function AdminSchedules() {
                 </>
               )}
 
-              <div className="form-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={formData.showOnlyOne}
-                    onChange={(e) => setFormData({ ...formData, showOnlyOne: e.target.checked })}
-                  />
-                  {' '}Show only the first questionnaire (instead of all)
-                </label>
-                <small>When enabled, only the first questionnaire will be shown to users</small>
-              </div>
-
               <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={formData.questionnaireIds.length === 0}>
-                  {editingId ? 'Update' : 'Create'}
+                  {editingId ? t('common.update') : t('common.create')}
                 </button>
               </div>
             </form>
@@ -419,18 +452,18 @@ export default function AdminSchedules() {
       <div className="data-list">
         {schedules.length === 0 ? (
           <div className="empty-state">
-            <p>No schedules yet. Add your first schedule to get started.</p>
+            <p>{t('admin.noSchedulesYet')}</p>
           </div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>Destination</th>
-                <th>Questionnaires</th>
-                <th>Type</th>
-                <th>Schedule</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{t('admin.destination')}</th>
+                <th>{t('admin.questionnaires')}</th>
+                <th>{t('admin.type')}</th>
+                <th>{t('admin.schedule')}</th>
+                <th>{t('admin.status')}</th>
+                <th>{t('admin.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -445,10 +478,10 @@ export default function AdminSchedules() {
                     ) : schedule.location_group_name ? (
                       <div>
                         <div><strong>🏢 {schedule.location_group_name}</strong></div>
-                        <small>(Location Group)</small>
+                        <small>({t('admin.locationGroup')})</small>
                       </div>
                     ) : (
-                      <span>N/A</span>
+                      <span>{t('admin.notAvailable')}</span>
                     )}
                   </td>
                   <td>
@@ -462,14 +495,14 @@ export default function AdminSchedules() {
                         )}
                       </div>
                     ) : (
-                      schedule.questionnaire_name || 'N/A'
+                      schedule.questionnaire_name || t('admin.notAvailable')
                     )}
                   </td>
                   <td>
                     {schedule.schedule_type === 'recurring_weekday' ? (
-                      <span>🔄 Recurring</span>
+                      <span>🔄 {t('admin.recurring')}</span>
                     ) : (
-                      <span>📅 Date-based</span>
+                      <span>📅 {t('admin.dateBased')}</span>
                     )}
                   </td>
                   <td>
@@ -484,22 +517,22 @@ export default function AdminSchedules() {
                       </div>
                     ) : (
                       <div>
-                        <div>{schedule.start_time ? new Date(schedule.start_time).toLocaleString() : 'N/A'}</div>
-                        <small>to</small>
-                        <div>{schedule.end_time ? new Date(schedule.end_time).toLocaleString() : 'N/A'}</div>
+                        <div>{schedule.start_time ? new Date(schedule.start_time).toLocaleString() : t('admin.notAvailable')}</div>
+                        <small>{t('admin.to')}</small>
+                        <div>{schedule.end_time ? new Date(schedule.end_time).toLocaleString() : t('admin.notAvailable')}</div>
                       </div>
                     )}
                   </td>
                   <td>
                     <span className={`status ${isActive(schedule) ? 'active' : 'inactive'}`}>
-                      {isActive(schedule) ? 'Active' : 'Inactive'}
+                      {isActive(schedule) ? t('admin.active') : t('admin.inactive')}
                     </span>
                   </td>
-                  <td>
-                    <button className="btn-icon" onClick={() => handleEdit(schedule)} title="Edit">
+                  <td className="table-actions">
+                    <button className="btn-icon" onClick={() => handleEdit(schedule)} title={t('common.edit')}>
                       ✏️
                     </button>
-                    <button className="btn-icon" onClick={() => handleDelete(schedule.id)} title="Delete">
+                    <button className="btn-icon" onClick={() => handleDelete(schedule.id)} title={t('common.delete')}>
                       🗑️
                     </button>
                   </td>

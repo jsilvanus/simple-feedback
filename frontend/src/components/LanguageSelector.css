@@ -5,6 +5,13 @@
   z-index: 1000;
 }
 
+.language-selector.inline {
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: auto;
+}
+
 .language-btn {
   display: flex;
   align-items: center;
