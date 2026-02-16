@@ -22,6 +22,13 @@ export default function FeedbackPage() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
+  // Helper function to get word text in current language with Finnish fallback
+  const getWordText = (wordObj) => {
+    if (typeof wordObj === 'string') return wordObj;
+    const currentLang = i18n.language || 'fi';
+    return wordObj[currentLang] || wordObj.fi || wordObj.en || wordObj.sv || '';
+  };
+
   useEffect(() => {
     checkAuthAndLoad();
   }, [locationSlug]);
@@ -277,13 +284,6 @@ export default function FeedbackPage() {
                 <div className="word-cloud-input">
                   <div className="word-chips">
                     {question.wordCloudOptions.words.map((word, index) => {
-                      // Get word text in current language with Finnish as fallback
-                      const getWordText = (wordObj) => {
-                        if (typeof wordObj === 'string') return wordObj;
-                        const currentLang = i18n.language || 'fi';
-                        return wordObj[currentLang] || wordObj.fi || wordObj.en || wordObj.sv || '';
-                      };
-                      
                       const wordText = getWordText(word.text);
                       const selectedWords = answers[question.id]?.wordArray || [];
                       const isSelected = selectedWords.includes(wordText);
