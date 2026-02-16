@@ -123,4 +123,72 @@ export const api = {
     
     return response.json();
   },
+
+  // Admin CRUD operations
+  async getLocations() {
+    return this.adminRequest('/locations');
+  },
+
+  async createLocation(data) {
+    return this.adminRequest('/locations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateLocation(id, data) {
+    return this.adminRequest(`/locations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteLocation(id) {
+    return this.adminRequest(`/locations/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getQuestionnaires(includeArchived = false) {
+    const query = includeArchived ? '?includeArchived=true' : '';
+    return this.adminRequest(`/questionnaires${query}`);
+  },
+
+  async createQuestionnaire(data) {
+    return this.adminRequest('/questionnaires', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateQuestionnaire(id, data) {
+    return this.adminRequest(`/questionnaires/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getSchedules() {
+    return this.adminRequest('/schedules');
+  },
+
+  async createSchedule(data) {
+    return this.adminRequest('/schedules', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateSchedule(id, data) {
+    return this.adminRequest(`/schedules/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteSchedule(id) {
+    return this.adminRequest(`/schedules/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
