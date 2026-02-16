@@ -316,7 +316,10 @@ export default function FeedbackPage() {
                   <div className="word-cloud-info">
                     <small>
                       {t('feedback.selectUpTo', { max: question.maxSelections })} 
-                      {' '}({(answers[question.id]?.wordArray || []).length}/{question.maxSelections} selected)
+                      {' '}({t('feedback.selectedCount', { 
+                        current: (answers[question.id]?.wordArray || []).length, 
+                        max: question.maxSelections 
+                      })})
                     </small>
                   </div>
                 </div>

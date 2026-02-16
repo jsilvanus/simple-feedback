@@ -24,7 +24,8 @@
     "noActiveQuestionnaire": "Ei aktiivista kyselyä tälle sijainnille",
     "failedToSubmit": "Palautteen lähetys epäonnistui",
     "locationNotFound": "Sijaintia ei löytynyt tai se ei ole aktiivinen",
-    "selectUpTo": "Valitse enintään {{max}} sanaa"
+    "selectUpTo": "Valitse enintään {{max}} sanaa",
+    "selectedCount": "{{current}}/{{max}} valittu"
   },
   "auth": {
     "login": "Kirjaudu sisään",

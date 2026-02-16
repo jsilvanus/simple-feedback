@@ -24,7 +24,8 @@
     "noActiveQuestionnaire": "No active questionnaire for this location",
     "failedToSubmit": "Failed to submit feedback",
     "locationNotFound": "Location not found or inactive",
-    "selectUpTo": "Select up to {{max}} words"
+    "selectUpTo": "Select up to {{max}} words",
+    "selectedCount": "{{current}}/{{max}} selected"
   },
   "auth": {
     "login": "Login",

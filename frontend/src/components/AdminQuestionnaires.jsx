@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import './AdminCrud.css';
 
+const DEFAULT_MAX_SELECTIONS = 3;
+
 export default function AdminQuestionnaires() {
   const [questionnaires, setQuestionnaires] = useState([]);
   const [questions, setQuestions] = useState([]);
@@ -84,7 +86,7 @@ export default function AdminQuestionnaires() {
           pageNumber: 1,
           answerScaleId: '',
           wordCloudOptionsId: '',
-          maxSelections: 3,
+          maxSelections: DEFAULT_MAX_SELECTIONS,
           orderIndex: formData.questions.length,
         },
       ],

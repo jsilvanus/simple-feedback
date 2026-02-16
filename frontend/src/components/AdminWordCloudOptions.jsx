@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import './AdminCrud.css';
 
+const DEFAULT_WORDS = [
+  { text: 'Excellent', color: '#2ecc71' },
+  { text: 'Good', color: '#3498db' },
+  { text: 'Average', color: '#f39c12' },
+  { text: 'Poor', color: '#e74c3c' },
+];
+
 export default function AdminWordCloudOptions() {
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,12 +16,7 @@ export default function AdminWordCloudOptions() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    words: [
-      { text: 'Excellent', color: '#2ecc71' },
-      { text: 'Good', color: '#3498db' },
-      { text: 'Average', color: '#f39c12' },
-      { text: 'Poor', color: '#e74c3c' },
-    ],
+    words: DEFAULT_WORDS,
   });
 
   useEffect(() => {
@@ -44,12 +46,7 @@ export default function AdminWordCloudOptions() {
       setShowForm(false);
       setFormData({
         name: '',
-        words: [
-          { text: 'Excellent', color: '#2ecc71' },
-          { text: 'Good', color: '#3498db' },
-          { text: 'Average', color: '#f39c12' },
-          { text: 'Poor', color: '#e74c3c' },
-        ],
+        words: DEFAULT_WORDS,
       });
       loadOptions();
     } catch (err) {
