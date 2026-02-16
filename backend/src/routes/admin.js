@@ -48,127 +48,121 @@ router.use(apiLimiter);
  * Get all locations
  */
 router.get('/locations', async (req, res, next) => {
-  /**
-   * PUT /api/admin/answer-scales/:id
-   * Update an answer scale
-   */
-  router.put('/answer-scales/:id', async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const { name, buttons } = req.body;
+  try {
+    const result = await db.query(
+      `SELECT l.*, lg.name as group_name
+       FROM locations l
+       LEFT JOIN location_groups lg ON l.group_id = lg.id
+       ORDER BY l.name`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
 
-      const updates = [];
-      const values = [];
-      let paramCount = 1;
+/**
+ * PUT /api/admin/answer-scales/:id
+ * Update an answer scale
+ */
+router.put('/answer-scales/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, buttons } = req.body;
 
-      if (name !== undefined) {
-        updates.push(`name = $${paramCount++}`);
-        values.push(name);
-      }
-      if (buttons !== undefined) {
-        if (!Array.isArray(buttons)) {
-          return res.status(400).json({ error: { message: 'Buttons must be an array' } });
-        }
-        updates.push(`buttons = $${paramCount++}`);
-        values.push(JSON.stringify(buttons));
-      }
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
 
-      if (updates.length === 0) {
-        return res.status(400).json({ error: { message: 'No fields to update' } });
-      }
-
-      updates.push(`updated_at = CURRENT_TIMESTAMP`);
-      values.push(id);
-
-      const query = `UPDATE answer_scales SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
-      const result = await db.query(query, values);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: { message: 'Answer scale not found' } });
-      }
-
-      res.json(result.rows[0]);
-    } catch (error) {
-      next(error);
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
     }
-  });
-
-  /**
-   * DELETE /api/admin/answer-scales/:id
-   * Delete an answer scale
-   */
-  router.delete('/answer-scales/:id', async (req, res, next) => {
-    try {
-      const { id } = req.params;
-
-      const result = await db.query(
-        'DELETE FROM answer_scales WHERE id = $1 RETURNING id',
-        [id]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: { message: 'Answer scale not found' } });
+    if (buttons !== undefined) {
+      if (!Array.isArray(buttons)) {
+        return res.status(400).json({ error: { message: 'Buttons must be an array' } });
       }
-
-      res.json({ success: true, message: 'Answer scale deleted successfully' });
-    } catch (error) {
-      next(error);
+      updates.push(`buttons = $${paramCount++}`);
+      values.push(JSON.stringify(buttons));
     }
-  });
 
-  /**
-   * GET /api/admin/word-cloud-options
-   * Get all word cloud options
-   */
-  router.get('/word-cloud-options', async (req, res, next) => {
-    try {
-      const result = await db.query(
-        'SELECT * FROM word_cloud_options ORDER BY name'
-      );
-      res.json(result.rows);
-    } catch (error) {
-      next(error);
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
     }
-  });
 
-  /**
-   * POST /api/admin/word-cloud-options
-   * Create a new word cloud option set
-   */
-  router.post('/word-cloud-options', async (req, res, next) => {
-    try {
-      const { name, words } = req.body;
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
 
-      if (!name || !words || !Array.isArray(words)) {
-        return res.status(400).json({ error: { message: 'Name and words array are required' } });
-      }
-
-      const result = await db.query(
-        'INSERT INTO word_cloud_options (name, words) VALUES ($1, $2) RETURNING *',
-        [name, JSON.stringify(words)]
-      );
-
-      res.status(201).json(result.rows[0]);
-    } catch (error) {
-      next(error);
-    }
-  });
-    const query = `UPDATE locations SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const query = `UPDATE answer_scales SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
     const result = await db.query(query, values);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Location not found' } });
+      return res.status(404).json({ error: { message: 'Answer scale not found' } });
     }
 
-    // Don't return password hash in response
-    const location = { ...result.rows[0] };
-    delete location.password_hash;
-
-    res.json(location);
+    res.json(result.rows[0]);
   } catch (error) {
-    if (error.code === '23505') {
-      return res.status(409).json({ error: { message: 'Location with this slug already exists' } });
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/answer-scales/:id
+ * Delete an answer scale
+ */
+router.delete('/answer-scales/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM answer_scales WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Answer scale not found' } });
     }
+
+    res.json({ success: true, message: 'Answer scale deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/word-cloud-options
+ * Get all word cloud options
+ */
+router.get('/word-cloud-options', async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM word_cloud_options ORDER BY name'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/word-cloud-options
+ * Create a new word cloud option set
+ */
+router.post('/word-cloud-options', async (req, res, next) => {
+  try {
+    const { name, words } = req.body;
+
+    if (!name || !words || !Array.isArray(words)) {
+      return res.status(400).json({ error: { message: 'Name and words array are required' } });
+    }
+
+    const result = await db.query(
+      'INSERT INTO word_cloud_options (name, words) VALUES ($1, $2) RETURNING *',
+      [name, JSON.stringify(words)]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
     next(error);
   }
 });

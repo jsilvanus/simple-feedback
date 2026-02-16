@@ -29,6 +29,14 @@ For detailed setup instructions, see the [Setup Guide](docs/SETUP.md).
 3. Configure backend `.env` file
 4. Install dependencies and start servers
 
+From the project root you can run the full development stack:
+
+```bash
+npm install
+npm run install:all
+npm run dev
+```
+
 ```bash
 # Backend
 cd backend
@@ -83,6 +91,17 @@ Visit `http://localhost:5173` to see the application.
 - Vanilla CSS with modern features
 
 ## 🔧 Development
+
+### Root Scripts (Recommended)
+
+```bash
+npm run dev:setup     # Start DB + run schema migration (first time / after schema changes)
+npm run dev           # Start DB + backend + Vite
+npm run dev:db        # Start only PostgreSQL (Docker)
+npm run dev:backend   # Start only backend (nodemon)
+npm run dev:frontend  # Start only frontend (Vite)
+npm run db:down       # Stop DB container
+```
 
 ### Backend Development
 

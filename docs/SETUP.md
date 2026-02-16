@@ -10,6 +10,23 @@ Before you begin, ensure you have the following installed:
 
 ## Quick Start
 
+If you use Docker for PostgreSQL, you can start everything from the repository root:
+
+```bash
+npm install
+npm run install:all
+npm run dev:setup
+npm run dev
+```
+
+Service-specific root commands are also available:
+
+```bash
+npm run dev:db
+npm run dev:backend
+npm run dev:frontend
+```
+
 ### 1. Clone the Repository
 
 ```bash

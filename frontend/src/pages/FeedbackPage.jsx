@@ -24,6 +24,39 @@ export default function FeedbackPage() {
   const [authRequired, setAuthRequired] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [contrastMode, setContrastMode] = useState(false);
+  const [uiSize, setUISize] = useState(100);
+
+  const loadQuestionnaire = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await api.getQuestionnaire(locationSlug);
+      setData(result);
+      return result;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkAuthAndLoad = async () => {
+    try {
+      const result = await loadQuestionnaire();
+      const isAuthenticated = sessionStorage.getItem(`location_auth_${locationSlug}`) === 'true';
+
+      if (result?.location?.passwordRequired && !isAuthenticated) {
+        setAuthRequired(true);
+      } else {
+        setAuthRequired(false);
+      }
+    } catch {
+      // Error state is handled in loadQuestionnaire
+    }
+  };
 
   useEffect(() => {
     // Check for contrast mode from URL param or localStorage
@@ -43,49 +76,36 @@ export default function FeedbackPage() {
       setUISize(parseInt(storedSize, 10));
     }
 
-    checkAuthAndLoad();
-  }, [locationSlug]);
+    const initializePage = async () => {
+      await checkAuthAndLoad();
+    };
+
+    initializePage();
+  }, [locationSlug, searchParams]);
 
   useEffect(() => {
     // Apply contrast mode to body
     if (contrastMode) {
       document.body.classList.add('contrast-mode');
-
-      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
-        if (Array.isArray(answer.wordArray) && answer.wordArray.length > 0) {
-          return {
-            questionId: parseInt(questionId, 10),
-            value: null,
-            textValue: answer.wordArray.join(', '),
-          };
-        }
-
-        // For continuous_scale, the value is an object (not null, not array),
-        // so we store it as JSON in textValue.
-        if (typeof answer.value === 'object' && answer.value !== null && !Array.isArray(answer.value)) {
-          return {
-            questionId: parseInt(questionId, 10),
-            value: null,
-            textValue: JSON.stringify(answer.value),
-          };
-        }
-
-        return {
-          questionId: parseInt(questionId, 10),
-          value: answer.value,
-          textValue: answer.textValue,
-        };
-      });
-
-    // Try loading without auth (in case password is not required)
-    try {
-      await loadQuestionnaire();
-    } catch (err) {
-      if (err.message.includes('authentication required')) {
-        setAuthRequired(true);
-        setLoading(false);
-      }
+    } else {
+      document.body.classList.remove('contrast-mode');
     }
+
+    return () => {
+      document.body.classList.remove('contrast-mode');
+    };
+  }, [contrastMode]);
+
+  const getWordText = (wordText) => {
+    if (typeof wordText === 'string') {
+      return wordText;
+    }
+
+    if (wordText && typeof wordText === 'object') {
+      return wordText[i18n.language] || wordText.en || Object.values(wordText)[0] || '';
+    }
+
+    return '';
   };
 
   const authenticateLocation = async (pass) => {
@@ -134,19 +154,6 @@ export default function FeedbackPage() {
 
   const handleSettingsLongPress = () => {
     handleToggleContrast();
-  };
-
-  const loadQuestionnaire = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await api.getQuestionnaire(locationSlug);
-      setData(result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleAnswer = (questionId, value, textValue = null, wordArray = null) => {
