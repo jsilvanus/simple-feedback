@@ -47,9 +47,15 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
 
     // Insert all answers
     for (const answer of answers) {
+      const normalizedValue = typeof answer.value === 'number' ? answer.value : null;
+      const normalizedTextValue =
+        answer.textValue !== undefined && answer.textValue !== null
+          ? answer.textValue
+          : (answer.value && typeof answer.value === 'object' ? JSON.stringify(answer.value) : null);
+
       await client.query(
         'INSERT INTO feedback_answers (session_id, question_id, value, text_value) VALUES ($1, $2, $3, $4)',
-        [sessionId, answer.questionId, answer.value || null, answer.textValue || null]
+        [sessionId, answer.questionId, normalizedValue, normalizedTextValue]
       );
     }
 

@@ -199,13 +199,17 @@ export default function FeedbackPage() {
       setSubmitting(true);
       
       const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
+        const normalizedValue = typeof answer.value === 'number' ? answer.value : null;
+
         const normalizedTextValue = Array.isArray(answer.wordArray)
           ? (answer.wordArray.length > 0 ? answer.wordArray.join(', ') : null)
-          : (answer.textValue || null);
+          : (answer.value && typeof answer.value === 'object'
+              ? JSON.stringify(answer.value)
+              : (answer.textValue || null));
 
         return {
           questionId: parseInt(questionId),
-          value: answer.value,
+          value: normalizedValue,
           textValue: normalizedTextValue,
         };
       });
