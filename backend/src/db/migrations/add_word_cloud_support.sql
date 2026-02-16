@@ -25,32 +25,32 @@ ON questionnaire_questions(word_cloud_options_id);
 -- Insert sample word cloud options for testing
 INSERT INTO word_cloud_options (name, words) VALUES 
 ('Service Quality', '[
-    {"text": "Excellent", "color": "#2ecc71"},
-    {"text": "Professional", "color": "#3498db"},
-    {"text": "Friendly", "color": "#9b59b6"},
-    {"text": "Fast", "color": "#1abc9c"},
-    {"text": "Helpful", "color": "#f39c12"},
-    {"text": "Clean", "color": "#16a085"},
-    {"text": "Organized", "color": "#27ae60"},
-    {"text": "Responsive", "color": "#2980b9"}
+    {"text": {"fi": "Erinomainen", "en": "Excellent", "sv": "Utmärkt"}, "color": "#2ecc71"},
+    {"text": {"fi": "Ammattimainen", "en": "Professional", "sv": "Professionell"}, "color": "#3498db"},
+    {"text": {"fi": "Ystävällinen", "en": "Friendly", "sv": "Vänlig"}, "color": "#9b59b6"},
+    {"text": {"fi": "Nopea", "en": "Fast", "sv": "Snabb"}, "color": "#1abc9c"},
+    {"text": {"fi": "Avulias", "en": "Helpful", "sv": "Hjälpsam"}, "color": "#f39c12"},
+    {"text": {"fi": "Siisti", "en": "Clean", "sv": "Ren"}, "color": "#16a085"},
+    {"text": {"fi": "Järjestetty", "en": "Organized", "sv": "Organiserad"}, "color": "#27ae60"},
+    {"text": {"fi": "Reagoiva", "en": "Responsive", "sv": "Responsiv"}, "color": "#2980b9"}
 ]'),
 ('Customer Experience', '[
-    {"text": "Amazing", "color": "#2ecc71"},
-    {"text": "Satisfied", "color": "#3498db"},
-    {"text": "Disappointed", "color": "#e74c3c"},
-    {"text": "Confused", "color": "#95a5a6"},
-    {"text": "Happy", "color": "#f39c12"},
-    {"text": "Frustrated", "color": "#c0392b"},
-    {"text": "Impressed", "color": "#9b59b6"},
-    {"text": "Neutral", "color": "#7f8c8d"}
+    {"text": {"fi": "Hämmästyttävä", "en": "Amazing", "sv": "Fantastisk"}, "color": "#2ecc71"},
+    {"text": {"fi": "Tyytyväinen", "en": "Satisfied", "sv": "Nöjd"}, "color": "#3498db"},
+    {"text": {"fi": "Pettynyt", "en": "Disappointed", "sv": "Besviken"}, "color": "#e74c3c"},
+    {"text": {"fi": "Hämmentynyt", "en": "Confused", "sv": "Förvirrad"}, "color": "#95a5a6"},
+    {"text": {"fi": "Iloinen", "en": "Happy", "sv": "Glad"}, "color": "#f39c12"},
+    {"text": {"fi": "Turhautunut", "en": "Frustrated", "sv": "Frustrerad"}, "color": "#c0392b"},
+    {"text": {"fi": "Vaikuttunut", "en": "Impressed", "sv": "Imponerad"}, "color": "#9b59b6"},
+    {"text": {"fi": "Neutraali", "en": "Neutral", "sv": "Neutral"}, "color": "#7f8c8d"}
 ]'),
 ('Product Features', '[
-    {"text": "Innovative", "color": "#e74c3c"},
-    {"text": "Easy to use", "color": "#2ecc71"},
-    {"text": "Reliable", "color": "#3498db"},
-    {"text": "Powerful", "color": "#9b59b6"},
-    {"text": "Affordable", "color": "#f39c12"},
-    {"text": "Modern", "color": "#1abc9c"},
-    {"text": "Intuitive", "color": "#16a085"},
-    {"text": "Flexible", "color": "#27ae60"}
+    {"text": {"fi": "Innovatiivinen", "en": "Innovative", "sv": "Innovativ"}, "color": "#e74c3c"},
+    {"text": {"fi": "Helppo käyttää", "en": "Easy to use", "sv": "Lätt att använda"}, "color": "#2ecc71"},
+    {"text": {"fi": "Luotettava", "en": "Reliable", "sv": "Pålitlig"}, "color": "#3498db"},
+    {"text": {"fi": "Tehokas", "en": "Powerful", "sv": "Kraftfull"}, "color": "#9b59b6"},
+    {"text": {"fi": "Edullinen", "en": "Affordable", "sv": "Prisvärd"}, "color": "#f39c12"},
+    {"text": {"fi": "Moderni", "en": "Modern", "sv": "Modern"}, "color": "#1abc9c"},
+    {"text": {"fi": "Intuitiivinen", "en": "Intuitive", "sv": "Intuitiv"}, "color": "#16a085"},
+    {"text": {"fi": "Joustava", "en": "Flexible", "sv": "Flexibel"}, "color": "#27ae60"}
 ]');

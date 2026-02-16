@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { api } from '../api';
 import LanguageSelector from '../components/LanguageSelector';
 import './FeedbackPage.css';
@@ -276,8 +277,16 @@ export default function FeedbackPage() {
                 <div className="word-cloud-input">
                   <div className="word-chips">
                     {question.wordCloudOptions.words.map((word, index) => {
+                      // Get word text in current language with Finnish as fallback
+                      const getWordText = (wordObj) => {
+                        if (typeof wordObj === 'string') return wordObj;
+                        const currentLang = i18n.language || 'fi';
+                        return wordObj[currentLang] || wordObj.fi || wordObj.en || wordObj.sv || '';
+                      };
+                      
+                      const wordText = getWordText(word.text);
                       const selectedWords = answers[question.id]?.wordArray || [];
-                      const isSelected = selectedWords.includes(word.text);
+                      const isSelected = selectedWords.includes(wordText);
                       const maxReached = selectedWords.length >= question.maxSelections && !isSelected;
                       
                       return (
@@ -295,10 +304,10 @@ export default function FeedbackPage() {
                             
                             if (isSelected) {
                               // Deselect word
-                              newWords = currentWords.filter(w => w !== word.text);
+                              newWords = currentWords.filter(w => w !== wordText);
                             } else if (currentWords.length < question.maxSelections) {
                               // Select word
-                              newWords = [...currentWords, word.text];
+                              newWords = [...currentWords, wordText];
                             } else {
                               // Max reached, don't add
                               return;
@@ -308,7 +317,7 @@ export default function FeedbackPage() {
                           }}
                           disabled={maxReached}
                         >
-                          {word.text}
+                          {wordText}
                         </button>
                       );
                     })}

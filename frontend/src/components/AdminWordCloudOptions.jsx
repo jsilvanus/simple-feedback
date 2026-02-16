@@ -3,10 +3,10 @@ import { api } from '../api';
 import './AdminCrud.css';
 
 const DEFAULT_WORDS = [
-  { text: 'Excellent', color: '#2ecc71' },
-  { text: 'Good', color: '#3498db' },
-  { text: 'Average', color: '#f39c12' },
-  { text: 'Poor', color: '#e74c3c' },
+  { text: { fi: 'Erinomainen', en: 'Excellent', sv: 'Utmärkt' }, color: '#2ecc71' },
+  { text: { fi: 'Hyvä', en: 'Good', sv: 'Bra' }, color: '#3498db' },
+  { text: { fi: 'Keskinkertainen', en: 'Average', sv: 'Genomsnittlig' }, color: '#f39c12' },
+  { text: { fi: 'Huono', en: 'Poor', sv: 'Dålig' }, color: '#e74c3c' },
 ];
 
 export default function AdminWordCloudOptions() {
@@ -60,14 +60,34 @@ export default function AdminWordCloudOptions() {
 
   const updateWord = (index, field, value) => {
     const newWords = [...formData.words];
-    newWords[index][field] = value;
+    if (field === 'text') {
+      // Handle text translations
+      if (typeof newWords[index].text === 'string') {
+        // Convert old format to new format
+        newWords[index].text = { fi: value, en: '', sv: '' };
+      } else {
+        newWords[index].text = value;
+      }
+    } else {
+      newWords[index][field] = value;
+    }
+    setFormData({ ...formData, words: newWords });
+  };
+
+  const updateWordTranslation = (index, lang, value) => {
+    const newWords = [...formData.words];
+    if (typeof newWords[index].text === 'string') {
+      // Convert to object format
+      newWords[index].text = { fi: '', en: '', sv: '' };
+    }
+    newWords[index].text[lang] = value;
     setFormData({ ...formData, words: newWords });
   };
 
   const addWord = () => {
     setFormData({
       ...formData,
-      words: [...formData.words, { text: '', color: '#333333' }],
+      words: [...formData.words, { text: { fi: '', en: '', sv: '' }, color: '#333333' }],
     });
   };
 
@@ -105,27 +125,61 @@ export default function AdminWordCloudOptions() {
               </div>
               
               <div className="form-group">
-                <label>Words</label>
+                <label>Words (Finnish is required, other languages optional)</label>
                 {formData.words.map((word, index) => (
-                  <div key={index} className="button-editor">
-                    <input
-                      type="text"
-                      value={word.text}
-                      onChange={(e) => updateWord(index, 'text', e.target.value)}
-                      placeholder="Word text (e.g., Excellent)"
-                      required
-                      style={{ flex: 2 }}
-                    />
-                    <input
-                      type="color"
-                      value={word.color}
-                      onChange={(e) => updateWord(index, 'color', e.target.value)}
-                    />
-                    {formData.words.length > 2 && (
-                      <button type="button" onClick={() => removeWord(index)} className="btn-icon">
-                        ❌
-                      </button>
-                    )}
+                  <div key={index} style={{ marginBottom: '20px', padding: '15px', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '12px', color: '#666' }}>Finnish (fi) *</label>
+                        <input
+                          type="text"
+                          value={typeof word.text === 'string' ? word.text : word.text.fi || ''}
+                          onChange={(e) => updateWordTranslation(index, 'fi', e.target.value)}
+                          placeholder="e.g., Erinomainen"
+                          required
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '12px', color: '#666' }}>English (en)</label>
+                        <input
+                          type="text"
+                          value={typeof word.text === 'string' ? '' : word.text.en || ''}
+                          onChange={(e) => updateWordTranslation(index, 'en', e.target.value)}
+                          placeholder="e.g., Excellent"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '12px', color: '#666' }}>Swedish (sv)</label>
+                        <input
+                          type="text"
+                          value={typeof word.text === 'string' ? '' : word.text.sv || ''}
+                          onChange={(e) => updateWordTranslation(index, 'sv', e.target.value)}
+                          placeholder="e.g., Utmärkt"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div style={{ width: '60px' }}>
+                        <label style={{ fontSize: '12px', color: '#666' }}>Color</label>
+                        <input
+                          type="color"
+                          value={word.color}
+                          onChange={(e) => updateWord(index, 'color', e.target.value)}
+                          style={{ width: '100%', height: '36px' }}
+                        />
+                      </div>
+                      {formData.words.length > 2 && (
+                        <button 
+                          type="button" 
+                          onClick={() => removeWord(index)} 
+                          className="btn-icon"
+                          style={{ marginTop: '20px' }}
+                        >
+                          ❌
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
                 <button type="button" onClick={addWord} className="btn btn-secondary btn-sm">
@@ -157,23 +211,31 @@ export default function AdminWordCloudOptions() {
               <div key={option.id} className="scale-card">
                 <h4>{option.name}</h4>
                 <div className="wordcloud-preview">
-                  {option.words.map((word, index) => (
-                    <span
-                      key={index}
-                      className="word-chip-preview"
-                      style={{ 
-                        backgroundColor: word.color,
-                        color: 'white',
-                        padding: '8px 16px',
-                        margin: '4px',
-                        borderRadius: '20px',
-                        display: 'inline-block',
-                        fontSize: '14px',
-                      }}
-                    >
-                      {word.text}
-                    </span>
-                  ))}
+                  {option.words.map((word, index) => {
+                    // Display Finnish by default, or the first available translation
+                    const displayText = typeof word.text === 'string' 
+                      ? word.text 
+                      : word.text.fi || word.text.en || word.text.sv || '';
+                    
+                    return (
+                      <span
+                        key={index}
+                        className="word-chip-preview"
+                        style={{ 
+                          backgroundColor: word.color,
+                          color: 'white',
+                          padding: '8px 16px',
+                          margin: '4px',
+                          borderRadius: '20px',
+                          display: 'inline-block',
+                          fontSize: '14px',
+                        }}
+                        title={typeof word.text === 'object' ? `FI: ${word.text.fi || '-'} | EN: ${word.text.en || '-'} | SV: ${word.text.sv || '-'}` : word.text}
+                      >
+                        {displayText}
+                      </span>
+                    );
+                  })}
                 </div>
                 <small>{option.words.length} words</small>
               </div>

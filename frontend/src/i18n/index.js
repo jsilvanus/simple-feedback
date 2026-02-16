@@ -4,8 +4,8 @@ import en from './locales/en.json';
 import fi from './locales/fi.json';
 import sv from './locales/sv.json';
 
-// Get saved language or default to English
-const savedLanguage = localStorage.getItem('language') || 'en';
+// Get saved language or default to Finnish
+const savedLanguage = localStorage.getItem('language') || 'fi';
 
 i18n
   .use(initReactI18next)
@@ -16,7 +16,7 @@ i18n
       sv: { translation: sv },
     },
     lng: savedLanguage,
-    fallbackLng: 'en',
+    fallbackLng: 'fi',
     interpolation: {
       escapeValue: false,
     },
