@@ -373,3 +373,15 @@
     width: 100% !important;
   }
 }
+
+/* Archived items styling */
+.archived-row {
+  opacity: 0.6;
+  background: #f5f5f5;
+}
+
+.archived-card {
+  opacity: 0.7;
+  background: #f5f5f5;
+  border: 2px dashed #ccc !important;
+}

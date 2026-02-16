@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const db = require('../db');
-const { apiLimiter } = require('../middleware/rateLimiter');
+const { apiLimiter, loginLimiter } = require('../middleware/rateLimiter');
 
 /**
  * GET /api/locations/:slug/questionnaire
@@ -93,6 +94,49 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
       },
       questionnaire,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/locations/:slug/login
+ * Authenticate to a password-protected location
+ */
+router.post('/:slug/login', loginLimiter, async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const { password } = req.body;
+
+    // Get location
+    const locationResult = await db.query(
+      'SELECT id, slug, name, password_hash, password_required FROM locations WHERE slug = $1 AND active = true',
+      [slug]
+    );
+
+    if (locationResult.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location not found or inactive' } });
+    }
+
+    const location = locationResult.rows[0];
+
+    // Check if password is required
+    if (!location.password_required || !location.password_hash) {
+      return res.json({ success: true, message: 'No password required' });
+    }
+
+    // Validate password
+    if (!password) {
+      return res.status(400).json({ error: { message: 'Password is required' } });
+    }
+
+    const isValid = await bcrypt.compare(password, location.password_hash);
+    
+    if (!isValid) {
+      return res.status(401).json({ error: { message: 'Invalid password' } });
+    }
+
+    res.json({ success: true, message: 'Authenticated successfully' });
   } catch (error) {
     next(error);
   }

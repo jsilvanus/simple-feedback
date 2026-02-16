@@ -209,6 +209,56 @@
   font-weight: 600;
 }
 
+/* Auth container styles */
+.auth-container {
+  max-width: 400px;
+}
+
+.auth-container h1 {
+  font-size: 28px;
+  color: #333;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  transition: border-color 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.error-message {
+  color: #e74c3c;
+  font-size: 14px;
+  margin: 10px 0;
+  text-align: center;
+}
+
+.auth-container .btn {
+  width: 100%;
+  margin-top: 10px;
+}
+
 @media (max-width: 768px) {
   .feedback-container {
     padding: 30px 20px;

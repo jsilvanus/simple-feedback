@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
+import LanguageSelector from '../components/LanguageSelector';
 import './FeedbackPage.css';
 
 export default function FeedbackPage() {
   const { locationSlug } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
@@ -13,10 +17,70 @@ export default function FeedbackPage() {
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    loadQuestionnaire();
+    checkAuthAndLoad();
   }, [locationSlug]);
+
+  const checkAuthAndLoad = async () => {
+    // Check URL param for password
+    const passParam = searchParams.get('pass');
+    if (passParam) {
+      await authenticateLocation(passParam);
+      // Clear password from URL
+      searchParams.delete('pass');
+      setSearchParams(searchParams, { replace: true });
+      return;
+    }
+
+    // Check if already authenticated
+    const storedAuth = sessionStorage.getItem(`location_auth_${locationSlug}`);
+    if (storedAuth) {
+      loadQuestionnaire();
+      return;
+    }
+
+    // Try loading without auth (in case password is not required)
+    try {
+      await loadQuestionnaire();
+    } catch (err) {
+      if (err.message.includes('authentication required')) {
+        setAuthRequired(true);
+        setLoading(false);
+      }
+    }
+  };
+
+  const authenticateLocation = async (pass) => {
+    try {
+      setLoading(true);
+      setAuthError('');
+      await api.authenticateLocation(locationSlug, pass);
+      sessionStorage.setItem(`location_auth_${locationSlug}`, 'true');
+      setAuthRequired(false);
+      await loadQuestionnaire();
+    } catch (err) {
+      setAuthError(t('auth.invalidCredentials'));
+      setAuthRequired(true);
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    authenticateLocation(password);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem(`location_auth_${locationSlug}`);
+    setData(null);
+    setAnswers({});
+    setCurrentPage(0);
+    setAuthRequired(true);
+  };
 
   const loadQuestionnaire = async () => {
     try {
@@ -77,17 +141,47 @@ export default function FeedbackPage() {
         setCurrentPage(0);
       }, 3000);
     } catch (err) {
-      setError('Failed to submit feedback');
+      setError(t('feedback.failedToSubmit'));
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Auth required view
+  if (authRequired) {
+    return (
+      <div className="feedback-page">
+        <LanguageSelector />
+        <div className="feedback-container auth-container">
+          <h1>{t('auth.loginRequired')}</h1>
+          <form onSubmit={handlePasswordSubmit}>
+            <div className="form-group">
+              <label htmlFor="password">{t('auth.enterPassword')}</label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('auth.password')}
+                autoFocus
+              />
+            </div>
+            {authError && <p className="error-message">{authError}</p>}
+            <button type="submit" className="btn btn-primary">
+              {t('auth.login')}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="feedback-page loading">
+        <LanguageSelector />
         <div className="spinner"></div>
-        <p>Loading...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -95,9 +189,10 @@ export default function FeedbackPage() {
   if (error) {
     return (
       <div className="feedback-page error">
-        <h1>Error</h1>
+        <LanguageSelector />
+        <h1>{t('common.error')}</h1>
         <p>{error}</p>
-        <button onClick={loadQuestionnaire}>Retry</button>
+        <button onClick={loadQuestionnaire}>{t('common.retry')}</button>
       </div>
     );
   }
@@ -105,9 +200,10 @@ export default function FeedbackPage() {
   if (success) {
     return (
       <div className="feedback-page success">
+        <LanguageSelector />
         <div className="success-icon">✓</div>
-        <h1>Thank you!</h1>
-        <p>Your feedback has been submitted.</p>
+        <h1>{t('feedback.thankYou')}</h1>
+        <p>{t('feedback.feedbackSubmitted')}</p>
       </div>
     );
   }
@@ -121,6 +217,10 @@ export default function FeedbackPage() {
 
   return (
     <div className="feedback-page">
+      <LanguageSelector 
+        onLongPress={handleLogout}
+        locationName={data?.location?.name}
+      />
       <div className="feedback-container">
         <header className="feedback-header">
           <h1>{data.location.name}</h1>
@@ -132,7 +232,10 @@ export default function FeedbackPage() {
 
         <div className="feedback-content">
           <div className="page-indicator">
-            Page {currentPage + 1} of {data.questionnaire.pages.length}
+            {t('feedback.pageOf', { 
+              current: currentPage + 1, 
+              total: data.questionnaire.pages.length 
+            })}
           </div>
 
           {currentPageData.questions.map(question => (
@@ -164,7 +267,7 @@ export default function FeedbackPage() {
                   className="text-input"
                   value={answers[question.id]?.textValue || ''}
                   onChange={(e) => handleAnswer(question.id, null, e.target.value)}
-                  placeholder="Enter your feedback here..."
+                  placeholder={t('feedback.enterFeedback')}
                   rows={4}
                 />
               )}
@@ -185,7 +288,7 @@ export default function FeedbackPage() {
               onClick={handlePrevious}
               disabled={submitting}
             >
-              Previous
+              {t('common.previous')}
             </button>
           )}
           
@@ -194,7 +297,7 @@ export default function FeedbackPage() {
             onClick={handleNext}
             disabled={submitting}
           >
-            {submitting ? 'Submitting...' : (isLastPage ? 'Submit' : 'Next')}
+            {submitting ? t('common.submitting') : (isLastPage ? t('common.submit') : t('common.next'))}
           </button>
         </div>
       </div>

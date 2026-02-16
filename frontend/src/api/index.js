@@ -31,6 +31,23 @@ export const api = {
     return response.json();
   },
 
+  // Authenticate location with password
+  async authenticateLocation(slug, password) {
+    const response = await fetch(`${API_BASE}/locations/${slug}/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Authentication failed');
+    }
+    
+    return response.json();
+  },
+
   // Admin login
   async adminLogin(username, password) {
     const response = await fetch(`${API_BASE}/admin/login`, {

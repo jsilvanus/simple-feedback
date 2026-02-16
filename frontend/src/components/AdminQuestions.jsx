@@ -7,6 +7,7 @@ export default function AdminQuestions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [formData, setFormData] = useState({
     text: '',
     type: 'scale',
@@ -14,18 +15,30 @@ export default function AdminQuestions() {
 
   useEffect(() => {
     loadQuestions();
-  }, []);
+  }, [showArchived]);
 
   const loadQuestions = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.adminRequest('/questions');
+      const data = await api.adminRequest(`/questions?includeArchived=${showArchived}`);
       setQuestions(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleArchiveToggle = async (questionId, currentArchived) => {
+    try {
+      await api.adminRequest(`/questions/${questionId}/archive`, {
+        method: 'PATCH',
+        body: JSON.stringify({ archived: !currentArchived }),
+      });
+      loadQuestions();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -65,9 +78,19 @@ export default function AdminQuestions() {
     <div className="admin-crud-section">
       <div className="section-header">
         <h2>Questions</h2>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add Question
-        </button>
+        <div>
+          <label style={{ marginRight: '20px' }}>
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+            />
+            {' '}Show Archived
+          </label>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            + Add Question
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -123,19 +146,37 @@ export default function AdminQuestions() {
               <tr>
                 <th>Type</th>
                 <th>Question</th>
+                <th>Status</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {questions.map((question) => (
-                <tr key={question.id}>
+                <tr key={question.id} className={question.archived ? 'archived-row' : ''}>
                   <td>
                     <span className="type-badge" title={question.type}>
                       {getTypeIcon(question.type)} {question.type}
                     </span>
                   </td>
                   <td>{question.text}</td>
+                  <td>
+                    {question.archived ? (
+                      <span className="status inactive">📦 Archived</span>
+                    ) : (
+                      <span className="status active">✓ Active</span>
+                    )}
+                  </td>
                   <td>{new Date(question.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      className="btn-icon"
+                      onClick={() => handleArchiveToggle(question.id, question.archived)}
+                      title={question.archived ? 'Unarchive' : 'Archive'}
+                    >
+                      {question.archived ? '📤' : '📦'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

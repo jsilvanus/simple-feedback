@@ -1,0 +1,48 @@
+{
+  "common": {
+    "loading": "Laddar...",
+    "error": "Fel",
+    "retry": "Försök igen",
+    "submit": "Skicka",
+    "cancel": "Avbryt",
+    "save": "Spara",
+    "delete": "Ta bort",
+    "edit": "Redigera",
+    "close": "Stäng",
+    "yes": "Ja",
+    "no": "Nej",
+    "previous": "Föregående",
+    "next": "Nästa",
+    "submitting": "Skickar...",
+    "location": "plats"
+  },
+  "feedback": {
+    "thankYou": "Tack!",
+    "feedbackSubmitted": "Din feedback har skickats.",
+    "pageOf": "Sida {{current}} av {{total}}",
+    "enterFeedback": "Skriv din feedback här...",
+    "noActiveQuestionnaire": "Ingen aktiv enkät för denna plats",
+    "failedToSubmit": "Misslyckades att skicka feedback",
+    "locationNotFound": "Platsen hittades inte eller är inte aktiv"
+  },
+  "auth": {
+    "login": "Logga in",
+    "logout": "Logga ut",
+    "username": "Användarnamn",
+    "password": "Lösenord",
+    "invalidCredentials": "Ogiltiga inloggningsuppgifter",
+    "loginRequired": "Inloggning krävs",
+    "enterPassword": "Ange platslösenord",
+    "logoutConfirm": "Är du säker på att du vill logga ut från {{location}}?"
+  },
+  "admin": {
+    "dashboard": "Adminpanel",
+    "locations": "Platser",
+    "questions": "Frågor",
+    "questionnaires": "Enkäter",
+    "schedules": "Scheman",
+    "results": "Resultat",
+    "export": "Exportera",
+    "answerScales": "Svarsskalor"
+  }
+}

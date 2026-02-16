@@ -12,6 +12,8 @@ export default function AdminLocations() {
     slug: '',
     name: '',
     active: true,
+    password: '',
+    passwordRequired: false,
   });
 
   useEffect(() => {
@@ -34,12 +36,20 @@ export default function AdminLocations() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.adminRequest('/locations', {
-        method: 'POST',
-        body: JSON.stringify(formData),
-      });
+      if (editingId) {
+        await api.adminRequest(`/locations/${editingId}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/locations', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
       setShowForm(false);
-      setFormData({ slug: '', name: '', active: true });
+      setEditingId(null);
+      setFormData({ slug: '', name: '', active: true, password: '', passwordRequired: false });
       loadLocations();
     } catch (err) {
       setError(err.message);
@@ -47,14 +57,21 @@ export default function AdminLocations() {
   };
 
   const handleEdit = (location) => {
-    // TODO: Implement edit functionality when backend PUT endpoint is added
-    alert('Edit functionality coming soon. For now, you can create new locations.');
+    setEditingId(location.id);
+    setFormData({
+      slug: location.slug,
+      name: location.name,
+      active: location.active,
+      password: '',
+      passwordRequired: location.password_required || false,
+    });
+    setShowForm(true);
   };
 
   const handleCancel = () => {
     setShowForm(false);
     setEditingId(null);
-    setFormData({ slug: '', name: '', active: true });
+    setFormData({ slug: '', name: '', active: true, password: '', passwordRequired: false });
   };
 
   if (loading) return <div className="loading">Loading locations...</div>;
@@ -109,6 +126,32 @@ export default function AdminLocations() {
                 </label>
               </div>
 
+              <div className="form-group checkbox">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={formData.passwordRequired}
+                    onChange={(e) => setFormData({ ...formData, passwordRequired: e.target.checked })}
+                  />
+                  Require Password
+                </label>
+                <small>Enable persistent login for this location</small>
+              </div>
+
+              {formData.passwordRequired && (
+                <div className="form-group">
+                  <label>Password {editingId && '(leave empty to keep current)'}</label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Enter location password"
+                    required={!editingId}
+                  />
+                  <small>Used for kiosk login and URL parameter authentication</small>
+                </div>
+              )}
+
               <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={handleCancel}>
                   Cancel
@@ -134,6 +177,7 @@ export default function AdminLocations() {
                 <th>Slug</th>
                 <th>Name</th>
                 <th>Status</th>
+                <th>Password</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
@@ -147,6 +191,13 @@ export default function AdminLocations() {
                     <span className={`status ${location.active ? 'active' : 'inactive'}`}>
                       {location.active ? 'Active' : 'Inactive'}
                     </span>
+                  </td>
+                  <td>
+                    {location.password_required ? (
+                      <span className="status active">🔒 Required</span>
+                    ) : (
+                      <span className="status inactive">🔓 None</span>
+                    )}
                   </td>
                   <td>{new Date(location.created_at).toLocaleDateString()}</td>
                   <td>

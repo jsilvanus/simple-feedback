@@ -4,27 +4,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { loginLimiter, apiLimiter } = require('../middleware/rateLimiter');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-// Middleware to verify JWT token
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: { message: 'No token provided' } });
-  }
-
-  const token = authHeader.substring(7);
-  
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: { message: 'Invalid token' } });
-  }
-};
+const { authenticate, JWT_SECRET } = require('../middleware/auth');
 
 /**
  * POST /api/admin/login
@@ -84,20 +64,99 @@ router.get('/locations', async (req, res, next) => {
  */
 router.post('/locations', async (req, res, next) => {
   try {
-    const { slug, name, active } = req.body;
+    const { slug, name, active, password, passwordRequired } = req.body;
 
     if (!slug || !name) {
       return res.status(400).json({ error: { message: 'Slug and name are required' } });
     }
 
+    let passwordHash = null;
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
     const result = await db.query(
-      'INSERT INTO locations (slug, name, active) VALUES ($1, $2, $3) RETURNING *',
-      [slug, name, active !== undefined ? active : true]
+      'INSERT INTO locations (slug, name, active, password_hash, password_required) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [slug, name, active !== undefined ? active : true, passwordHash, passwordRequired || false]
     );
 
-    res.status(201).json(result.rows[0]);
+    // Don't return password hash in response
+    const location = { ...result.rows[0] };
+    delete location.password_hash;
+
+    res.status(201).json(location);
   } catch (error) {
     if (error.code === '23505') { // Unique violation
+      return res.status(409).json({ error: { message: 'Location with this slug already exists' } });
+    }
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/locations/:id
+ * Update a location
+ */
+router.put('/locations/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { slug, name, active, password, passwordRequired } = req.body;
+
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (slug !== undefined) {
+      updates.push(`slug = $${paramCount++}`);
+      values.push(slug);
+    }
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+    if (passwordRequired !== undefined) {
+      updates.push(`password_required = $${paramCount++}`);
+      values.push(passwordRequired);
+    }
+    if (password !== undefined) {
+      if (password === null || password === '') {
+        // Clear password
+        updates.push(`password_hash = NULL`);
+        updates.push(`password_required = false`);
+      } else {
+        // Set new password
+        const passwordHash = await bcrypt.hash(password, 10);
+        updates.push(`password_hash = $${paramCount++}`);
+        values.push(passwordHash);
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const query = `UPDATE locations SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location not found' } });
+    }
+
+    // Don't return password hash in response
+    const location = { ...result.rows[0] };
+    delete location.password_hash;
+
+    res.json(location);
+  } catch (error) {
+    if (error.code === '23505') {
       return res.status(409).json({ error: { message: 'Location with this slug already exists' } });
     }
     next(error);
@@ -110,9 +169,15 @@ router.post('/locations', async (req, res, next) => {
  */
 router.get('/questions', async (req, res, next) => {
   try {
-    const result = await db.query(
-      'SELECT * FROM questions ORDER BY id'
-    );
+    const { includeArchived } = req.query;
+    
+    let query = 'SELECT * FROM questions';
+    if (includeArchived !== 'true') {
+      query += ' WHERE archived = false';
+    }
+    query += ' ORDER BY id';
+
+    const result = await db.query(query);
     res.json(result.rows);
   } catch (error) {
     next(error);
@@ -141,6 +206,34 @@ router.post('/questions', async (req, res, next) => {
     );
 
     res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/admin/questions/:id/archive
+ * Archive or unarchive a question
+ */
+router.patch('/questions/:id/archive', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { archived } = req.body;
+
+    if (archived === undefined) {
+      return res.status(400).json({ error: { message: 'archived field is required' } });
+    }
+
+    const result = await db.query(
+      'UPDATE questions SET archived = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [archived, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Question not found' } });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
     next(error);
   }
@@ -190,9 +283,15 @@ router.post('/answer-scales', async (req, res, next) => {
  */
 router.get('/questionnaires', async (req, res, next) => {
   try {
-    const result = await db.query(
-      'SELECT * FROM questionnaires ORDER BY name'
-    );
+    const { includeArchived } = req.query;
+    
+    let query = 'SELECT * FROM questionnaires';
+    if (includeArchived !== 'true') {
+      query += ' WHERE archived = false';
+    }
+    query += ' ORDER BY name';
+
+    const result = await db.query(query);
     res.json(result.rows);
   } catch (error) {
     next(error);
@@ -258,6 +357,34 @@ router.get('/schedules', async (req, res, next) => {
        ORDER BY s.start_time DESC`
     );
     res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/admin/questionnaires/:id/archive
+ * Archive or unarchive a questionnaire
+ */
+router.patch('/questionnaires/:id/archive', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { archived } = req.body;
+
+    if (archived === undefined) {
+      return res.status(400).json({ error: { message: 'archived field is required' } });
+    }
+
+    const result = await db.query(
+      'UPDATE questionnaires SET archived = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [archived, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Questionnaire not found' } });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
     next(error);
   }

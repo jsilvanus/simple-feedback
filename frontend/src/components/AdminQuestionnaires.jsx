@@ -9,6 +9,7 @@ export default function AdminQuestionnaires() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -17,14 +18,14 @@ export default function AdminQuestionnaires() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [showArchived]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       const [questionnairesData, questionsData, scalesData] = await Promise.all([
-        api.adminRequest('/questionnaires'),
+        api.adminRequest(`/questionnaires?includeArchived=${showArchived}`),
         api.adminRequest('/questions'),
         api.adminRequest('/answer-scales'),
       ]);
@@ -35,6 +36,18 @@ export default function AdminQuestionnaires() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleArchiveToggle = async (questionnaireId, currentArchived) => {
+    try {
+      await api.adminRequest(`/questionnaires/${questionnaireId}/archive`, {
+        method: 'PATCH',
+        body: JSON.stringify({ archived: !currentArchived }),
+      });
+      loadData();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -91,9 +104,19 @@ export default function AdminQuestionnaires() {
     <div className="admin-crud-section">
       <div className="section-header">
         <h2>Questionnaires</h2>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add Questionnaire
-        </button>
+        <div>
+          <label style={{ marginRight: '20px' }}>
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+            />
+            {' '}Show Archived
+          </label>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            + Add Questionnaire
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -188,10 +211,27 @@ export default function AdminQuestionnaires() {
         ) : (
           <div className="questionnaires-grid">
             {questionnaires.map((questionnaire) => (
-              <div key={questionnaire.id} className="questionnaire-card">
-                <h4>{questionnaire.name}</h4>
+              <div 
+                key={questionnaire.id} 
+                className={`questionnaire-card ${questionnaire.archived ? 'archived-card' : ''}`}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <h4>{questionnaire.name}</h4>
+                  <button
+                    className="btn-icon"
+                    onClick={() => handleArchiveToggle(questionnaire.id, questionnaire.archived)}
+                    title={questionnaire.archived ? 'Unarchive' : 'Archive'}
+                  >
+                    {questionnaire.archived ? '📤' : '📦'}
+                  </button>
+                </div>
                 {questionnaire.description && <p>{questionnaire.description}</p>}
-                <small>Created {new Date(questionnaire.created_at).toLocaleDateString()}</small>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <small>Created {new Date(questionnaire.created_at).toLocaleDateString()}</small>
+                  {questionnaire.archived && (
+                    <span className="status inactive" style={{ fontSize: '12px' }}>📦 Archived</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
