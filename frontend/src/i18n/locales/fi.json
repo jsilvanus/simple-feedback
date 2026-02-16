@@ -150,7 +150,13 @@
     "resultsDesc": "Näytä ja vie palautedataa",
     "results": "Tulokset",
     "export": "Vie",
-    "answerScales": "Vastausasteikot"
+    "answerScales": "Vastausasteikot",
+    "columnViewInstructions": "Vedä kyselyt sijainteihin luodaksesi aikatauluja",
+    "schedulesCount": "{{count}} aikataulu",
+    "schedulesCount_plural": "{{count}} aikataulua",
+    "schedulesFor": "Aikataulut kohteelle",
+    "noSchedulesYetDrag": "Ei aikatauluja vielä. Vedä kysely sijaintiin luodaksesi.",
+    "selectToViewSchedules": "Valitse sijainti tai kysely nähdäksesi aikataulut"
   },
   "settings": {
     "title": "Asetukset",

@@ -4,7 +4,7 @@ import { api } from '../api';
 import './ColumnView.css';
 
 export default function ColumnView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [locations, setLocations] = useState([]);
   const [questionnaires, setQuestionnaires] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -100,7 +100,7 @@ export default function ColumnView() {
   };
 
   const deleteSchedule = async (scheduleId) => {
-    if (!confirm('Are you sure you want to delete this schedule?')) return;
+    if (!confirm(t('admin.confirmDeleteSchedule'))) return;
     
     try {
       await api.deleteSchedule(scheduleId);
@@ -124,7 +124,7 @@ export default function ColumnView() {
       <div className="column-view-header">
         <h2>{t('admin.columnView')}</h2>
         <p className="column-view-subtitle">
-          Drag questionnaires to locations to create schedules
+          {t('admin.columnViewInstructions')}
         </p>
       </div>
 
@@ -165,7 +165,7 @@ export default function ColumnView() {
                 </div>
                 {getSchedulesForLocation(location.id).length > 0 && (
                   <div className="column-item-badge">
-                    {getSchedulesForLocation(location.id).length} schedules
+                    {t('admin.schedulesCount', { count: getSchedulesForLocation(location.id).length })}
                   </div>
                 )}
               </div>
@@ -198,7 +198,7 @@ export default function ColumnView() {
                 )}
                 {getSchedulesForQuestionnaire(questionnaire.id).length > 0 && (
                   <div className="column-item-badge">
-                    {getSchedulesForQuestionnaire(questionnaire.id).length} schedules
+                    {t('admin.schedulesCount', { count: getSchedulesForQuestionnaire(questionnaire.id).length })}
                   </div>
                 )}
               </div>
@@ -215,12 +215,12 @@ export default function ColumnView() {
           <div className="column-content">
             {selectedLocation && (
               <div className="column-filter-info">
-                Schedules for: <strong>{selectedLocation.name}</strong>
+                {t('admin.schedulesFor')}: <strong>{selectedLocation.name}</strong>
               </div>
             )}
             {selectedQuestionnaire && !selectedLocation && (
               <div className="column-filter-info">
-                Schedules for: <strong>{selectedQuestionnaire.name}</strong>
+                {t('admin.schedulesFor')}: <strong>{selectedQuestionnaire.name}</strong>
               </div>
             )}
             
@@ -236,8 +236,8 @@ export default function ColumnView() {
                 return (
                   <div className="column-empty">
                     {selectedLocation || selectedQuestionnaire
-                      ? 'No schedules yet. Drag a questionnaire to a location to create one.'
-                      : 'Select a location or questionnaire to view schedules'}
+                      ? t('admin.noSchedulesYetDrag')
+                      : t('admin.selectToViewSchedules')}
                   </div>
                 );
               }
@@ -261,11 +261,11 @@ export default function ColumnView() {
                   <div className="column-item-meta">
                     {schedule.schedule_type === 'date_based' && schedule.date_ranges?.[0] && (
                       <>
-                        {new Date(schedule.date_ranges[0].start_date).toLocaleDateString()} - 
-                        {new Date(schedule.date_ranges[0].end_date).toLocaleDateString()}
+                        {new Date(schedule.date_ranges[0].start_date).toLocaleDateString(i18n.language)} - 
+                        {new Date(schedule.date_ranges[0].end_date).toLocaleDateString(i18n.language)}
                       </>
                     )}
-                    {schedule.schedule_type === 'recurring_weekday' && ' Recurring'}
+                    {schedule.schedule_type === 'recurring_weekday' && ` ${t('admin.recurring')}`}
                   </div>
                   {schedule.questionnaires && (
                     <div className="schedule-questionnaires">
