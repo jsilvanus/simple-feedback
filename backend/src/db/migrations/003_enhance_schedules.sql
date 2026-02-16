@@ -29,6 +29,10 @@ ON CONFLICT DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_schedule_questionnaires_schedule ON schedule_questionnaires(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_schedules_type ON schedules(schedule_type);
 
+-- Make start_time and end_time nullable for recurring schedules
+ALTER TABLE schedules ALTER COLUMN start_time DROP NOT NULL;
+ALTER TABLE schedules ALTER COLUMN end_time DROP NOT NULL;
+
 -- Note: We keep questionnaire_id for backward compatibility but it's now optional
 -- New schedules should use schedule_questionnaires junction table
 ALTER TABLE schedules ALTER COLUMN questionnaire_id DROP NOT NULL;
