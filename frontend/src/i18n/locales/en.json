@@ -1,0 +1,47 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "previous": "Previous",
+    "next": "Next",
+    "submitting": "Submitting..."
+  },
+  "feedback": {
+    "thankYou": "Thank you!",
+    "feedbackSubmitted": "Your feedback has been submitted.",
+    "pageOf": "Page {{current}} of {{total}}",
+    "enterFeedback": "Enter your feedback here...",
+    "noActiveQuestionnaire": "No active questionnaire for this location",
+    "failedToSubmit": "Failed to submit feedback",
+    "locationNotFound": "Location not found or inactive"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "username": "Username",
+    "password": "Password",
+    "invalidCredentials": "Invalid credentials",
+    "loginRequired": "Login Required",
+    "enterPassword": "Enter location password",
+    "logoutConfirm": "Are you sure you want to logout from {{location}}?"
+  },
+  "admin": {
+    "dashboard": "Admin Dashboard",
+    "locations": "Locations",
+    "questions": "Questions",
+    "questionnaires": "Questionnaires",
+    "schedules": "Schedules",
+    "results": "Results",
+    "export": "Export",
+    "answerScales": "Answer Scales"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "common": {
+    "loading": "Ladataan...",
+    "error": "Virhe",
+    "retry": "Yritä uudelleen",
+    "submit": "Lähetä",
+    "cancel": "Peruuta",
+    "save": "Tallenna",
+    "delete": "Poista",
+    "edit": "Muokkaa",
+    "close": "Sulje",
+    "yes": "Kyllä",
+    "no": "Ei",
+    "previous": "Edellinen",
+    "next": "Seuraava",
+    "submitting": "Lähetetään..."
+  },
+  "feedback": {
+    "thankYou": "Kiitos!",
+    "feedbackSubmitted": "Palautteesi on vastaanotettu.",
+    "pageOf": "Sivu {{current}}/{{total}}",
+    "enterFeedback": "Kirjoita palautteesi tähän...",
+    "noActiveQuestionnaire": "Ei aktiivista kyselyä tälle sijainnille",
+    "failedToSubmit": "Palautteen lähetys epäonnistui",
+    "locationNotFound": "Sijaintia ei löytynyt tai se ei ole aktiivinen"
+  },
+  "auth": {
+    "login": "Kirjaudu sisään",
+    "logout": "Kirjaudu ulos",
+    "username": "Käyttäjätunnus",
+    "password": "Salasana",
+    "invalidCredentials": "Virheelliset tunnukset",
+    "loginRequired": "Kirjautuminen vaaditaan",
+    "enterPassword": "Syötä sijainnin salasana",
+    "logoutConfirm": "Haluatko varmasti kirjautua ulos sijainnista {{location}}?"
+  },
+  "admin": {
+    "dashboard": "Hallintapaneeli",
+    "locations": "Sijainnit",
+    "questions": "Kysymykset",
+    "questionnaires": "Kyselyt",
+    "schedules": "Aikataulut",
+    "results": "Tulokset",
+    "export": "Vie",
+    "answerScales": "Vastausasteikot"
+  }
+}
