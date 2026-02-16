@@ -6,25 +6,6 @@ const db = require('../db');
 const { loginLimiter, apiLimiter } = require('../middleware/rateLimiter');
 const { authenticate, JWT_SECRET } = require('../middleware/auth');
 
-// Middleware to verify JWT token
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: { message: 'No token provided' } });
-  }
-
-  const token = authHeader.substring(7);
-  
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: { message: 'Invalid token' } });
-  }
-};
-
 /**
  * POST /api/admin/login
  * Admin login (simplified - no user table for now)
