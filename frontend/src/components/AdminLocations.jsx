@@ -4,6 +4,7 @@ import './AdminCrud.css';
 
 export default function AdminLocations() {
   const [locations, setLocations] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -12,12 +13,14 @@ export default function AdminLocations() {
     slug: '',
     name: '',
     active: true,
+    groupId: '',
     password: '',
     passwordRequired: false,
   });
 
   useEffect(() => {
     loadLocations();
+    loadGroups();
   }, []);
 
   const loadLocations = async () => {
@@ -30,6 +33,15 @@ export default function AdminLocations() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGroups = async () => {
+    try {
+      const data = await api.adminRequest('/location-groups');
+      setGroups(data);
+    } catch (err) {
+      console.error('Failed to load groups:', err);
     }
   };
 
@@ -49,7 +61,7 @@ export default function AdminLocations() {
       }
       setShowForm(false);
       setEditingId(null);
-      setFormData({ slug: '', name: '', active: true, password: '', passwordRequired: false });
+      setFormData({ slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false });
       loadLocations();
     } catch (err) {
       setError(err.message);
@@ -62,6 +74,7 @@ export default function AdminLocations() {
       slug: location.slug,
       name: location.name,
       active: location.active,
+      groupId: location.group_id || '',
       password: '',
       passwordRequired: location.password_required || false,
     });
@@ -85,7 +98,7 @@ export default function AdminLocations() {
   const handleCancel = () => {
     setShowForm(false);
     setEditingId(null);
-    setFormData({ slug: '', name: '', active: true, password: '', passwordRequired: false });
+    setFormData({ slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false });
   };
 
   if (loading) return <div className="loading">Loading locations...</div>;
@@ -127,6 +140,22 @@ export default function AdminLocations() {
                   placeholder="e.g., Main Lobby"
                   required
                 />
+              </div>
+
+              <div className="form-group">
+                <label>Location Group</label>
+                <select
+                  value={formData.groupId}
+                  onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
+                >
+                  <option value="">No Group</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+                <small>Assign this location to a group for group-level scheduling</small>
               </div>
 
               <div className="form-group checkbox">
@@ -190,6 +219,7 @@ export default function AdminLocations() {
               <tr>
                 <th>Slug</th>
                 <th>Name</th>
+                <th>Group</th>
                 <th>Status</th>
                 <th>Password</th>
                 <th>Created</th>
@@ -201,6 +231,13 @@ export default function AdminLocations() {
                 <tr key={location.id}>
                   <td><code>/{location.slug}</code></td>
                   <td>{location.name}</td>
+                  <td>
+                    {location.group_name ? (
+                      <span className="status">{location.group_name}</span>
+                    ) : (
+                      <span className="status inactive">No Group</span>
+                    )}
+                  </td>
                   <td>
                     <span className={`status ${location.active ? 'active' : 'inactive'}`}>
                       {location.active ? 'Active' : 'Inactive'}
