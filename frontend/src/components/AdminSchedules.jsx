@@ -98,8 +98,14 @@ export default function AdminSchedules() {
   const handleEdit = (schedule) => {
     setEditingId(schedule.id);
     
-    // Determine destination type
-    const destinationType = schedule.location_id ? 'location' : 'group';
+    // Determine destination type based on which field has a value
+    let destinationType = 'location'; // default
+    if (schedule.location_group_id) {
+      destinationType = 'group';
+    } else if (!schedule.location_id) {
+      // Neither is set - this shouldn't happen, but default to location
+      destinationType = 'location';
+    }
     
     setFormData({
       destinationType,

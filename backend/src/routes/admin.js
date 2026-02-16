@@ -124,7 +124,7 @@ router.put('/locations/:id', async (req, res, next) => {
     }
     if (groupId !== undefined) {
       updates.push(`group_id = $${paramCount++}`);
-      values.push(groupId);
+      values.push(groupId === '' || groupId === null ? null : groupId);
     }
     if (passwordRequired !== undefined) {
       updates.push(`password_required = $${paramCount++}`);
@@ -874,17 +874,19 @@ router.put('/schedules/:id', async (req, res, next) => {
 
     if (locationId !== undefined) {
       updates.push(`location_id = $${paramCount++}`);
-      values.push(locationId);
+      const cleanLocationId = locationId === '' || locationId === null ? null : locationId;
+      values.push(cleanLocationId);
       // If setting locationId to a non-null value, clear locationGroupId
-      if (locationId !== null) {
+      if (cleanLocationId !== null) {
         updates.push(`location_group_id = NULL`);
       }
     }
     if (locationGroupId !== undefined) {
       updates.push(`location_group_id = $${paramCount++}`);
-      values.push(locationGroupId);
+      const cleanLocationGroupId = locationGroupId === '' || locationGroupId === null ? null : locationGroupId;
+      values.push(cleanLocationGroupId);
       // If setting locationGroupId to a non-null value, clear locationId
-      if (locationGroupId !== null) {
+      if (cleanLocationGroupId !== null) {
         updates.push(`location_id = NULL`);
       }
     }
