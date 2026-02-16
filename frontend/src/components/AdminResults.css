@@ -218,6 +218,54 @@
   font-size: 13px;
 }
 
+.wordcloud-analytics {
+  padding-left: 20px;
+}
+
+.word-frequency {
+  margin-top: 20px;
+}
+
+.word-frequency h5 {
+  margin: 0 0 15px 0;
+  color: #666;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.word-cloud-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.word-frequency-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f9fa;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid #e0e0e0;
+}
+
+.word-chip-result {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.frequency-badge {
+  background: #667eea;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;

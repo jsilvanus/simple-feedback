@@ -79,13 +79,20 @@ export default function AdminResults() {
           type: result.question_type,
           values: [],
           texts: [],
+          wordCloudWords: result.word_cloud_words || null,
         };
       }
       if (result.value !== null) {
         byQuestion[result.question_text].values.push(result.value);
       }
       if (result.text_value) {
-        byQuestion[result.question_text].texts.push(result.text_value);
+        // For word cloud, translate words to Finnish for analytics
+        if (result.question_type === 'wordcloud' && result.word_cloud_words) {
+          const translatedText = translateToFinnish(result.text_value, result.word_cloud_words);
+          byQuestion[result.question_text].texts.push(translatedText);
+        } else {
+          byQuestion[result.question_text].texts.push(result.text_value);
+        }
       }
     });
 
@@ -94,6 +101,42 @@ export default function AdminResults() {
       byLocation,
       byQuestion,
     });
+  };
+
+  // Helper function to translate word cloud answers to Finnish
+  const translateToFinnish = (textValue, wordCloudWords) => {
+    if (!textValue || !wordCloudWords) return textValue;
+    
+    try {
+      // Parse word cloud words if it's a JSON string
+      const words = typeof wordCloudWords === 'string' ? JSON.parse(wordCloudWords) : wordCloudWords;
+      
+      // Create a mapping from all language versions to Finnish
+      const translationMap = {};
+      words.forEach(word => {
+        if (typeof word.text === 'object') {
+          const fi = word.text.fi || '';
+          const en = word.text.en || '';
+          const sv = word.text.sv || '';
+          
+          // Map all translations to Finnish
+          if (fi) {
+            translationMap[fi] = fi; // FI -> FI
+            if (en) translationMap[en] = fi; // EN -> FI
+            if (sv) translationMap[sv] = fi; // SV -> FI
+          }
+        }
+      });
+      
+      // Split the stored text and translate each word
+      const selectedWords = textValue.split(',').map(w => w.trim());
+      const translatedWords = selectedWords.map(word => translationMap[word] || word);
+      
+      return translatedWords.join(', ');
+    } catch (e) {
+      console.error('Error translating word cloud text:', e);
+      return textValue;
+    }
   };
 
   const handleFilterChange = (field, value) => {
@@ -304,6 +347,35 @@ export default function AdminResults() {
                   {data.texts.length > 5 && (
                     <small>...and {data.texts.length - 5} more</small>
                   )}
+                </div>
+              </div>
+            )}
+
+            {data.type === 'wordcloud' && data.texts.length > 0 && (
+              <div className="wordcloud-analytics">
+                <div className="stat-row">
+                  <span>Total Responses:</span>
+                  <strong>{data.texts.length}</strong>
+                </div>
+                <div className="word-frequency">
+                  <h5>Word Frequency (Finnish):</h5>
+                  <div className="word-cloud-display">
+                    {Object.entries(
+                      data.texts
+                        .flatMap(text => text.split(',').map(w => w.trim()))
+                        .reduce((acc, word) => {
+                          acc[word] = (acc[word] || 0) + 1;
+                          return acc;
+                        }, {})
+                    )
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([word, count]) => (
+                        <div key={word} className="word-frequency-item">
+                          <span className="word-chip-result">{word}</span>
+                          <span className="frequency-badge">{count}x</span>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               </div>
             )}

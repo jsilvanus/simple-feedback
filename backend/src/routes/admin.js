@@ -471,12 +471,16 @@ router.get('/results', async (req, res, next) => {
         quest.text as question_text,
         quest.type as question_type,
         fa.value,
-        fa.text_value
+        fa.text_value,
+        qq.word_cloud_options_id,
+        wco.words as word_cloud_words
       FROM feedback_sessions fs
       JOIN locations l ON fs.location_id = l.id
       JOIN questionnaires q ON fs.questionnaire_id = q.id
       JOIN feedback_answers fa ON fs.id = fa.session_id
       JOIN questions quest ON fa.question_id = quest.id
+      LEFT JOIN questionnaire_questions qq ON qq.questionnaire_id = fs.questionnaire_id AND qq.question_id = quest.id
+      LEFT JOIN word_cloud_options wco ON qq.word_cloud_options_id = wco.id
       WHERE 1=1
     `;
 
