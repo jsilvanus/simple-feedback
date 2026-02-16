@@ -91,6 +91,7 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
         id: location.id,
         slug: location.slug,
         name: location.name,
+        passwordRequired: location.password_required || false,
       },
       questionnaire,
     });

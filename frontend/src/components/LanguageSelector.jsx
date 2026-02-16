@@ -8,11 +8,9 @@ const LANGUAGES = [
   { code: 'sv', name: 'Svenska', flag: '🇸🇪' },
 ];
 
-export default function LanguageSelector({ onLongPress, locationName }) {
+export default function LanguageSelector() {
   const { i18n, t } = useTranslation();
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const pressTimer = useRef(null);
   const buttonRef = useRef(null);
 
   const currentLanguage = LANGUAGES.find(lang => lang.code === i18n.language) || LANGUAGES[0];
@@ -23,31 +21,8 @@ export default function LanguageSelector({ onLongPress, locationName }) {
     setShowDropdown(false);
   };
 
-  const handleMouseDown = () => {
-    if (onLongPress) {
-      pressTimer.current = setTimeout(() => {
-        setShowLogoutModal(true);
-      }, 1000); // 1 second long press
-    }
-  };
-
-  const handleMouseUp = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-    }
-  };
-
   const handleClick = () => {
-    if (!showLogoutModal) {
-      setShowDropdown(!showDropdown);
-    }
-  };
-
-  const handleLogout = () => {
-    if (onLongPress) {
-      onLongPress();
-    }
-    setShowLogoutModal(false);
+    setShowDropdown(!showDropdown);
   };
 
   useEffect(() => {
@@ -69,10 +44,6 @@ export default function LanguageSelector({ onLongPress, locationName }) {
         <button
           className="language-btn"
           onClick={handleClick}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onTouchStart={handleMouseDown}
-          onTouchEnd={handleMouseUp}
           aria-label="Select language"
         >
           <span className="language-flag">{currentLanguage.flag}</span>
@@ -94,23 +65,6 @@ export default function LanguageSelector({ onLongPress, locationName }) {
           </div>
         )}
       </div>
-
-      {showLogoutModal && (
-        <div className="modal-overlay" onClick={() => setShowLogoutModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>{t('auth.logout')}</h2>
-            <p>{t('auth.logoutConfirm', { location: locationName || t('common.location') })}</p>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowLogoutModal(false)}>
-                {t('common.no')}
-              </button>
-              <button className="btn btn-primary" onClick={handleLogout}>
-                {t('common.yes')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

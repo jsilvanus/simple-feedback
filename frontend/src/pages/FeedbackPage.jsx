@@ -3,6 +3,8 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import LanguageSelector from '../components/LanguageSelector';
+import SettingsButton from '../components/SettingsButton';
+import SettingsModal from '../components/SettingsModal';
 import './FeedbackPage.css';
 
 export default function FeedbackPage() {
@@ -20,10 +22,42 @@ export default function FeedbackPage() {
   const [authRequired, setAuthRequired] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [contrastMode, setContrastMode] = useState(false);
+  const [uiSize, setUISize] = useState(100);
 
   useEffect(() => {
+    // Check for contrast mode from URL param or localStorage
+    const contrastParam = searchParams.get('contrast');
+    const storedContrast = localStorage.getItem('contrastMode');
+    
+    if (contrastParam === 'true' || contrastParam === '1') {
+      setContrastMode(true);
+      localStorage.setItem('contrastMode', 'true');
+    } else if (storedContrast === 'true') {
+      setContrastMode(true);
+    }
+
+    // Load UI size from localStorage
+    const storedSize = localStorage.getItem('uiSize');
+    if (storedSize) {
+      setUISize(parseInt(storedSize, 10));
+    }
+
     checkAuthAndLoad();
   }, [locationSlug]);
+
+  useEffect(() => {
+    // Apply contrast mode to body
+    if (contrastMode) {
+      document.body.classList.add('contrast-mode');
+    } else {
+      document.body.classList.remove('contrast-mode');
+    }
+
+    // Apply UI size as CSS variable
+    document.documentElement.style.setProperty('--ui-scale', uiSize / 100);
+  }, [contrastMode, uiSize]);
 
   const checkAuthAndLoad = async () => {
     // Check URL param for password
@@ -80,6 +114,26 @@ export default function FeedbackPage() {
     setAnswers({});
     setCurrentPage(0);
     setAuthRequired(true);
+    setShowSettings(false);
+  };
+
+  const handleToggleContrast = () => {
+    const newMode = !contrastMode;
+    setContrastMode(newMode);
+    localStorage.setItem('contrastMode', newMode.toString());
+  };
+
+  const handleChangeUISize = (newSize) => {
+    setUISize(newSize);
+    localStorage.setItem('uiSize', newSize.toString());
+  };
+
+  const handleSettingsClick = () => {
+    setShowSettings(true);
+  };
+
+  const handleSettingsLongPress = () => {
+    handleToggleContrast();
   };
 
   const loadQuestionnaire = async () => {
@@ -217,9 +271,20 @@ export default function FeedbackPage() {
 
   return (
     <div className="feedback-page">
-      <LanguageSelector 
-        onLongPress={handleLogout}
-        locationName={data?.location?.name}
+      <LanguageSelector />
+      <SettingsButton 
+        onClick={handleSettingsClick}
+        onLongPress={handleSettingsLongPress}
+      />
+      <SettingsModal 
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onLogout={handleLogout}
+        showLogout={data?.location?.passwordRequired || false}
+        contrastMode={contrastMode}
+        onToggleContrast={handleToggleContrast}
+        uiSize={uiSize}
+        onChangeUISize={handleChangeUISize}
       />
       <div className="feedback-container">
         <header className="feedback-header">
