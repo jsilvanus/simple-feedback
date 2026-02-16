@@ -196,7 +196,7 @@ router.post('/questions', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Text and type are required' } });
     }
 
-    if (!['scale', 'text', 'wordcloud'].includes(type)) {
+    if (!['scale', 'text', 'wordcloud', 'continuous_scale'].includes(type)) {
       return res.status(400).json({ error: { message: 'Invalid question type' } });
     }
 
