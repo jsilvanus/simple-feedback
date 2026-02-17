@@ -3,107 +3,21 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
-export default function AdminAnswerScales() {
+const DEFAULT_BUTTONS = [
+  { label: '😞', value: 1, color: '#e74c3c' },
+  { label: '😐', value: 2, color: '#f39c12' },
+  { label: '🙂', value: 3, color: '#3498db' },
+  { label: '😀', value: 4, color: '#2ecc71' },
+];
+
+export function AnswerScaleForm({ entity, onSave, onCancel }) {
   const { t } = useTranslation();
-  const [scales, setScales] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState(
+    entity
+      ? { name: entity.name, buttons: entity.buttons }
+      : { name: '', buttons: DEFAULT_BUTTONS }
+  );
   const [error, setError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    buttons: [
-      { label: '😞', value: 1, color: '#e74c3c' },
-      { label: '😐', value: 2, color: '#f39c12' },
-      { label: '🙂', value: 3, color: '#3498db' },
-      { label: '😀', value: 4, color: '#2ecc71' },
-    ],
-  });
-
-  useEffect(() => {
-    loadScales();
-  }, []);
-
-  const loadScales = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await api.adminRequest('/answer-scales');
-      setScales(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        await api.adminRequest(`/answer-scales/${editingId}`, {
-          method: 'PUT',
-          body: JSON.stringify(formData),
-        });
-      } else {
-        await api.adminRequest('/answer-scales', {
-          method: 'POST',
-          body: JSON.stringify(formData),
-        });
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setFormData({
-        name: '',
-        buttons: [
-          { label: '😞', value: 1, color: '#e74c3c' },
-          { label: '😐', value: 2, color: '#f39c12' },
-          { label: '🙂', value: 3, color: '#3498db' },
-          { label: '😀', value: 4, color: '#2ecc71' },
-        ],
-      });
-      loadScales();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleEdit = (scale) => {
-    setEditingId(scale.id);
-    setFormData({
-      name: scale.name,
-      buttons: scale.buttons,
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this answer scale?')) {
-      return;
-    }
-    try {
-      await api.adminRequest(`/answer-scales/${id}`, {
-        method: 'DELETE',
-      });
-      loadScales();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingId(null);
-    setFormData({
-      name: '',
-      buttons: [
-        { label: '😞', value: 1, color: '#e74c3c' },
-        { label: '😐', value: 2, color: '#f39c12' },
-        { label: '🙂', value: 3, color: '#3498db' },
-        { label: '😀', value: 4, color: '#2ecc71' },
-      ],
-    });
-  };
 
   const updateButton = (index, field, value) => {
     const newButtons = [...formData.buttons];
@@ -124,6 +38,146 @@ export default function AdminAnswerScales() {
     setFormData({ ...formData, buttons: newButtons });
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      if (entity) {
+        await api.adminRequest(`/answer-scales/${entity.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/answer-scales', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
+      onSave();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <>
+      <h3>{entity ? t('admin.editAnswerScale') : t('admin.addNewAnswerScale')}</h3>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Scale Name *</label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="e.g., Satisfaction Scale"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Buttons</label>
+          {formData.buttons.map((button, index) => (
+            <div key={index} className="button-editor">
+              <input
+                type="text"
+                value={button.label}
+                onChange={(e) => updateButton(index, 'label', e.target.value)}
+                placeholder="Label (e.g., 😀)"
+                required
+              />
+              <input
+                type="number"
+                value={button.value}
+                onChange={(e) => updateButton(index, 'value', parseInt(e.target.value))}
+                placeholder="Value"
+                required
+              />
+              <input
+                type="color"
+                value={button.color}
+                onChange={(e) => updateButton(index, 'color', e.target.value)}
+              />
+              {formData.buttons.length > 2 && (
+                <button type="button" onClick={() => removeButton(index)} className="btn-icon">
+                  ❌
+                </button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={addButton} className="btn btn-secondary btn-sm">
+            + Add Button
+          </button>
+        </div>
+
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {entity ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
+export default function AdminAnswerScales() {
+  const { t } = useTranslation();
+  const [scales, setScales] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingEntity, setEditingEntity] = useState(null);
+
+  useEffect(() => {
+    loadScales();
+  }, []);
+
+  const loadScales = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.adminRequest('/answer-scales');
+      setScales(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (scale) => {
+    setEditingEntity(scale);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this answer scale?')) {
+      return;
+    }
+    try {
+      await api.adminRequest(`/answer-scales/${id}`, {
+        method: 'DELETE',
+      });
+      loadScales();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleFormSave = () => {
+    setShowForm(false);
+    setEditingEntity(null);
+    loadScales();
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setEditingEntity(null);
+  };
+
   if (loading) return <div className="loading">{t('admin.loadingAnswerScales')}</div>;
   if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
@@ -139,63 +193,11 @@ export default function AdminAnswerScales() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? t('admin.editAnswerScale') : t('admin.addNewAnswerScale')}</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Scale Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Satisfaction Scale"
-                  required
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>Buttons</label>
-                {formData.buttons.map((button, index) => (
-                  <div key={index} className="button-editor">
-                    <input
-                      type="text"
-                      value={button.label}
-                      onChange={(e) => updateButton(index, 'label', e.target.value)}
-                      placeholder="Label (e.g., 😀)"
-                      required
-                    />
-                    <input
-                      type="number"
-                      value={button.value}
-                      onChange={(e) => updateButton(index, 'value', parseInt(e.target.value))}
-                      placeholder="Value"
-                      required
-                    />
-                    <input
-                      type="color"
-                      value={button.color}
-                      onChange={(e) => updateButton(index, 'color', e.target.value)}
-                    />
-                    {formData.buttons.length > 2 && (
-                      <button type="button" onClick={() => removeButton(index)} className="btn-icon">
-                        ❌
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button type="button" onClick={addButton} className="btn btn-secondary btn-sm">
-                  + Add Button
-                </button>
-              </div>
-
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingId ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
+            <AnswerScaleForm
+              entity={editingEntity}
+              onSave={handleFormSave}
+              onCancel={handleFormCancel}
+            />
           </div>
         </div>
       )}

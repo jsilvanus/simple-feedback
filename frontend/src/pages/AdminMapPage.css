@@ -1,0 +1,283 @@
+/* ─── Page layout ─────────────────────────────────────────────────────────── */
+
+.admin-map-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #f5f7fa;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
+.map-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e0e6ed;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.map-page-header h1 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.map-error {
+  color: #e74c3c;
+  font-size: 0.85rem;
+}
+
+/* ─── Scroll canvas ───────────────────────────────────────────────────────── */
+
+.map-canvas-scroll {
+  position: relative;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ─── Columns container ───────────────────────────────────────────────────── */
+
+.map-columns-container {
+  display: flex;
+  align-items: flex-start;
+  padding: 24px 16px 40px;
+  gap: 0;
+  min-height: 100%;
+}
+
+/* ─── Single column ───────────────────────────────────────────────────────── */
+
+.map-column {
+  /* Extra horizontal padding creates space for the anchor dots
+     which are positioned with left:-7px / right:-7px */
+  min-width: 200px;
+  max-width: 240px;
+  flex-shrink: 0;
+  padding: 0 24px;
+}
+
+.map-column-header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8896a7;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.map-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-column-empty {
+  font-size: 0.8rem;
+  color: #c0cbe0;
+  padding: 6px 8px;
+}
+
+/* ─── Card ────────────────────────────────────────────────────────────────── */
+
+.map-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: #fff;
+  border: 1px solid #e0e6ed;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+  overflow: hidden; /* clip the progress bar */
+}
+
+.map-card:hover {
+  border-color: #b0bfd0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.map-card.highlighted {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.map-card.dimmed {
+  opacity: 0.2;
+}
+
+.map-card.long-pressing {
+  border-color: #667eea;
+}
+
+.card-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.card-label {
+  font-size: 0.78rem;
+  color: #2d3748;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ─── Long-press progress bar ─────────────────────────────────────────────── */
+
+.card-long-press-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #e8ecf2;
+}
+
+.card-long-press-fill {
+  height: 100%;
+  background: #667eea;
+  transition: width 30ms linear;
+}
+
+/* ─── Anchor dots ─────────────────────────────────────────────────────────── */
+
+.map-card-anchor {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #c0cbe0;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #b0bfd0;
+  cursor: crosshair;
+  z-index: 2;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.map-card-anchor:hover {
+  background: #667eea;
+  transform: scale(1.2);
+}
+
+.map-card-anchor.left {
+  left: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.map-card-anchor.left:hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
+.map-card-anchor.right {
+  right: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.map-card-anchor.right:hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
+.map-card-anchor.drop-target {
+  background: #27ae60;
+  box-shadow: 0 0 0 1px #27ae60, 0 0 8px rgba(39, 174, 96, 0.5);
+  transform: translateY(-50%) scale(1.3);
+}
+
+/* ─── SVG overlay ─────────────────────────────────────────────────────────── */
+
+.map-svg-overlay {
+  pointer-events: none;
+}
+
+/* ─── Delete popover ──────────────────────────────────────────────────────── */
+
+.link-delete-popover {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #e0e6ed;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  min-width: 160px;
+  transform: translate(-50%, -110%);
+}
+
+.link-delete-popover p {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: #555;
+}
+
+.popover-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ─── Danger button ───────────────────────────────────────────────────────── */
+
+.btn-danger {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.btn-danger:hover {
+  background: #c0392b;
+}
+
+.btn-danger.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+/* ─── Mobile column navigation ────────────────────────────────────────────── */
+
+.mobile-col-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-col-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #fff;
+    border-top: 1px solid #e0e6ed;
+    flex-shrink: 0;
+  }
+
+  .mobile-col-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #555;
+    text-align: center;
+    flex: 1;
+    padding: 0 8px;
+  }
+}

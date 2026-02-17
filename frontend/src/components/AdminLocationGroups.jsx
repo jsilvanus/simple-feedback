@@ -3,18 +3,93 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
+export function LocationGroupForm({ entity, onSave, onCancel }) {
+  const { t } = useTranslation();
+  const [formData, setFormData] = useState(
+    entity
+      ? { name: entity.name, description: entity.description || '', active: entity.active }
+      : { name: '', description: '', active: true }
+  );
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      if (entity) {
+        await api.adminRequest(`/location-groups/${entity.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/location-groups', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
+      onSave();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <>
+      <h3>{entity ? t('admin.editLocationGroup') : t('admin.addNewLocationGroup')}</h3>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="name">Name *</label>
+          <input
+            id="name"
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="description">Description</label>
+          <textarea
+            id="description"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            rows="3"
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={formData.active}
+              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+            />
+            Active
+          </label>
+        </div>
+
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {entity ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
 export default function AdminLocationGroups() {
   const { t } = useTranslation();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    active: true,
-  });
+  const [editingEntity, setEditingEntity] = useState(null);
 
   useEffect(() => {
     loadGroups();
@@ -33,36 +108,8 @@ export default function AdminLocationGroups() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        await api.adminRequest(`/location-groups/${editingId}`, {
-          method: 'PUT',
-          body: JSON.stringify(formData),
-        });
-      } else {
-        await api.adminRequest('/location-groups', {
-          method: 'POST',
-          body: JSON.stringify(formData),
-        });
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setFormData({ name: '', description: '', active: true });
-      loadGroups();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const handleEdit = (group) => {
-    setEditingId(group.id);
-    setFormData({
-      name: group.name,
-      description: group.description || '',
-      active: group.active,
-    });
+    setEditingEntity(group);
     setShowForm(true);
   };
 
@@ -80,10 +127,15 @@ export default function AdminLocationGroups() {
     }
   };
 
-  const handleCancel = () => {
+  const handleFormSave = () => {
     setShowForm(false);
-    setEditingId(null);
-    setFormData({ name: '', description: '', active: true });
+    setEditingEntity(null);
+    loadGroups();
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setEditingEntity(null);
   };
 
   if (loading) return <div className="loading">{t('admin.loadingLocationGroups')}</div>;
@@ -101,49 +153,11 @@ export default function AdminLocationGroups() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? t('admin.editLocationGroup') : t('admin.addNewLocationGroup')}</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="name">Name *</label>
-                <input
-                  id="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="description">Description</label>
-                <textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows="3"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={formData.active}
-                    onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                  />
-                  Active
-                </label>
-              </div>
-
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingId ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
+            <LocationGroupForm
+              entity={editingEntity}
+              onSave={handleFormSave}
+              onCancel={handleFormCancel}
+            />
           </div>
         </div>
       )}

@@ -107,11 +107,14 @@ export default function AdminPage() {
           >
             {t('admin.schedules')}
           </button>
-          <button 
-            className={activeTab === 'results' ? 'active' : ''} 
+          <button
+            className={activeTab === 'results' ? 'active' : ''}
             onClick={() => setActiveTab('results')}
           >
             {t('admin.results')}
+          </button>
+          <button onClick={() => navigate('/admin/map')}>
+            🗺️ Visual Map
           </button>
         </nav>
 

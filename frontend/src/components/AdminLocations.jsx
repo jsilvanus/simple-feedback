@@ -3,6 +3,138 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
+export function LocationForm({ entity, locationGroups, onSave, onCancel }) {
+  const { t } = useTranslation();
+  const [formData, setFormData] = useState(
+    entity
+      ? {
+          slug: entity.slug,
+          name: entity.name,
+          active: entity.active,
+          groupId: entity.group_id || '',
+          password: '',
+          passwordRequired: entity.password_required || false,
+        }
+      : { slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false }
+  );
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      if (entity) {
+        await api.adminRequest(`/locations/${entity.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/locations', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
+      onSave();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <>
+      <h3>{entity ? t('admin.editLocation') : t('admin.addNewLocation')}</h3>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Slug *</label>
+          <input
+            type="text"
+            value={formData.slug}
+            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+            placeholder="e.g., lobby"
+            required
+            disabled={!!entity}
+          />
+          <small>URL-friendly identifier (cannot be changed after creation)</small>
+        </div>
+
+        <div className="form-group">
+          <label>Name *</label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="e.g., Main Lobby"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Location Group</label>
+          <select
+            value={formData.groupId}
+            onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
+          >
+            <option value="">No Group</option>
+            {(locationGroups || []).map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+          <small>Assign this location to a group for group-level scheduling</small>
+        </div>
+
+        <div className="form-group checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={formData.active}
+              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+            />
+            Active
+          </label>
+        </div>
+
+        <div className="form-group checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={formData.passwordRequired}
+              onChange={(e) => setFormData({ ...formData, passwordRequired: e.target.checked })}
+            />
+            Require Password
+          </label>
+          <small>Enable persistent login for this location</small>
+        </div>
+
+        {formData.passwordRequired && (
+          <div className="form-group">
+            <label>Password {entity && '(leave empty to keep current)'}</label>
+            <input
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              placeholder="Enter location password"
+              required={!entity}
+            />
+            <small>Used for kiosk login and URL parameter authentication</small>
+          </div>
+        )}
+
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {entity ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
 export default function AdminLocations() {
   const { t } = useTranslation();
   const [locations, setLocations] = useState([]);
@@ -10,15 +142,7 @@ export default function AdminLocations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    slug: '',
-    name: '',
-    active: true,
-    groupId: '',
-    password: '',
-    passwordRequired: false,
-  });
+  const [editingEntity, setEditingEntity] = useState(null);
 
   useEffect(() => {
     loadLocations();
@@ -47,39 +171,8 @@ export default function AdminLocations() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        await api.adminRequest(`/locations/${editingId}`, {
-          method: 'PUT',
-          body: JSON.stringify(formData),
-        });
-      } else {
-        await api.adminRequest('/locations', {
-          method: 'POST',
-          body: JSON.stringify(formData),
-        });
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setFormData({ slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false });
-      loadLocations();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const handleEdit = (location) => {
-    setEditingId(location.id);
-    setFormData({
-      slug: location.slug,
-      name: location.name,
-      active: location.active,
-      groupId: location.group_id || '',
-      password: '',
-      passwordRequired: location.password_required || false,
-    });
+    setEditingEntity(location);
     setShowForm(true);
   };
 
@@ -97,10 +190,15 @@ export default function AdminLocations() {
     }
   };
 
-  const handleCancel = () => {
+  const handleFormSave = () => {
     setShowForm(false);
-    setEditingId(null);
-    setFormData({ slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false });
+    setEditingEntity(null);
+    loadLocations();
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setEditingEntity(null);
   };
 
   if (loading) return <div className="loading">{t('admin.loadingLocations')}</div>;
@@ -118,94 +216,12 @@ export default function AdminLocations() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? t('admin.editLocation') : t('admin.addNewLocation')}</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Slug *</label>
-                <input
-                  type="text"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="e.g., lobby"
-                  required
-                  disabled={editingId}
-                />
-                <small>URL-friendly identifier (cannot be changed after creation)</small>
-              </div>
-              
-              <div className="form-group">
-                <label>Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Main Lobby"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Location Group</label>
-                <select
-                  value={formData.groupId}
-                  onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
-                >
-                  <option value="">No Group</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-                <small>Assign this location to a group for group-level scheduling</small>
-              </div>
-
-              <div className="form-group checkbox">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={formData.active}
-                    onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                  />
-                  Active
-                </label>
-              </div>
-
-              <div className="form-group checkbox">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={formData.passwordRequired}
-                    onChange={(e) => setFormData({ ...formData, passwordRequired: e.target.checked })}
-                  />
-                  Require Password
-                </label>
-                <small>Enable persistent login for this location</small>
-              </div>
-
-              {formData.passwordRequired && (
-                <div className="form-group">
-                  <label>Password {editingId && '(leave empty to keep current)'}</label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Enter location password"
-                    required={!editingId}
-                  />
-                  <small>Used for kiosk login and URL parameter authentication</small>
-                </div>
-              )}
-
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingId ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
+            <LocationForm
+              entity={editingEntity}
+              locationGroups={groups}
+              onSave={handleFormSave}
+              onCancel={handleFormCancel}
+            />
           </div>
         </div>
       )}

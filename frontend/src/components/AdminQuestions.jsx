@@ -3,6 +3,215 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
+export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
+  const { t } = useTranslation();
+  const [formData, setFormData] = useState(
+    entity
+      ? {
+          text: entity.text,
+          type: entity.type,
+          answerScaleId: entity.answer_scale_id || '',
+          wordCloudOptionsId: entity.word_cloud_options_id || '',
+          maxSelections: entity.max_selections || 3,
+          continuousAxes: Array.isArray(entity.continuous_axes) && entity.continuous_axes.length > 0
+            ? entity.continuous_axes
+            : [{ id: 'axis_1', label: '' }],
+        }
+      : {
+          text: '',
+          type: 'scale',
+          answerScaleId: '',
+          wordCloudOptionsId: '',
+          maxSelections: 3,
+          continuousAxes: [{ id: 'axis_1', label: '' }],
+        }
+  );
+  const [error, setError] = useState(null);
+
+  const addAxis = () => {
+    const nextIndex = formData.continuousAxes.length + 1;
+    setFormData({
+      ...formData,
+      continuousAxes: [...formData.continuousAxes, { id: `axis_${nextIndex}`, label: '' }],
+    });
+  };
+
+  const updateAxis = (index, field, value) => {
+    const updatedAxes = [...formData.continuousAxes];
+    updatedAxes[index][field] = value;
+    setFormData({ ...formData, continuousAxes: updatedAxes });
+  };
+
+  const removeAxis = (index) => {
+    const updatedAxes = formData.continuousAxes.filter((_, axisIndex) => axisIndex !== index);
+    setFormData({
+      ...formData,
+      continuousAxes: updatedAxes.length > 0 ? updatedAxes : [{ id: 'axis_1', label: '' }],
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const payload = {
+        ...formData,
+        answerScaleId: formData.answerScaleId || null,
+        wordCloudOptionsId: formData.wordCloudOptionsId || null,
+        continuousAxes: formData.type === 'continuous_scale'
+          ? formData.continuousAxes
+              .map((axis, index) => ({
+                id: axis.id || `axis_${index + 1}`,
+                label: (axis.label || '').trim(),
+              }))
+              .filter(axis => axis.label.length > 0)
+          : [],
+      };
+
+      if (entity) {
+        await api.adminRequest(`/questions/${entity.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await api.adminRequest('/questions', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      }
+      onSave();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <>
+      <h3>{entity ? t('admin.editQuestion') : t('admin.addNewQuestion')}</h3>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Question Text *</label>
+          <textarea
+            value={formData.text}
+            onChange={(e) => setFormData({ ...formData, text: e.target.value })}
+            placeholder="e.g., How satisfied are you with our service?"
+            required
+            rows={3}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Question Type *</label>
+          <select
+            value={formData.type}
+            onChange={(e) => {
+              const nextType = e.target.value;
+              setFormData({
+                ...formData,
+                type: nextType,
+                answerScaleId: ['scale', 'continuous_scale'].includes(nextType) ? formData.answerScaleId : '',
+                wordCloudOptionsId: nextType === 'wordcloud' ? formData.wordCloudOptionsId : '',
+                maxSelections: nextType === 'wordcloud' ? formData.maxSelections : 3,
+                continuousAxes: nextType === 'continuous_scale'
+                  ? (formData.continuousAxes.length > 0 ? formData.continuousAxes : [{ id: 'axis_1', label: '' }])
+                  : [],
+              });
+            }}
+            required
+          >
+            <option value="scale">Scale (buttons)</option>
+            <option value="text">Text input</option>
+            <option value="wordcloud">Word cloud</option>
+            <option value="continuous_scale">Continuous Scale (Radar)</option>
+          </select>
+        </div>
+
+        {['scale', 'continuous_scale'].includes(formData.type) && (
+          <div className="form-group">
+            <label>Answer Scale</label>
+            <select
+              value={formData.answerScaleId}
+              onChange={(e) => setFormData({ ...formData, answerScaleId: e.target.value ? parseInt(e.target.value, 10) : '' })}
+            >
+              <option value="">No scale</option>
+              {(scales || []).map((scale) => (
+                <option key={scale.id} value={scale.id}>
+                  {scale.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {formData.type === 'continuous_scale' && (
+          <div className="form-group">
+            <label>Axes</label>
+            {(formData.continuousAxes || []).map((axis, index) => (
+              <div key={axis.id || index} className="button-editor">
+                <input
+                  type="text"
+                  value={axis.label || ''}
+                  onChange={(e) => updateAxis(index, 'label', e.target.value)}
+                  placeholder={`Axis ${index + 1} label`}
+                  required
+                />
+                {(formData.continuousAxes || []).length > 1 && (
+                  <button type="button" onClick={() => removeAxis(index)} className="btn-icon">
+                    ❌
+                  </button>
+                )}
+              </div>
+            ))}
+            <button type="button" onClick={addAxis} className="btn btn-secondary btn-sm">
+              + Add Axis
+            </button>
+          </div>
+        )}
+
+        {formData.type === 'wordcloud' && (
+          <>
+            <div className="form-group">
+              <label>Word Cloud Options</label>
+              <select
+                value={formData.wordCloudOptionsId}
+                onChange={(e) => setFormData({ ...formData, wordCloudOptionsId: e.target.value ? parseInt(e.target.value, 10) : '' })}
+              >
+                <option value="">No word cloud options</option>
+                {(wordClouds || []).map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Max Selections</label>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={formData.maxSelections}
+                onChange={(e) => setFormData({ ...formData, maxSelections: parseInt(e.target.value, 10) || 1 })}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {entity ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
 export default function AdminQuestions() {
   const { t } = useTranslation();
   const [questions, setQuestions] = useState([]);
@@ -12,17 +221,7 @@ export default function AdminQuestions() {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    text: '',
-    type: 'scale',
-    answerScaleId: '',
-    wordCloudOptionsId: '',
-    maxSelections: 3,
-    continuousAxes: [
-      { id: 'axis_1', label: '' },
-    ],
-  });
+  const [editingEntity, setEditingEntity] = useState(null);
 
   useEffect(() => {
     loadQuestions();
@@ -59,105 +258,20 @@ export default function AdminQuestions() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        ...formData,
-        answerScaleId: formData.answerScaleId || null,
-        wordCloudOptionsId: formData.wordCloudOptionsId || null,
-        continuousAxes: formData.type === 'continuous_scale'
-          ? formData.continuousAxes
-              .map((axis, index) => ({
-                id: axis.id || `axis_${index + 1}`,
-                label: (axis.label || '').trim(),
-              }))
-              .filter(axis => axis.label.length > 0)
-          : [],
-      };
-
-      if (editingId) {
-        await api.adminRequest(`/questions/${editingId}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-      } else {
-        await api.adminRequest('/questions', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setFormData({
-        text: '',
-        type: 'scale',
-        answerScaleId: '',
-        wordCloudOptionsId: '',
-        maxSelections: 3,
-        continuousAxes: [
-          { id: 'axis_1', label: '' },
-        ],
-      });
-      loadQuestions();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const handleEdit = (question) => {
-    setEditingId(question.id);
-    setFormData({
-      text: question.text,
-      type: question.type,
-      answerScaleId: question.answer_scale_id || '',
-      wordCloudOptionsId: question.word_cloud_options_id || '',
-      maxSelections: question.max_selections || 3,
-      continuousAxes: Array.isArray(question.continuous_axes) && question.continuous_axes.length > 0
-        ? question.continuous_axes
-        : [{ id: 'axis_1', label: '' }],
-    });
+    setEditingEntity(question);
     setShowForm(true);
   };
 
-  const handleCancel = () => {
+  const handleFormSave = () => {
     setShowForm(false);
-    setEditingId(null);
-    setFormData({
-      text: '',
-      type: 'scale',
-      answerScaleId: '',
-      wordCloudOptionsId: '',
-      maxSelections: 3,
-      continuousAxes: [
-        { id: 'axis_1', label: '' },
-      ],
-    });
+    setEditingEntity(null);
+    loadQuestions();
   };
 
-  const addAxis = () => {
-    const nextIndex = formData.continuousAxes.length + 1;
-    setFormData({
-      ...formData,
-      continuousAxes: [
-        ...formData.continuousAxes,
-        { id: `axis_${nextIndex}`, label: '' },
-      ],
-    });
-  };
-
-  const updateAxis = (index, field, value) => {
-    const updatedAxes = [...formData.continuousAxes];
-    updatedAxes[index][field] = value;
-    setFormData({ ...formData, continuousAxes: updatedAxes });
-  };
-
-  const removeAxis = (index) => {
-    const updatedAxes = formData.continuousAxes.filter((_, axisIndex) => axisIndex !== index);
-    setFormData({
-      ...formData,
-      continuousAxes: updatedAxes.length > 0 ? updatedAxes : [{ id: 'axis_1', label: '' }],
-    });
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setEditingEntity(null);
   };
 
   const getTypeIcon = (type) => {
@@ -195,126 +309,13 @@ export default function AdminQuestions() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? t('admin.editQuestion') : t('admin.addNewQuestion')}</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Question Text *</label>
-                <textarea
-                  value={formData.text}
-                  onChange={(e) => setFormData({ ...formData, text: e.target.value })}
-                  placeholder="e.g., How satisfied are you with our service?"
-                  required
-                  rows={3}
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>Question Type *</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => {
-                    const nextType = e.target.value;
-                    setFormData({
-                      ...formData,
-                      type: nextType,
-                      answerScaleId: ['scale', 'continuous_scale'].includes(nextType) ? formData.answerScaleId : '',
-                      wordCloudOptionsId: nextType === 'wordcloud' ? formData.wordCloudOptionsId : '',
-                      maxSelections: nextType === 'wordcloud' ? formData.maxSelections : 3,
-                      continuousAxes: nextType === 'continuous_scale'
-                        ? (formData.continuousAxes.length > 0 ? formData.continuousAxes : [{ id: 'axis_1', label: '' }])
-                        : [],
-                    });
-                  }}
-                  required
-                >
-                  <option value="scale">Scale (buttons)</option>
-                  <option value="text">Text input</option>
-                  <option value="wordcloud">Word cloud</option>
-                  <option value="continuous_scale">Continuous Scale (Radar)</option>
-                </select>
-              </div>
-
-              {['scale', 'continuous_scale'].includes(formData.type) && (
-                <div className="form-group">
-                  <label>Answer Scale</label>
-                  <select
-                    value={formData.answerScaleId}
-                    onChange={(e) => setFormData({ ...formData, answerScaleId: e.target.value ? parseInt(e.target.value, 10) : '' })}
-                  >
-                    <option value="">No scale</option>
-                    {answerScales.map((scale) => (
-                      <option key={scale.id} value={scale.id}>
-                        {scale.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {formData.type === 'continuous_scale' && (
-                <div className="form-group">
-                  <label>Axes</label>
-                  {(formData.continuousAxes || []).map((axis, index) => (
-                    <div key={axis.id || index} className="button-editor">
-                      <input
-                        type="text"
-                        value={axis.label || ''}
-                        onChange={(e) => updateAxis(index, 'label', e.target.value)}
-                        placeholder={`Axis ${index + 1} label`}
-                        required
-                      />
-                      {(formData.continuousAxes || []).length > 1 && (
-                        <button type="button" onClick={() => removeAxis(index)} className="btn-icon">
-                          ❌
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button type="button" onClick={addAxis} className="btn btn-secondary btn-sm">
-                    + Add Axis
-                  </button>
-                </div>
-              )}
-
-              {formData.type === 'wordcloud' && (
-                <>
-                  <div className="form-group">
-                    <label>Word Cloud Options</label>
-                    <select
-                      value={formData.wordCloudOptionsId}
-                      onChange={(e) => setFormData({ ...formData, wordCloudOptionsId: e.target.value ? parseInt(e.target.value, 10) : '' })}
-                    >
-                      <option value="">No word cloud options</option>
-                      {wordCloudOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Max Selections</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="20"
-                      value={formData.maxSelections}
-                      onChange={(e) => setFormData({ ...formData, maxSelections: parseInt(e.target.value, 10) || 1 })}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingId ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
+            <QuestionForm
+              entity={editingEntity}
+              scales={answerScales}
+              wordClouds={wordCloudOptions}
+              onSave={handleFormSave}
+              onCancel={handleFormCancel}
+            />
           </div>
         </div>
       )}

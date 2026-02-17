@@ -10,85 +10,19 @@ const DEFAULT_WORDS = [
   { text: { fi: 'Huono', en: 'Poor', sv: 'Dålig' }, color: '#e74c3c' },
 ];
 
-export default function AdminWordCloudOptions() {
+export function WordCloudOptionsForm({ entity, onSave, onCancel }) {
   const { t } = useTranslation();
-  const [options, setOptions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState(
+    entity
+      ? { name: entity.name, words: entity.words }
+      : { name: '', words: DEFAULT_WORDS }
+  );
   const [error, setError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    words: DEFAULT_WORDS,
-  });
-
-  useEffect(() => {
-    loadOptions();
-  }, []);
-
-  const loadOptions = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await api.adminRequest('/word-cloud-options');
-      setOptions(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        await api.adminRequest(`/word-cloud-options/${editingId}`, {
-          method: 'PUT',
-          body: JSON.stringify(formData),
-        });
-      } else {
-        await api.adminRequest('/word-cloud-options', {
-          method: 'POST',
-          body: JSON.stringify(formData),
-        });
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setFormData({
-        name: '',
-        words: DEFAULT_WORDS,
-      });
-      loadOptions();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingId(null);
-    setFormData({
-      name: '',
-      words: DEFAULT_WORDS,
-    });
-  };
-
-  const handleEdit = (option) => {
-    setEditingId(option.id);
-    setFormData({
-      name: option.name,
-      words: option.words,
-    });
-    setShowForm(true);
-  };
 
   const updateWord = (index, field, value) => {
     const newWords = [...formData.words];
     if (field === 'text') {
-      // Handle text translations
       if (typeof newWords[index].text === 'string') {
-        // Convert old format to new format
         newWords[index].text = { fi: value, en: '', sv: '' };
       } else {
         newWords[index].text = value;
@@ -102,7 +36,6 @@ export default function AdminWordCloudOptions() {
   const updateWordTranslation = (index, lang, value) => {
     const newWords = [...formData.words];
     if (typeof newWords[index].text === 'string') {
-      // Convert to object format
       newWords[index].text = { fi: '', en: '', sv: '' };
     }
     newWords[index].text[lang] = value;
@@ -121,6 +54,160 @@ export default function AdminWordCloudOptions() {
     setFormData({ ...formData, words: newWords });
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      if (entity) {
+        await api.adminRequest(`/word-cloud-options/${entity.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } else {
+        await api.adminRequest('/word-cloud-options', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
+      onSave();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <>
+      <h3>{entity ? t('admin.editWordCloudOptionSet') : t('admin.addNewWordCloudOptionSet')}</h3>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Option Set Name *</label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="e.g., Service Quality Words"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Words (Finnish is required, other languages optional)</label>
+          {formData.words.map((word, index) => (
+            <div key={index} style={{ marginBottom: '20px', padding: '15px', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '12px', color: '#666' }}>Finnish (fi) *</label>
+                  <input
+                    type="text"
+                    value={typeof word.text === 'string' ? word.text : word.text.fi || ''}
+                    onChange={(e) => updateWordTranslation(index, 'fi', e.target.value)}
+                    placeholder="e.g., Erinomainen"
+                    required
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '12px', color: '#666' }}>English (en)</label>
+                  <input
+                    type="text"
+                    value={typeof word.text === 'string' ? '' : word.text.en || ''}
+                    onChange={(e) => updateWordTranslation(index, 'en', e.target.value)}
+                    placeholder="e.g., Excellent"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '12px', color: '#666' }}>Swedish (sv)</label>
+                  <input
+                    type="text"
+                    value={typeof word.text === 'string' ? '' : word.text.sv || ''}
+                    onChange={(e) => updateWordTranslation(index, 'sv', e.target.value)}
+                    placeholder="e.g., Utmärkt"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ width: '60px' }}>
+                  <label style={{ fontSize: '12px', color: '#666' }}>Color</label>
+                  <input
+                    type="color"
+                    value={word.color}
+                    onChange={(e) => updateWord(index, 'color', e.target.value)}
+                    style={{ width: '100%', height: '36px' }}
+                  />
+                </div>
+                {formData.words.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => removeWord(index)}
+                    className="btn-icon"
+                    style={{ marginTop: '20px' }}
+                  >
+                    ❌
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          <button type="button" onClick={addWord} className="btn btn-secondary btn-sm">
+            + {t('admin.addWord')}
+          </button>
+        </div>
+
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            {t('common.cancel')}
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {entity ? t('common.update') : t('common.create')}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
+export default function AdminWordCloudOptions() {
+  const { t } = useTranslation();
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingEntity, setEditingEntity] = useState(null);
+
+  useEffect(() => {
+    loadOptions();
+  }, []);
+
+  const loadOptions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.adminRequest('/word-cloud-options');
+      setOptions(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (option) => {
+    setEditingEntity(option);
+    setShowForm(true);
+  };
+
+  const handleFormSave = () => {
+    setShowForm(false);
+    setEditingEntity(null);
+    loadOptions();
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setEditingEntity(null);
+  };
+
   if (loading) return <div className="loading">{t('admin.loadingWordCloudOptions')}</div>;
   if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
@@ -136,91 +223,11 @@ export default function AdminWordCloudOptions() {
       {showForm && (
         <div className="form-modal">
           <div className="form-container">
-            <h3>{editingId ? t('admin.editWordCloudOptionSet') : t('admin.addNewWordCloudOptionSet')}</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Option Set Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Service Quality Words"
-                  required
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>Words (Finnish is required, other languages optional)</label>
-                {formData.words.map((word, index) => (
-                  <div key={index} style={{ marginBottom: '20px', padding: '15px', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '12px', color: '#666' }}>Finnish (fi) *</label>
-                        <input
-                          type="text"
-                          value={typeof word.text === 'string' ? word.text : word.text.fi || ''}
-                          onChange={(e) => updateWordTranslation(index, 'fi', e.target.value)}
-                          placeholder="e.g., Erinomainen"
-                          required
-                          style={{ width: '100%' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '12px', color: '#666' }}>English (en)</label>
-                        <input
-                          type="text"
-                          value={typeof word.text === 'string' ? '' : word.text.en || ''}
-                          onChange={(e) => updateWordTranslation(index, 'en', e.target.value)}
-                          placeholder="e.g., Excellent"
-                          style={{ width: '100%' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '12px', color: '#666' }}>Swedish (sv)</label>
-                        <input
-                          type="text"
-                          value={typeof word.text === 'string' ? '' : word.text.sv || ''}
-                          onChange={(e) => updateWordTranslation(index, 'sv', e.target.value)}
-                          placeholder="e.g., Utmärkt"
-                          style={{ width: '100%' }}
-                        />
-                      </div>
-                      <div style={{ width: '60px' }}>
-                        <label style={{ fontSize: '12px', color: '#666' }}>Color</label>
-                        <input
-                          type="color"
-                          value={word.color}
-                          onChange={(e) => updateWord(index, 'color', e.target.value)}
-                          style={{ width: '100%', height: '36px' }}
-                        />
-                      </div>
-                      {formData.words.length > 2 && (
-                        <button 
-                          type="button" 
-                          onClick={() => removeWord(index)} 
-                          className="btn-icon"
-                          style={{ marginTop: '20px' }}
-                        >
-                          ❌
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                <button type="button" onClick={addWord} className="btn btn-secondary btn-sm">
-                  + {t('admin.addWord')}
-                </button>
-              </div>
-
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                  {t('common.cancel')}
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingId ? t('common.update') : t('common.create')}
-                </button>
-              </div>
-            </form>
+            <WordCloudOptionsForm
+              entity={editingEntity}
+              onSave={handleFormSave}
+              onCancel={handleFormCancel}
+            />
           </div>
         </div>
       )}
@@ -242,16 +249,15 @@ export default function AdminWordCloudOptions() {
                 </div>
                 <div className="wordcloud-preview">
                   {option.words.map((word, index) => {
-                    // Display Finnish by default, or the first available translation
-                    const displayText = typeof word.text === 'string' 
-                      ? word.text 
+                    const displayText = typeof word.text === 'string'
+                      ? word.text
                       : word.text.fi || word.text.en || word.text.sv || '';
-                    
+
                     return (
                       <span
                         key={index}
                         className="word-chip-preview"
-                        style={{ 
+                        style={{
                           backgroundColor: word.color,
                           color: 'white',
                           padding: '8px 16px',
