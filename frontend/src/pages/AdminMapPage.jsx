@@ -52,16 +52,21 @@ function getColumnEntities(colIndex, scales, wordClouds, questions, questionnair
     case 2:
       return questionnaires.map(q => ({ type: 'questionnaire', id: q.id, label: q.name, icon: '📋' }));
     case 3:
-      return schedules.map(s => ({
-        type: 'schedule', id: s.id,
-        label: s.location_group_name || s.location_name || `Schedule #${s.id}`,
-        icon: s.schedule_type === 'recurring_weekday' ? '🔄' : '📅',
-      }));
+      return schedules.map(s => {
+        const firstTarget = (s.locationTargets || [])[0];
+        const label = firstTarget
+          ? (firstTarget.location_name || firstTarget.location_group_name || `Schedule #${s.id}`)
+          : `Schedule #${s.id}`;
+        return { type: 'schedule', id: s.id, label, icon: s.schedule_type === 'recurring_weekday' ? '🔄' : '📅' };
+      });
     case 4: {
       const groups = locationGroups.map(g => ({ type: 'locationgroup', id: g.id, label: g.name, icon: '🏢' }));
-      const directLocIds = new Set(
-        schedules.filter(s => s.location_id && !s.location_group_id).map(s => s.location_id)
-      );
+      const directLocIds = new Set();
+      for (const s of schedules) {
+        for (const lt of (s.locationTargets || [])) {
+          if (lt.location_id) directLocIds.add(lt.location_id);
+        }
+      }
       const directLocs = locations
         .filter(l => directLocIds.has(l.id))
         .map(l => ({ type: 'directlocation', id: l.id, label: l.name, icon: '📍' }));
@@ -106,10 +111,12 @@ function computeConnections(scales, wordClouds, questions, questionnaires, sched
 
   // Col 3 → Col 4
   for (const sched of schedules) {
-    if (sched.location_group_id) {
-      conns.push({ id: `sched-${sched.id}-lg-${sched.location_group_id}`, fromType: 'schedule', fromId: sched.id, fromCol: 3, toType: 'locationgroup', toId: sched.location_group_id, toCol: 4 });
-    } else if (sched.location_id) {
-      conns.push({ id: `sched-${sched.id}-dloc-${sched.location_id}`, fromType: 'schedule', fromId: sched.id, fromCol: 3, toType: 'directlocation', toId: sched.location_id, toCol: 4 });
+    for (const lt of (sched.locationTargets || [])) {
+      if (lt.location_group_id) {
+        conns.push({ id: `sched-${sched.id}-lg-${lt.location_group_id}`, fromType: 'schedule', fromId: sched.id, fromCol: 3, toType: 'locationgroup', toId: lt.location_group_id, toCol: 4 });
+      } else if (lt.location_id) {
+        conns.push({ id: `sched-${sched.id}-dloc-${lt.location_id}`, fromType: 'schedule', fromId: sched.id, fromCol: 3, toType: 'directlocation', toId: lt.location_id, toCol: 4 });
+      }
     }
   }
 
@@ -462,25 +469,32 @@ export default function AdminMapPage() {
         const sched = schedules.find(s => s.id === toId);
         const existing = (sched.questionnaires || []).map(q => q.id.toString());
         if (!existing.includes(fromId.toString())) {
+          const locTargets = (sched.locationTargets || []).map(lt => lt.location_id ? { locationId: lt.location_id } : { locationGroupId: lt.location_group_id });
           await api.adminRequest(`/schedules/${toId}`, {
             method: 'PUT',
-            body: JSON.stringify({ questionnaireIds: [...existing, fromId.toString()], scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, ...(sched.location_group_id ? { locationGroupId: sched.location_group_id } : { locationId: sched.location_id }), ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }),
+            body: JSON.stringify({ locationTargets: locTargets, questionnaireIds: [...existing, fromId.toString()], scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }),
           });
         }
       } else if (fromType === 'schedule' && toType === 'locationgroup') {
         const sched = schedules.find(s => s.id === fromId);
         const qIds = (sched.questionnaires || []).map(q => q.id.toString());
-        await api.adminRequest(`/schedules/${fromId}`, {
-          method: 'PUT',
-          body: JSON.stringify({ questionnaireIds: qIds, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, locationGroupId: toId, locationId: null, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }),
-        });
+        const existing = (sched.locationTargets || []).map(lt => lt.location_id ? { locationId: lt.location_id } : { locationGroupId: lt.location_group_id });
+        if (!existing.some(t => t.locationGroupId === toId)) {
+          await api.adminRequest(`/schedules/${fromId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ locationTargets: [...existing, { locationGroupId: toId }], questionnaireIds: qIds, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }),
+          });
+        }
       } else if (fromType === 'schedule' && toType === 'directlocation') {
         const sched = schedules.find(s => s.id === fromId);
         const qIds = (sched.questionnaires || []).map(q => q.id.toString());
-        await api.adminRequest(`/schedules/${fromId}`, {
-          method: 'PUT',
-          body: JSON.stringify({ questionnaireIds: qIds, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, locationId: toId, locationGroupId: null, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }),
-        });
+        const existing = (sched.locationTargets || []).map(lt => lt.location_id ? { locationId: lt.location_id } : { locationGroupId: lt.location_group_id });
+        if (!existing.some(t => t.locationId === toId)) {
+          await api.adminRequest(`/schedules/${fromId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ locationTargets: [...existing, { locationId: toId }], questionnaireIds: qIds, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }),
+          });
+        }
       } else if (fromType === 'locationgroup' && toType === 'location') {
         const loc = locations.find(l => l.id === toId);
         await api.adminRequest(`/locations/${toId}`, {
@@ -510,11 +524,18 @@ export default function AdminMapPage() {
       } else if (fromType === 'questionnaire' && toType === 'schedule') {
         const sched = schedules.find(s => s.id === toId);
         const remaining = (sched.questionnaires || []).filter(q => q.id !== fromId).map(q => q.id.toString());
-        await api.adminRequest(`/schedules/${toId}`, { method: 'PUT', body: JSON.stringify({ questionnaireIds: remaining, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, ...(sched.location_group_id ? { locationGroupId: sched.location_group_id } : { locationId: sched.location_id }), ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }) });
+        const locTargets = (sched.locationTargets || []).map(lt => lt.location_id ? { locationId: lt.location_id } : { locationGroupId: lt.location_group_id });
+        await api.adminRequest(`/schedules/${toId}`, { method: 'PUT', body: JSON.stringify({ locationTargets: locTargets, questionnaireIds: remaining, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }) });
       } else if (fromType === 'schedule' && (toType === 'locationgroup' || toType === 'directlocation')) {
         const sched = schedules.find(s => s.id === fromId);
         const qIds = (sched.questionnaires || []).map(q => q.id.toString());
-        await api.adminRequest(`/schedules/${fromId}`, { method: 'PUT', body: JSON.stringify({ questionnaireIds: qIds, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, locationId: null, locationGroupId: null, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }) });
+        const remaining = (sched.locationTargets || [])
+          .filter(lt => toType === 'locationgroup' ? lt.location_group_id !== toId : lt.location_id !== toId)
+          .map(lt => lt.location_id ? { locationId: lt.location_id } : { locationGroupId: lt.location_group_id });
+        await api.adminRequest(`/schedules/${fromId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ locationTargets: remaining, questionnaireIds: qIds, scheduleType: sched.schedule_type, showOnlyOne: sched.show_only_one || false, ...(sched.schedule_type === 'date_based' ? { startTime: sched.start_time, endTime: sched.end_time } : { weekdayPattern: sched.weekday_pattern }) }),
+        });
       } else if (fromType === 'locationgroup' && toType === 'location') {
         const loc = locations.find(l => l.id === toId);
         await api.adminRequest(`/locations/${toId}`, { method: 'PUT', body: JSON.stringify({ slug: loc.slug, name: loc.name, active: loc.active, groupId: null, passwordRequired: loc.password_required || false, password: '' }) });

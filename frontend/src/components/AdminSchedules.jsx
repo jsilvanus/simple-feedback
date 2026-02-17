@@ -6,9 +6,7 @@ import './AdminCrud.css';
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const DEFAULT_FORM_DATA = {
-  destinationType: 'location',
-  locationId: '',
-  locationGroupId: '',
+  locationTargets: [], // [{type: 'location'|'group', id: string}]
   questionnaireIds: [],
   scheduleType: 'date_based',
   dateRanges: [{ startTime: '', endTime: '' }],
@@ -17,11 +15,12 @@ const DEFAULT_FORM_DATA = {
 };
 
 function entityToFormData(schedule) {
-  const destinationType = schedule.location_group_id ? 'group' : 'location';
   return {
-    destinationType,
-    locationId: schedule.location_id?.toString() || '',
-    locationGroupId: schedule.location_group_id?.toString() || '',
+    locationTargets: (schedule.locationTargets || []).map(lt =>
+      lt.location_id
+        ? { type: 'location', id: lt.location_id.toString() }
+        : { type: 'group', id: lt.location_group_id.toString() }
+    ),
     questionnaireIds: schedule.questionnaires?.map(q => q.id.toString()) ||
                      (schedule.questionnaire_id ? [schedule.questionnaire_id.toString()] : []),
     scheduleType: schedule.schedule_type || 'date_based',
@@ -99,6 +98,17 @@ export function ScheduleForm({ entity, locations, locationGroups, questionnaires
     });
   };
 
+  const toggleLocationTarget = (type, id) => {
+    const targets = [...formData.locationTargets];
+    const idx = targets.findIndex(t => t.type === type && t.id === id);
+    if (idx > -1) {
+      targets.splice(idx, 1);
+    } else {
+      targets.push({ type, id });
+    }
+    setFormData({ ...formData, locationTargets: targets });
+  };
+
   const toggleQuestionnaire = (id) => {
     const ids = [...formData.questionnaireIds];
     const index = ids.indexOf(id);
@@ -124,16 +134,15 @@ export function ScheduleForm({ entity, locations, locationGroups, questionnaires
 
     try {
       const basePayload = {
+        locationTargets: formData.locationTargets.map(lt =>
+          lt.type === 'location'
+            ? { locationId: Number.parseInt(lt.id, 10) }
+            : { locationGroupId: Number.parseInt(lt.id, 10) }
+        ),
         questionnaireIds: formData.questionnaireIds.map((id) => Number.parseInt(id, 10)),
         scheduleType: formData.scheduleType,
         showOnlyOne: formData.showOnlyOne,
       };
-
-      if (formData.destinationType === 'location') {
-        basePayload.locationId = Number.parseInt(formData.locationId, 10);
-      } else {
-        basePayload.locationGroupId = Number.parseInt(formData.locationGroupId, 10);
-      }
 
       const scheduleEntries =
         formData.scheduleType === 'date_based'
@@ -192,60 +201,49 @@ export function ScheduleForm({ entity, locations, locationGroups, questionnaires
       <h3>{entity ? t('admin.editSchedule') : t('admin.addNewSchedule')}</h3>
       {error && <div className="error">{error}</div>}
       <form onSubmit={handleSubmit}>
-        <div className="form-row schedule-destination-row">
-          <div className="form-group">
-            <label>{t('admin.publishTo')} *</label>
-            <div className="toggle-button-group">
-              <button
-                type="button"
-                className={`toggle-btn ${formData.destinationType === 'location' ? 'active' : ''}`}
-                onClick={() => setFormData({ ...formData, destinationType: 'location' })}
-              >
-                {t('admin.specificLocation')}
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${formData.destinationType === 'group' ? 'active' : ''}`}
-                onClick={() => setFormData({ ...formData, destinationType: 'group' })}
-              >
-                {t('admin.locationGroup')}
-              </button>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>{formData.destinationType === 'location' ? t('admin.locations') : t('admin.locationGroup')} *</label>
-            {formData.destinationType === 'location' ? (
-              <select
-                value={formData.locationId}
-                onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-                required
-              >
-                <option value="">{t('admin.selectLocation')}</option>
-                {(locations || []).map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name} (/{location.slug})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <>
-                <select
-                  value={formData.locationGroupId}
-                  onChange={(e) => setFormData({ ...formData, locationGroupId: e.target.value })}
-                  required
-                  aria-describedby="group-help-text"
+        <div className="form-group">
+          <label>{t('admin.publishTo')}</label>
+          {(locationGroups || []).length > 0 && (
+            <>
+              <small style={{ display: 'block', marginBottom: '6px', color: '#666' }}>{t('admin.locationGroup')}</small>
+              <div className="questionnaire-cards-grid">
+                {(locationGroups || []).map((group) => {
+                  const checked = formData.locationTargets.some(lt => lt.type === 'group' && lt.id === group.id.toString());
+                  return (
+                    <label
+                      key={`group-${group.id}`}
+                      className={`questionnaire-checkbox-card ${checked ? 'selected' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleLocationTarget('group', group.id.toString())}
+                      />
+                      <span>🏢 {group.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <small style={{ display: 'block', margin: '8px 0 6px', color: '#666' }}>{t('admin.locations')}</small>
+          <div className="questionnaire-cards-grid">
+            {(locations || []).map((location) => {
+              const checked = formData.locationTargets.some(lt => lt.type === 'location' && lt.id === location.id.toString());
+              return (
+                <label
+                  key={`loc-${location.id}`}
+                  className={`questionnaire-checkbox-card ${checked ? 'selected' : ''}`}
                 >
-                  <option value="">{t('admin.selectLocationGroup')}</option>
-                  {(locationGroups || []).map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-                <small id="group-help-text">{t('admin.scheduleAppliesToGroup')}</small>
-              </>
-            )}
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleLocationTarget('location', location.id.toString())}
+                  />
+                  <span>📍 {location.name} (/{location.slug})</span>
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -560,15 +558,16 @@ export default function AdminSchedules() {
               {schedules.map((schedule) => (
                 <tr key={schedule.id}>
                   <td>
-                    {schedule.location_name ? (
+                    {(schedule.locationTargets || []).length > 0 ? (
                       <div>
-                        <div><strong>{schedule.location_name}</strong></div>
-                        <small>/{schedule.location_slug}</small>
-                      </div>
-                    ) : schedule.location_group_name ? (
-                      <div>
-                        <div><strong>🏢 {schedule.location_group_name}</strong></div>
-                        <small>({t('admin.locationGroup')})</small>
+                        {schedule.locationTargets.map((lt, i) => (
+                          <div key={i}>
+                            {lt.location_id
+                              ? <span>📍 <strong>{lt.location_name}</strong>{lt.location_slug ? ` (/${lt.location_slug})` : ''}</span>
+                              : <span>🏢 <strong>{lt.location_group_name}</strong></span>
+                            }
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <span>{t('admin.notAvailable')}</span>

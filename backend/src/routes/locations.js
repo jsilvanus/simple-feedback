@@ -32,10 +32,11 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
     // Query for active schedules (both location-specific and group-level)
     // Priority: location-specific schedules first, then group-level schedules
     const scheduleResult = await db.query(
-      `SELECT s.*, s.schedule_type, s.weekday_pattern, s.show_only_one,
-              CASE WHEN s.location_id IS NOT NULL THEN 1 ELSE 2 END as priority
+      `SELECT DISTINCT s.*, s.schedule_type, s.weekday_pattern, s.show_only_one,
+              CASE WHEN sl.location_id IS NOT NULL THEN 1 ELSE 2 END as priority
        FROM schedules s
-       WHERE (s.location_id = $1 OR (s.location_group_id = $2 AND $2 IS NOT NULL))
+       JOIN schedule_locations sl ON s.id = sl.schedule_id
+       WHERE (sl.location_id = $1 OR (sl.location_group_id = $2 AND $2 IS NOT NULL))
          AND (
            (s.schedule_type = 'date_based' AND s.start_time <= $3 AND s.end_time >= $3)
            OR (s.schedule_type = 'recurring_weekday')

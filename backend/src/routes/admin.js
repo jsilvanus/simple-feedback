@@ -912,7 +912,7 @@ router.get('/schedules', async (req, res, next) => {
        ORDER BY s.start_time DESC`
     );
 
-    // For each schedule, get associated questionnaires
+    // For each schedule, get associated questionnaires and location targets
     const schedules = await Promise.all(
       schedulesResult.rows.map(async (schedule) => {
         // Try to get questionnaires from junction table first
@@ -934,11 +934,23 @@ router.get('/schedules', async (req, res, next) => {
           questionnairesResult.rows = legacyResult.rows.map(q => ({ ...q, display_order: 0 }));
         }
 
+        // Get location targets from junction table
+        const locTargetsResult = await db.query(
+          `SELECT sl.location_id, sl.location_group_id,
+                  l.name  AS location_name,  l.slug AS location_slug,
+                  lg.name AS location_group_name
+           FROM schedule_locations sl
+           LEFT JOIN locations      l  ON sl.location_id       = l.id
+           LEFT JOIN location_groups lg ON sl.location_group_id = lg.id
+           WHERE sl.schedule_id = $1`,
+          [schedule.id]
+        );
+
         return {
           ...schedule,
           questionnaires: questionnairesResult.rows,
-          // For backward compatibility
           questionnaire_name: questionnairesResult.rows[0]?.name || null,
+          locationTargets: locTargetsResult.rows,
         };
       })
     );
@@ -985,9 +997,8 @@ router.post('/schedules', async (req, res, next) => {
   const client = await db.pool.connect();
   
   try {
-    const { 
-      locationId,
-      locationGroupId,  // NEW: Support for location groups
+    const {
+      locationTargets,  // Array of {locationId?} | {locationGroupId?} — replaces old locationId/locationGroupId
       questionnaireIds, // Array of questionnaire IDs
       scheduleType,     // 'date_based' or 'recurring_weekday'
       startTime,        // For date_based
@@ -996,22 +1007,9 @@ router.post('/schedules', async (req, res, next) => {
       showOnlyOne       // Boolean
     } = req.body;
 
-    // Must have either locationId or locationGroupId, but not both
-    if (!locationId && !locationGroupId) {
-      return res.status(400).json({ 
-        error: { message: 'Either locationId or locationGroupId is required' } 
-      });
-    }
-
-    if (locationId && locationGroupId) {
-      return res.status(400).json({ 
-        error: { message: 'Cannot specify both locationId and locationGroupId' } 
-      });
-    }
-
     if (!questionnaireIds || !Array.isArray(questionnaireIds) || questionnaireIds.length === 0) {
-      return res.status(400).json({ 
-        error: { message: 'questionnaireIds array is required and must not be empty' } 
+      return res.status(400).json({
+        error: { message: 'questionnaireIds array is required and must not be empty' }
       });
     }
 
@@ -1020,33 +1018,31 @@ router.post('/schedules', async (req, res, next) => {
     // Validate based on schedule type
     if (type === 'date_based') {
       if (!startTime || !endTime) {
-        return res.status(400).json({ 
-          error: { message: 'startTime and endTime are required for date_based schedules' } 
+        return res.status(400).json({
+          error: { message: 'startTime and endTime are required for date_based schedules' }
         });
       }
     } else if (type === 'recurring_weekday') {
       if (!weekdayPattern || !weekdayPattern.days || !weekdayPattern.start_hour || !weekdayPattern.end_hour) {
-        return res.status(400).json({ 
-          error: { message: 'weekdayPattern with days, start_hour, and end_hour is required for recurring_weekday schedules' } 
+        return res.status(400).json({
+          error: { message: 'weekdayPattern with days, start_hour, and end_hour is required for recurring_weekday schedules' }
         });
       }
     } else {
-      return res.status(400).json({ 
-        error: { message: 'scheduleType must be either date_based or recurring_weekday' } 
+      return res.status(400).json({
+        error: { message: 'scheduleType must be either date_based or recurring_weekday' }
       });
     }
 
     await client.query('BEGIN');
 
-    // Create schedule
+    // Create schedule (location_id / location_group_id kept as legacy columns, left null)
     const scheduleResult = await client.query(
-      `INSERT INTO schedules 
-       (location_id, location_group_id, schedule_type, start_time, end_time, weekday_pattern, show_only_one) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+      `INSERT INTO schedules
+       (schedule_type, start_time, end_time, weekday_pattern, show_only_one)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
       [
-        locationId || null,
-        locationGroupId || null,
         type,
         type === 'date_based' ? startTime : null,
         type === 'date_based' ? endTime : null,
@@ -1063,6 +1059,20 @@ router.post('/schedules', async (req, res, next) => {
         'INSERT INTO schedule_questionnaires (schedule_id, questionnaire_id, display_order) VALUES ($1, $2, $3)',
         [scheduleId, questionnaireIds[i], i]
       );
+    }
+
+    // Add location targets to junction table
+    if (Array.isArray(locationTargets)) {
+      for (const target of locationTargets) {
+        const locId = target.locationId || null;
+        const lgId  = target.locationGroupId || null;
+        if (locId || lgId) {
+          await client.query(
+            'INSERT INTO schedule_locations (schedule_id, location_id, location_group_id) VALUES ($1, $2, $3)',
+            [scheduleId, locId, lgId]
+          );
+        }
+      }
     }
 
     await client.query('COMMIT');
@@ -1085,9 +1095,8 @@ router.put('/schedules/:id', async (req, res, next) => {
   
   try {
     const { id } = req.params;
-    const { 
-      locationId,
-      locationGroupId, // NEW: Support for location groups
+    const {
+      locationTargets, // Array of {locationId?} | {locationGroupId?} — replaces old locationId/locationGroupId
       questionnaireIds,
       scheduleType,
       startTime,
@@ -1098,29 +1107,11 @@ router.put('/schedules/:id', async (req, res, next) => {
 
     await client.query('BEGIN');
 
-    // Build update query
+    // Build update query for scalar schedule fields
     const updates = [];
     const values = [];
     let paramCount = 1;
 
-    if (locationId !== undefined) {
-      updates.push(`location_id = $${paramCount++}`);
-      const cleanLocationId = locationId === '' || locationId === null ? null : locationId;
-      values.push(cleanLocationId);
-      // If setting locationId to a non-null value, clear locationGroupId
-      if (cleanLocationId !== null) {
-        updates.push(`location_group_id = NULL`);
-      }
-    }
-    if (locationGroupId !== undefined) {
-      updates.push(`location_group_id = $${paramCount++}`);
-      const cleanLocationGroupId = locationGroupId === '' || locationGroupId === null ? null : locationGroupId;
-      values.push(cleanLocationGroupId);
-      // If setting locationGroupId to a non-null value, clear locationId
-      if (cleanLocationGroupId !== null) {
-        updates.push(`location_id = NULL`);
-      }
-    }
     if (scheduleType !== undefined) {
       updates.push(`schedule_type = $${paramCount++}`);
       values.push(scheduleType);
@@ -1157,18 +1148,27 @@ router.put('/schedules/:id', async (req, res, next) => {
 
     // Update questionnaires if provided
     if (questionnaireIds !== undefined && Array.isArray(questionnaireIds)) {
-      // Delete existing questionnaires
-      await client.query(
-        'DELETE FROM schedule_questionnaires WHERE schedule_id = $1',
-        [id]
-      );
-
-      // Add new questionnaires
+      await client.query('DELETE FROM schedule_questionnaires WHERE schedule_id = $1', [id]);
       for (let i = 0; i < questionnaireIds.length; i++) {
         await client.query(
           'INSERT INTO schedule_questionnaires (schedule_id, questionnaire_id, display_order) VALUES ($1, $2, $3)',
           [id, questionnaireIds[i], i]
         );
+      }
+    }
+
+    // Update location targets if provided
+    if (locationTargets !== undefined && Array.isArray(locationTargets)) {
+      await client.query('DELETE FROM schedule_locations WHERE schedule_id = $1', [id]);
+      for (const target of locationTargets) {
+        const locId = target.locationId || null;
+        const lgId  = target.locationGroupId || null;
+        if (locId || lgId) {
+          await client.query(
+            'INSERT INTO schedule_locations (schedule_id, location_id, location_group_id) VALUES ($1, $2, $3)',
+            [id, locId, lgId]
+          );
+        }
       }
     }
 
