@@ -640,6 +640,46 @@ export default function AdminMapPage() {
             const entities = getColumnEntities(col.index, scales, wordClouds, questions, questionnaires, schedules, locationGroups, locations);
             const hidden = isMobile && (col.index < mobilePair || col.index > mobilePair + 1);
 
+            // Button click handlers for each column
+            let createButton = null;
+            switch (col.index) {
+              case 0:
+                createButton = (
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <button className="btn btn-primary btn-xs" onClick={() => setEditModal({ type: 'scale', entity: null })}>+ Add Scale</button>
+                    <button className="btn btn-primary btn-xs" onClick={() => setEditModal({ type: 'wordcloud', entity: null })}>+ Add Word Cloud</button>
+                  </div>
+                );
+                break;
+              case 1:
+                createButton = (
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'question', entity: null })}>+ Add Question</button>
+                );
+                break;
+              case 2:
+                createButton = (
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'questionnaire', entity: null })}>+ Add Questionnaire</button>
+                );
+                break;
+              case 3:
+                createButton = (
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'schedule', entity: null })}>+ Add Schedule</button>
+                );
+                break;
+              case 4:
+                createButton = (
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'locationgroup', entity: null })}>+ Add Location Group</button>
+                );
+                break;
+              case 5:
+                createButton = (
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'location', entity: null })}>+ Add Location</button>
+                );
+                break;
+              default:
+                break;
+            }
+
             return (
               <div
                 key={col.index}
@@ -647,6 +687,7 @@ export default function AdminMapPage() {
                 style={hidden ? { display: 'none' } : undefined}
               >
                 <div className="map-column-header">{col.icon} {col.label}</div>
+                {createButton}
                 <div className="map-card-list">
                   {entities.length === 0 && (
                     <div className="map-column-empty">—</div>
