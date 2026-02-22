@@ -8,7 +8,7 @@
     "start": "npm run db:up && concurrently -n backend,frontend -c blue,green \"npm run start --prefix backend\" \"npm run preview --prefix frontend\"",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
-    "db:migrate": "docker compose exec db sh -c \"PGPASSWORD=postgres psql -U postgres -d simple_feedback -f /app/backend_db/schema.sql\"",
+    "db:migrate": "docker compose exec db sh -c \"PGPASSWORD=postgres psql -U postgres -d simple_feedback -f /app/backend_db/schema.sql && for f in /app/backend_db/migrations/*.sql; do PGPASSWORD=postgres psql -U postgres -d simple_feedback -f '$f'; done\"",
     "dev:setup": "npm run db:up && npm run db:migrate",
     "dev:all": "npm run dev",
     "start:all": "npm run start",
