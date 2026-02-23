@@ -1037,18 +1037,28 @@ router.post('/schedules', async (req, res, next) => {
 
     await client.query('BEGIN');
 
-    // Create schedule (location_id / location_group_id kept as legacy columns, left null)
+    // Determine location_id or location_group_id if provided
+    let locationId = null;
+    let locationGroupId = null;
+    if (Array.isArray(locationTargets) && locationTargets.length > 0) {
+      const target = locationTargets[0]; // Only use the first for legacy column
+      if (target.locationId) locationId = target.locationId;
+      if (target.locationGroupId) locationGroupId = target.locationGroupId;
+    }
+
     const scheduleResult = await client.query(
       `INSERT INTO schedules
-       (schedule_type, start_time, end_time, weekday_pattern, show_only_one)
-       VALUES ($1, $2, $3, $4, $5)
+       (schedule_type, start_time, end_time, weekday_pattern, show_only_one, location_id, location_group_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         type,
         type === 'date_based' ? startTime : null,
         type === 'date_based' ? endTime : null,
         type === 'recurring_weekday' ? JSON.stringify(weekdayPattern) : null,
-        showOnlyOne || false
+        showOnlyOne || false,
+        locationId,
+        locationGroupId
       ]
     );
 

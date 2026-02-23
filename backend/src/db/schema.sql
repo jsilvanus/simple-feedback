@@ -1,3 +1,5 @@
+ALTER TABLE schedules
+DROP CONSTRAINT IF EXISTS schedules_check1;
 -- Database schema for Simple Feedback App
 
 CREATE TABLE IF NOT EXISTS location_groups (
@@ -72,11 +74,7 @@ CREATE TABLE IF NOT EXISTS schedules (
     end_time TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CHECK (end_time > start_time OR end_time IS NULL),
-    CHECK (
-        (location_id IS NOT NULL AND location_group_id IS NULL) OR 
-        (location_id IS NULL AND location_group_id IS NOT NULL)
-    )
+    CHECK (end_time > start_time OR end_time IS NULL)
 );
 
 CREATE TABLE IF NOT EXISTS feedback_sessions (
