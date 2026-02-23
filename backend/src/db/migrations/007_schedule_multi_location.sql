@@ -4,12 +4,8 @@
 -- Create the junction table
 CREATE TABLE IF NOT EXISTS schedule_locations (
   schedule_id       INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-  location_id       INTEGER          REFERENCES locations(id) ON DELETE CASCADE,
-  location_group_id INTEGER          REFERENCES location_groups(id) ON DELETE CASCADE,
-  CONSTRAINT check_sl_one_target CHECK (
-    (location_id IS NOT NULL AND location_group_id IS NULL) OR
-    (location_id IS NULL    AND location_group_id IS NOT NULL)
-  )
+  location_id       INTEGER REFERENCES locations(id) ON DELETE CASCADE,
+  location_group_id INTEGER REFERENCES location_groups(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_schedule_locations_schedule ON schedule_locations(schedule_id);
