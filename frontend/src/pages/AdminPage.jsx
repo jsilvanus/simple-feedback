@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import LanguageSelector from '../components/LanguageSelector';
+import ColumnView from '../components/ColumnView';
 import AdminLocations from '../components/AdminLocations';
 import AdminLocationGroups from '../components/AdminLocationGroups';
 import AdminQuestions from '../components/AdminQuestions';
@@ -119,34 +120,7 @@ export default function AdminPage() {
         </nav>
 
         <div className="admin-content">
-          {activeTab === 'overview' && (
-            <div className="admin-section">
-              <h2>{t('admin.welcomeTitle')}</h2>
-              <p>{t('admin.welcomeDesc')}</p>
-              <div className="feature-grid">
-                <div className="feature-card">
-                  <h3>{t('admin.locations')}</h3>
-                  <p>{t('admin.locationsDesc')}</p>
-                </div>
-                <div className="feature-card">
-                  <h3>{t('admin.questions')}</h3>
-                  <p>{t('admin.questionsDesc')}</p>
-                </div>
-                <div className="feature-card">
-                  <h3>{t('admin.questionnaires')}</h3>
-                  <p>{t('admin.questionnairesDesc')}</p>
-                </div>
-                <div className="feature-card">
-                  <h3>{t('admin.schedules')}</h3>
-                  <p>{t('admin.schedulesDesc')}</p>
-                </div>
-                <div className="feature-card">
-                  <h3>{t('admin.results')}</h3>
-                  <p>{t('admin.resultsDesc')}</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {activeTab === 'overview' && <ColumnView />}
 
           {activeTab === 'questions' && (
             <div className="admin-grouped-sections">

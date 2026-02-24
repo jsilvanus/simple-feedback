@@ -1,0 +1,261 @@
+.column-view {
+  width: 100%;
+  height: 100%;
+}
+
+.column-view-header {
+  margin-bottom: 24px;
+}
+
+.column-view-header h2 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.column-view-subtitle {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.column-view-loading,
+.column-view-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 16px;
+}
+
+.column-view-error {
+  color: #c33;
+}
+
+.column-view-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  height: calc(100vh - 300px);
+  min-height: 500px;
+}
+
+.column {
+  background: #f8f9fa;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+.column-header {
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.column-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.column-count {
+  background: #667eea;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.column-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.column-item {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.column-item:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.column-item.selected {
+  border-color: #667eea;
+  background: #f0f3ff;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.column-item.inactive {
+  opacity: 0.6;
+}
+
+.column-item.draggable {
+  cursor: grab;
+}
+
+.column-item.draggable:active {
+  cursor: grabbing;
+}
+
+.column-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.column-item-title {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+  flex: 1;
+}
+
+.column-item-meta {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.column-item-tag {
+  display: inline-block;
+  background: #e9ecef;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #495057;
+  margin-left: 6px;
+}
+
+.column-item-badge {
+  font-size: 11px;
+  color: #667eea;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  color: #999;
+  transition: color 0.2s ease;
+}
+
+.toggle-btn.active {
+  color: #28a745;
+}
+
+.toggle-btn:hover {
+  color: #333;
+}
+
+.drag-handle {
+  color: #999;
+  font-size: 16px;
+  cursor: grab;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 0 4px;
+  color: #999;
+  transition: color 0.2s ease;
+  line-height: 1;
+}
+
+.delete-btn:hover {
+  color: #dc3545;
+}
+
+.column-filter-info {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #856404;
+}
+
+.column-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.schedule-item {
+  border-left: 3px solid #667eea;
+}
+
+.schedule-questionnaires {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Drag and drop visual feedback */
+.column-item.drag-over {
+  border-color: #28a745;
+  background: #f0fff4;
+}
+
+/* Scrollbar styling */
+.column-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.column-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.column-content::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.column-content::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .column-view-container {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .column {
+    min-height: 300px;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1400px) {
+  .column-view-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

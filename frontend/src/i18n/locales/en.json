@@ -45,6 +45,7 @@
     "backToHome": "Back to Home",
     "dashboard": "Admin Dashboard",
     "overview": "Overview",
+    "columnView": "Column View",
     "locations": "Locations",
     "locationGroups": "Location Groups",
     "questions": "Questions",
@@ -149,7 +150,13 @@
     "resultsDesc": "View and export feedback data",
     "results": "Results",
     "export": "Export",
-    "answerScales": "Answer Scales"
+    "answerScales": "Answer Scales",
+    "columnViewInstructions": "Drag questionnaires to locations to create schedules",
+    "schedulesCount": "{{count}} schedule",
+    "schedulesCount_plural": "{{count}} schedules",
+    "schedulesFor": "Schedules for",
+    "noSchedulesYetDrag": "No schedules yet. Drag a questionnaire to a location to create one.",
+    "selectToViewSchedules": "Select a location or questionnaire to view schedules"
   },
   "settings": {
     "title": "Settings",

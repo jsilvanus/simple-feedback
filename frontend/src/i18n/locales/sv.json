@@ -45,6 +45,7 @@
     "backToHome": "Tillbaka till startsidan",
     "dashboard": "Adminpanel",
     "overview": "Översikt",
+    "columnView": "Kolumnvy",
     "locations": "Platser",
     "locationGroups": "Platsgrupper",
     "questions": "Frågor",
@@ -149,7 +150,13 @@
     "resultsDesc": "Visa och exportera feedbackdata",
     "results": "Resultat",
     "export": "Exportera",
-    "answerScales": "Svarsskalor"
+    "answerScales": "Svarsskalor",
+    "columnViewInstructions": "Dra enkäter till platser för att skapa scheman",
+    "schedulesCount": "{{count}} schema",
+    "schedulesCount_plural": "{{count}} scheman",
+    "schedulesFor": "Scheman för",
+    "noSchedulesYetDrag": "Inga scheman än. Dra en enkät till en plats för att skapa ett.",
+    "selectToViewSchedules": "Välj en plats eller enkät för att visa scheman"
   },
   "settings": {
     "title": "Inställningar",
