@@ -47,7 +47,13 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
 
     // Insert all answers
     for (const answer of answers) {
-      const normalizedValue = typeof answer.value === 'number' ? answer.value : null;
+      // Accept numeric (including fractional) values; parse strings to float for NUMERIC column
+      const rawValue = answer.value;
+      let normalizedValue = null;
+      if (rawValue !== null && rawValue !== undefined) {
+        const parsed = parseFloat(rawValue);
+        normalizedValue = isNaN(parsed) ? null : parsed;
+      }
       const normalizedTextValue =
         answer.textValue !== undefined && answer.textValue !== null
           ? answer.textValue

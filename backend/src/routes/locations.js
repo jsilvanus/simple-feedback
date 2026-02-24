@@ -98,6 +98,7 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
         const questionsResult = await db.query(
           `SELECT q.id, q.text, q.type, qq.page_number, qq.order_index,
                   q.answer_scale_id, a.name as scale_name, a.buttons,
+                  a.scale_mode, a.step, a.min_label, a.max_label, a.min_value, a.max_value,
                   q.word_cloud_options_id, wc.name as word_cloud_name, wc.words,
                   q.max_selections, q.continuous_axes
            FROM questions q
@@ -119,10 +120,16 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
             id: question.id,
             text: question.text,
             type: question.type,
-            answerScale: question.buttons ? {
+            answerScale: question.answer_scale_id ? {
               id: question.answer_scale_id,
               name: question.scale_name,
-              buttons: question.buttons,
+              buttons: question.buttons || [],
+              scaleMode: question.scale_mode || 'normal',
+              step: question.step !== null && question.step !== undefined ? parseFloat(question.step) : 1,
+              minLabel: question.min_label || null,
+              maxLabel: question.max_label || null,
+              minValue: question.min_value !== null && question.min_value !== undefined ? parseFloat(question.min_value) : null,
+              maxValue: question.max_value !== null && question.max_value !== undefined ? parseFloat(question.max_value) : null,
             } : null,
             wordCloudOptions: question.words ? {
               id: question.word_cloud_options_id,
