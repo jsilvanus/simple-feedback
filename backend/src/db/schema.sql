@@ -1,6 +1,6 @@
-ALTER TABLE schedules
-DROP CONSTRAINT IF EXISTS schedules_check1;
 -- Database schema for Simple Feedback App
+-- Clean, standalone schema — run via db:init for fresh installations.
+-- For existing databases, use db:migrate (runs migrations/ in order).
 
 CREATE TABLE IF NOT EXISTS location_groups (
     id SERIAL PRIMARY KEY,
@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS locations (
     name VARCHAR(255) NOT NULL,
     active BOOLEAN DEFAULT true,
     group_id INTEGER REFERENCES location_groups(id) ON DELETE SET NULL,
+    password_hash VARCHAR(255),
+    password_required BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -25,6 +27,12 @@ CREATE TABLE IF NOT EXISTS answer_scales (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     buttons JSONB NOT NULL,
+    scale_mode VARCHAR(20) DEFAULT 'normal' CHECK (scale_mode IN ('normal', 'bipolar')),
+    step NUMERIC(4,2) DEFAULT 1 CHECK (step >= 0.01 AND step <= 1),
+    min_label JSONB,
+    max_label JSONB,
+    min_value NUMERIC,
+    max_value NUMERIC,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -45,6 +53,7 @@ CREATE TABLE IF NOT EXISTS questions (
     word_cloud_options_id INTEGER REFERENCES word_cloud_options(id) ON DELETE SET NULL,
     max_selections INTEGER DEFAULT 3,
     continuous_axes JSONB,
+    archived BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -53,6 +62,7 @@ CREATE TABLE IF NOT EXISTS questionnaires (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
+    archived BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -70,11 +80,27 @@ CREATE TABLE IF NOT EXISTS schedules (
     location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
     location_group_id INTEGER REFERENCES location_groups(id) ON DELETE CASCADE,
     questionnaire_id INTEGER REFERENCES questionnaires(id) ON DELETE CASCADE,
+    schedule_type VARCHAR(20) DEFAULT 'date_based' CHECK (schedule_type IN ('date_based', 'recurring_weekday')),
+    weekday_pattern JSONB,
+    show_only_one BOOLEAN DEFAULT false,
     start_time TIMESTAMP,
     end_time TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CHECK (end_time > start_time OR end_time IS NULL)
+);
+
+CREATE TABLE IF NOT EXISTS schedule_questionnaires (
+    schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+    questionnaire_id INTEGER NOT NULL REFERENCES questionnaires(id) ON DELETE CASCADE,
+    display_order INTEGER DEFAULT 0,
+    PRIMARY KEY (schedule_id, questionnaire_id)
+);
+
+CREATE TABLE IF NOT EXISTS schedule_locations (
+    schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+    location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
+    location_group_id INTEGER REFERENCES location_groups(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS feedback_sessions (
@@ -88,160 +114,60 @@ CREATE TABLE IF NOT EXISTS feedback_answers (
     id SERIAL PRIMARY KEY,
     session_id INTEGER NOT NULL REFERENCES feedback_sessions(id) ON DELETE CASCADE,
     question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    value INTEGER,
+    value NUMERIC,
     text_value TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS schedule_questionnaires (
-    schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-    questionnaire_id INTEGER NOT NULL REFERENCES questionnaires(id) ON DELETE CASCADE,
-    display_order INTEGER DEFAULT 0,
-    PRIMARY KEY (schedule_id, questionnaire_id)
+CREATE TABLE IF NOT EXISTS images (
+    id SERIAL PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    size INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Backward-compatible schema updates for existing databases
-ALTER TABLE locations
-ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255),
-ADD COLUMN IF NOT EXISTS password_required BOOLEAN DEFAULT false;
+CREATE TABLE IF NOT EXISTS answer_views (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    view_type VARCHAR(50) NOT NULL CHECK (view_type IN ('radar')),
+    questionnaire_id INTEGER NOT NULL REFERENCES questionnaires(id) ON DELETE CASCADE,
+    config JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-ALTER TABLE schedules
-ADD COLUMN IF NOT EXISTS schedule_type VARCHAR(20) DEFAULT 'date_based',
-ADD COLUMN IF NOT EXISTS weekday_pattern JSONB,
-ADD COLUMN IF NOT EXISTS show_only_one BOOLEAN DEFAULT false;
+CREATE TABLE IF NOT EXISTS answer_view_questions (
+    answer_view_id INTEGER NOT NULL REFERENCES answer_views(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    axis_label VARCHAR(255),
+    display_order INTEGER DEFAULT 0,
+    PRIMARY KEY (answer_view_id, question_id)
+);
 
-UPDATE schedules SET schedule_type = 'date_based' WHERE schedule_type IS NULL;
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(255) PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-ALTER TABLE schedules
-DROP CONSTRAINT IF EXISTS schedules_schedule_type_check;
-
-ALTER TABLE schedules
-ADD CONSTRAINT schedules_schedule_type_check
-CHECK (schedule_type IN ('date_based', 'recurring_weekday'));
-
-INSERT INTO schedule_questionnaires (schedule_id, questionnaire_id, display_order)
-SELECT id, questionnaire_id, 0
-FROM schedules
-WHERE questionnaire_id IS NOT NULL
-ON CONFLICT DO NOTHING;
-
-ALTER TABLE questions
-ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false,
-ADD COLUMN IF NOT EXISTS answer_scale_id INTEGER REFERENCES answer_scales(id) ON DELETE SET NULL,
-ADD COLUMN IF NOT EXISTS word_cloud_options_id INTEGER REFERENCES word_cloud_options(id) ON DELETE SET NULL,
-ADD COLUMN IF NOT EXISTS max_selections INTEGER DEFAULT 3,
-ADD COLUMN IF NOT EXISTS continuous_axes JSONB;
-
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'questionnaire_questions'
-          AND column_name = 'answer_scale_id'
-    ) THEN
-        UPDATE questions q
-        SET answer_scale_id = qq.answer_scale_id
-        FROM (
-            SELECT DISTINCT ON (question_id) question_id, answer_scale_id
-            FROM questionnaire_questions
-            WHERE answer_scale_id IS NOT NULL
-            ORDER BY question_id, questionnaire_id
-        ) qq
-        WHERE q.id = qq.question_id
-          AND q.answer_scale_id IS NULL;
-    END IF;
-END $$;
-
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'questionnaire_questions'
-          AND column_name = 'word_cloud_options_id'
-    ) THEN
-        UPDATE questions q
-        SET word_cloud_options_id = qq.word_cloud_options_id
-        FROM (
-            SELECT DISTINCT ON (question_id) question_id, word_cloud_options_id
-            FROM questionnaire_questions
-            WHERE word_cloud_options_id IS NOT NULL
-            ORDER BY question_id, questionnaire_id
-        ) qq
-        WHERE q.id = qq.question_id
-          AND q.word_cloud_options_id IS NULL;
-    END IF;
-END $$;
-
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'questionnaire_questions'
-          AND column_name = 'max_selections'
-    ) THEN
-        UPDATE questions q
-        SET max_selections = qq.max_selections
-        FROM (
-            SELECT question_id, MAX(max_selections) AS max_selections
-            FROM questionnaire_questions
-            WHERE max_selections IS NOT NULL
-            GROUP BY question_id
-        ) qq
-        WHERE q.id = qq.question_id
-          AND q.max_selections IS NULL;
-    END IF;
-END $$;
-
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'questionnaire_questions'
-          AND column_name = 'answer_scale_id'
-    ) THEN
-        ALTER TABLE questionnaire_questions DROP COLUMN answer_scale_id;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'questionnaire_questions'
-          AND column_name = 'word_cloud_options_id'
-    ) THEN
-        ALTER TABLE questionnaire_questions DROP COLUMN word_cloud_options_id;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'questionnaire_questions'
-          AND column_name = 'max_selections'
-    ) THEN
-        ALTER TABLE questionnaire_questions DROP COLUMN max_selections;
-    END IF;
-END $$;
-
-ALTER TABLE questionnaires
-ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false;
-
--- Indexes for performance
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_locations_slug ON locations(slug);
 CREATE INDEX IF NOT EXISTS idx_locations_active ON locations(active);
 CREATE INDEX IF NOT EXISTS idx_locations_group ON locations(group_id);
 CREATE INDEX IF NOT EXISTS idx_schedules_location_time ON schedules(location_id, start_time, end_time);
 CREATE INDEX IF NOT EXISTS idx_schedules_location_group ON schedules(location_group_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_type ON schedules(schedule_type);
+CREATE INDEX IF NOT EXISTS idx_schedule_questionnaires_schedule ON schedule_questionnaires(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_locations_schedule ON schedule_locations(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_locations_location ON schedule_locations(location_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_locations_group ON schedule_locations(location_group_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_sessions_location ON feedback_sessions(location_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_sessions_timestamp ON feedback_sessions(timestamp);
 CREATE INDEX IF NOT EXISTS idx_feedback_answers_session ON feedback_answers(session_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_answers_question ON feedback_answers(question_id);
-DROP INDEX IF EXISTS idx_questionnaire_questions_wordcloud;
 CREATE INDEX IF NOT EXISTS idx_questions_wordcloud_options ON questions(word_cloud_options_id);
-CREATE INDEX IF NOT EXISTS idx_schedule_questionnaires_schedule ON schedule_questionnaires(schedule_id);
-CREATE INDEX IF NOT EXISTS idx_schedules_type ON schedules(schedule_type);
 CREATE INDEX IF NOT EXISTS idx_questions_archived ON questions(archived);
 CREATE INDEX IF NOT EXISTS idx_questions_continuous_axes ON questions USING GIN(continuous_axes);
 CREATE INDEX IF NOT EXISTS idx_questionnaires_archived ON questionnaires(archived);
