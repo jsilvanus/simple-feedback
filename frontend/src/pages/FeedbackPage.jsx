@@ -6,6 +6,7 @@ import { api } from '../api';
 import LanguageSelector from '../components/LanguageSelector';
 import SettingsButton from '../components/SettingsButton';
 import SettingsModal from '../components/SettingsModal';
+import MultiScaleQuestion from '../components/MultiScaleQuestion';
 import './FeedbackPage.css';
 
 export default function FeedbackPage() {
@@ -179,6 +180,19 @@ export default function FeedbackPage() {
     }));
   };
 
+  const handleScaleItemAnswer = (questionId, itemId, value) => {
+    setAnswers(prev => {
+      const existing = prev[questionId] || {};
+      return {
+        ...prev,
+        [questionId]: {
+          ...existing,
+          scaleItems: { ...(existing.scaleItems || {}), [itemId]: value },
+        },
+      };
+    });
+  };
+
   const handleNext = () => {
     if (currentPage < data.questionnaire.pages.length - 1) {
       setCurrentPage(prev => prev + 1);
@@ -196,21 +210,36 @@ export default function FeedbackPage() {
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
-      
-      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
-        const normalizedValue = typeof answer.value === 'number' ? answer.value : null;
 
+      const formattedAnswers = [];
+
+      Object.entries(answers).forEach(([questionId, answer]) => {
+        // Multi-scale question: emit one answer per scale item
+        if (answer.scaleItems && Object.keys(answer.scaleItems).length > 0) {
+          Object.entries(answer.scaleItems).forEach(([itemId, value]) => {
+            formattedAnswers.push({
+              questionId: parseInt(questionId),
+              scaleItemId: parseInt(itemId),
+              value: typeof value === 'number' ? value : null,
+              textValue: null,
+            });
+          });
+          return;
+        }
+
+        // Legacy single-scale / text / wordcloud answers
+        const normalizedValue = typeof answer.value === 'number' ? answer.value : null;
         const normalizedTextValue = Array.isArray(answer.wordArray)
           ? (answer.wordArray.length > 0 ? answer.wordArray.join(', ') : null)
           : (answer.value && typeof answer.value === 'object'
               ? JSON.stringify(answer.value)
               : (answer.textValue || null));
 
-        return {
+        formattedAnswers.push({
           questionId: parseInt(questionId),
           value: normalizedValue,
           textValue: normalizedTextValue,
-        };
+        });
       });
 
       await api.submitFeedback(
@@ -339,7 +368,16 @@ export default function FeedbackPage() {
             <div key={question.id} className="question">
               <h3>{question.text}</h3>
 
-              {question.type === 'scale' && question.answerScale && (
+              {question.type === 'scale' && Array.isArray(question.scaleItems) && question.scaleItems.length > 0 && (
+                <MultiScaleQuestion
+                  question={question}
+                  itemAnswers={answers[question.id]?.scaleItems || {}}
+                  onItemAnswer={(itemId, value) => handleScaleItemAnswer(question.id, itemId, value)}
+                />
+              )}
+
+              {question.type === 'scale' && question.answerScale &&
+                (!Array.isArray(question.scaleItems) || question.scaleItems.length === 0) && (
                 question.answerScale.step < 1 ? (() => {
                   const scale = question.answerScale;
                   const buttons = scale.buttons || [];

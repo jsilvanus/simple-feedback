@@ -107,8 +107,33 @@ export default function AdminResults() {
           maxValue: result.max_value !== null && result.max_value !== undefined ? parseFloat(result.max_value) : null,
           continuousAxes: result.continuous_axes || [],
           wordCloudWords: result.word_cloud_words || null,
+          // Multi-scale: keyed by scale_item_id
+          scaleItemsData: {},
         };
       }
+
+      // Handle multi-scale item answers
+      if (result.scale_item_id) {
+        const itemId = result.scale_item_id;
+        const qData = byQuestion[result.question_text];
+        if (!qData.scaleItemsData[itemId]) {
+          qData.scaleItemsData[itemId] = {
+            id: itemId,
+            label: result.scale_item_label,
+            orderIndex: result.scale_item_order ?? 0,
+            values: [],
+            scaleStep: result.scale_step ? parseFloat(result.scale_step) : 1,
+          };
+        }
+        if (result.value !== null) {
+          const numValue = parseFloat(result.value);
+          if (!isNaN(numValue)) {
+            qData.scaleItemsData[itemId].values.push(numValue);
+          }
+        }
+        return;
+      }
+
       if (result.value !== null) {
         // Parse to float — feedback_answers.value is NUMERIC (may come as string from pg)
         const numValue = parseFloat(result.value);
@@ -426,7 +451,52 @@ export default function AdminResults() {
           <div key={question} className="question-analytics">
             <h4>{question}</h4>
             
-            {data.type === 'scale' && data.values.length > 0 && (
+            {data.type === 'scale' && Object.keys(data.scaleItemsData || {}).length > 0 && (
+              <div className="scale-analytics">
+                <div className="stat-row">
+                  <span>Multi-scale question — {Object.keys(data.scaleItemsData).length} items</span>
+                </div>
+                <div className="multi-scale-breakdown">
+                  {Object.values(data.scaleItemsData)
+                    .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+                    .map(item => {
+                      const itemLabelText = getLabelText(item.label) || `Item ${item.id}`;
+                      const avg = item.values.length > 0 ? getAverage(item.values) : null;
+                      const totalWidth = item.values.length > 0 ? Math.max(...item.values) : 1;
+                      return (
+                        <div key={item.id} className="scale-item-breakdown">
+                          <div className="scale-item-breakdown-label">
+                            <span>{itemLabelText}</span>
+                            <span className="scale-item-breakdown-stats">
+                              {avg !== null && <strong>{avg}</strong>}
+                              <span className="response-count">({item.values.length})</span>
+                            </span>
+                          </div>
+                          {item.values.length > 0 && (
+                            <div className="distribution">
+                              <div className="chart">
+                                {Object.entries(getDistribution(item.values, item.scaleStep))
+                                  .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
+                                  .map(([value, count]) => (
+                                    <div key={value} className="bar-container">
+                                      <span className="bar-label">{value}</span>
+                                      <div className="bar-wrapper">
+                                        <div className="bar" style={{ width: `${(count / item.values.length) * 100}%` }} />
+                                        <span className="bar-count">{count}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {data.type === 'scale' && data.values.length > 0 && Object.keys(data.scaleItemsData || {}).length === 0 && (
               <div className="scale-analytics">
                 <div className="stat-row">
                   <span>Average Score:</span>

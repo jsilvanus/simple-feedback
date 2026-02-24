@@ -1,0 +1,330 @@
+/* MultiScaleQuestion component styles */
+
+/* ===== Common ===== */
+.ms-end-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+/* ===== Stacked / Compact layouts ===== */
+.ms-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ms-compact {
+  gap: 12px;
+}
+
+.ms-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-item-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #444;
+}
+
+/* ===== Buttons renderer ===== */
+.ms-buttons-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ms-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ms-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: #333;
+}
+
+.ms-btn:hover {
+  border-color: #667eea;
+  background: #f0f2ff;
+}
+
+.ms-btn.selected {
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ===== Slider renderer ===== */
+.ms-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ms-slider {
+  width: 100%;
+  height: 6px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.ms-slider-value {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #667eea;
+  min-height: 24px;
+}
+
+.ms-slider-value .no-selection {
+  color: #bbb;
+}
+
+/* ===== Labeled line renderer ===== */
+.ms-labeled-line-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ms-labeled-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  padding-top: 12px;
+}
+
+.ms-labeled-line::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ddd;
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+.ms-tick-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.ms-tick {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #aaa;
+  background: #fff;
+  transition: all 0.15s ease;
+}
+
+.ms-tick:hover {
+  border-color: #667eea;
+  background: #f0f2ff;
+}
+
+.ms-tick.selected {
+  border-color: transparent;
+}
+
+.ms-tick-label {
+  font-size: 11px;
+  color: #888;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ===== Stars renderer ===== */
+.ms-stars-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ms-stars {
+  display: flex;
+  gap: 4px;
+}
+
+.ms-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+  color: #f5a623;
+  padding: 4px;
+  transition: transform 0.1s ease;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ms-star:hover {
+  transform: scale(1.15);
+}
+
+.ms-star.filled {
+  color: #f5a623;
+}
+
+.ms-star-value {
+  font-size: 14px;
+  color: #888;
+  margin-left: 4px;
+}
+
+/* ===== Thumbs renderer ===== */
+.ms-thumbs-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ms-thumbs {
+  display: flex;
+  gap: 16px;
+}
+
+.ms-thumb {
+  background: none;
+  border: 2px solid #ddd;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 28px;
+  padding: 8px 20px;
+  min-height: 56px;
+  transition: all 0.15s ease;
+}
+
+.ms-thumb:hover {
+  border-color: #667eea;
+  background: #f0f2ff;
+}
+
+.ms-thumb-up.selected {
+  border-color: #2ecc71;
+  background: #e8f9f0;
+}
+
+.ms-thumb-down.selected {
+  border-color: #e74c3c;
+  background: #fde8e8;
+}
+
+/* ===== Matrix layout ===== */
+.ms-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ms-matrix-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #eee;
+}
+
+.ms-matrix-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.ms-matrix-row-label {
+  min-width: 120px;
+  font-size: 14px;
+  color: #444;
+  font-weight: 500;
+}
+
+.ms-matrix-col-header {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+  font-weight: 600;
+}
+
+.ms-matrix-cell {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.ms-matrix-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #aaa;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ms-matrix-btn:hover {
+  border-color: #667eea;
+  background: #f0f2ff;
+}
+
+.ms-matrix-btn.selected {
+  border-color: transparent;
+}
+
+.ms-matrix-footer {
+  display: flex;
+  align-items: center;
+  padding-top: 6px;
+}
+
+.ms-matrix-end-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.ms-matrix-end-label-right {
+  font-size: 12px;
+  color: #888;
+  margin-left: auto;
+}
+
+/* ===== High-contrast mode ===== */
+.contrast-mode .ms-btn {
+  border-width: 3px;
+}
+
+.contrast-mode .ms-btn.selected {
+  outline: 3px solid #fff;
+}
+
+.contrast-mode .ms-item-label {
+  color: #000;
+}

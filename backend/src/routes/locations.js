@@ -100,7 +100,8 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
                   q.answer_scale_id, a.name as scale_name, a.buttons,
                   a.scale_mode, a.step, a.min_label, a.max_label, a.min_value, a.max_value,
                   q.word_cloud_options_id, wc.name as word_cloud_name, wc.words,
-                  q.max_selections, q.continuous_axes
+                  q.max_selections, q.continuous_axes,
+                  q.multi_scale_layout, q.multi_scale_defaults
            FROM questions q
            JOIN questionnaire_questions qq ON q.id = qq.question_id
            LEFT JOIN answer_scales a ON q.answer_scale_id = a.id
@@ -110,6 +111,62 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
            ORDER BY qq.page_number, qq.order_index`,
           [q.id]
         );
+
+        // Fetch scale items for scale questions
+        const scaleQuestionIds = questionsResult.rows
+          .filter(r => r.type === 'scale')
+          .map(r => r.id);
+
+        const scaleItemsByQuestion = {};
+        if (scaleQuestionIds.length > 0) {
+          const scaleItemsResult = await db.query(
+            `SELECT qsi.*,
+                    a.name as scale_name, a.buttons, a.scale_mode, a.step,
+                    a.min_label, a.max_label, a.min_value, a.max_value
+             FROM question_scale_items qsi
+             JOIN answer_scales a ON qsi.answer_scale_id = a.id
+             WHERE qsi.question_id = ANY($1)
+             ORDER BY qsi.question_id, qsi.order_index`,
+            [scaleQuestionIds]
+          );
+
+          const defaults = {};
+          questionsResult.rows.forEach(r => {
+            if (r.type === 'scale') defaults[r.id] = r.multi_scale_defaults || {};
+          });
+
+          scaleItemsResult.rows.forEach(item => {
+            if (!scaleItemsByQuestion[item.question_id]) {
+              scaleItemsByQuestion[item.question_id] = [];
+            }
+            const qDefaults = defaults[item.question_id] || {};
+            scaleItemsByQuestion[item.question_id].push({
+              id: item.id,
+              answerScaleId: item.answer_scale_id,
+              label: item.label,
+              orderIndex: item.order_index,
+              // Resolve display settings: item override → question defaults
+              displayMode: item.display_mode || qDefaults.displayMode || null,
+              showEndLabels: item.show_end_labels !== null ? item.show_end_labels : (qDefaults.showEndLabels !== undefined ? qDefaults.showEndLabels : true),
+              showValueLabels: item.show_value_labels !== null ? item.show_value_labels : (qDefaults.showValueLabels !== undefined ? qDefaults.showValueLabels : true),
+              showItemLabel: item.show_item_label !== null ? item.show_item_label : (qDefaults.showItemLabel !== undefined ? qDefaults.showItemLabel : true),
+              minLabelOverride: item.min_label_override || null,
+              maxLabelOverride: item.max_label_override || null,
+              required: item.required !== null ? item.required : true,
+              scale: {
+                id: item.answer_scale_id,
+                name: item.scale_name,
+                buttons: item.buttons || [],
+                scaleMode: item.scale_mode || 'normal',
+                step: item.step !== null ? parseFloat(item.step) : 1,
+                minLabel: item.min_label || null,
+                maxLabel: item.max_label || null,
+                minValue: item.min_value !== null && item.min_value !== undefined ? parseFloat(item.min_value) : null,
+                maxValue: item.max_value !== null && item.max_value !== undefined ? parseFloat(item.max_value) : null,
+              },
+            });
+          });
+        }
 
         // Group questions by page
         const pages = {};
@@ -139,6 +196,9 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
             } : null,
             maxSelections: question.max_selections || 3,
             continuousAxes: Array.isArray(question.continuous_axes) ? question.continuous_axes : [],
+            scaleItems: scaleItemsByQuestion[question.id] || [],
+            multiScaleLayout: question.multi_scale_layout || 'stacked',
+            multiScaleDefaults: question.multi_scale_defaults || {},
           });
         });
 
