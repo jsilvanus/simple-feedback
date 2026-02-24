@@ -160,7 +160,14 @@
     "resultsDesc": "Visa och exportera feedbackdata",
     "results": "Resultat",
     "export": "Exportera",
-    "answerScales": "Svarsskalor"
+    "answerScales": "Svarsskalor",
+    "answerViews": "Svarsvyer",
+    "addAnswerView": "Lägg till svarsvy",
+    "addNewAnswerView": "Lägg till ny svarsvy",
+    "editAnswerView": "Redigera svarsvy",
+    "loadingAnswerViews": "Laddar svarsvyer...",
+    "noAnswerViewsYet": "Inga svarsvyer ännu. Lägg till din första svarsvy för att komma igång.",
+    "answerViewsDesc": "Skapa sammansatta radarvisualiseringar som kombinerar flera skalafrågor"
   },
   "map": {
     "back": "Tillbaka",

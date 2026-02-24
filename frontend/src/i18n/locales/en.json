@@ -160,7 +160,14 @@
     "resultsDesc": "View and export feedback data",
     "results": "Results",
     "export": "Export",
-    "answerScales": "Answer Scales"
+    "answerScales": "Answer Scales",
+    "answerViews": "Answer Views",
+    "addAnswerView": "Add Answer View",
+    "addNewAnswerView": "Add New Answer View",
+    "editAnswerView": "Edit Answer View",
+    "loadingAnswerViews": "Loading answer views...",
+    "noAnswerViewsYet": "No answer views yet. Add your first answer view to get started.",
+    "answerViewsDesc": "Create composite radar visualizations combining multiple scale questions"
   },
   "map": {
     "back": "Back",

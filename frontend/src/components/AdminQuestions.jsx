@@ -123,7 +123,10 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
             <option value="scale">Scale (buttons)</option>
             <option value="text">Text input</option>
             <option value="wordcloud">Word set</option>
-            <option value="continuous_scale">Continuous Scale (Radar)</option>
+            {/* continuous_scale is legacy — hidden from new question creation; existing questions still display */}
+            {entity && entity.type === 'continuous_scale' && (
+              <option value="continuous_scale">Continuous Scale (Radar) — legacy</option>
+            )}
           </select>
         </div>
 
