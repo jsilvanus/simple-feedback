@@ -9,6 +9,17 @@
   margin-bottom: 6px;
 }
 
+/* MultiScaleQuestion component styles */
+
+/* ===== Common ===== */
+.ms-end-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
 /* ===== Stacked / Compact layouts ===== */
 .ms-stacked {
   display: flex;
@@ -43,20 +54,24 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  width: 100%;
 }
 
 .ms-btn {
-  min-width: 44px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
-  padding: 8px 14px;
+  padding: 8px 12px;
   border: 2px solid #ddd;
   border-radius: 8px;
   background: #fff;
-  font-size: 15px;
+  font-size: clamp(13px, 3vw, 16px);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
   color: #333;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .ms-btn:hover {
@@ -165,20 +180,23 @@
 
 .ms-stars {
   display: flex;
-  gap: 4px;
+  gap: 6px;
+  width: 100%;
+  justify-content: space-between;
 }
 
 .ms-star {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 28px;
+  font-size: clamp(40px, 5vw, 28px);
   line-height: 1;
   color: #f5a623;
-  padding: 4px;
-  transition: transform 0.1s ease;
-  min-width: 44px;
-  min-height: 44px;
+  padding: 6px;
+  transition: transform 0.12s ease;
+  min-height: 40px;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -188,37 +206,40 @@
   transform: scale(1.15);
 }
 
-.ms-star.filled {
+.ms-stars {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+}
+.ms-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: clamp(40px, 7.5vw, 44px);
+  line-height: 1;
   color: #f5a623;
-}
-
-.ms-star-value {
-  font-size: 14px;
-  color: #888;
-  margin-left: 4px;
-}
-
-/* ===== Thumbs renderer ===== */
-.ms-thumbs-wrapper {
+  padding: 8px 10px;
+  transition: transform 0.12s ease;
+  min-height: 56px;
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ms-thumbs {
-  display: flex;
-  gap: 16px;
+  align-items: center;
+  justify-content: center;
 }
 
 .ms-thumb {
+  flex: 1 1 0;
+  min-width: 0;
   background: none;
   border: 2px solid #ddd;
   border-radius: 12px;
   cursor: pointer;
-  font-size: 28px;
-  padding: 8px 20px;
-  min-height: 56px;
-  transition: all 0.15s ease;
+  font-size: clamp(18px, 4.5vw, 28px);
+  padding: 8px 12px;
+  min-height: 48px;
+  transition: all 0.12s ease;
 }
 
 .ms-thumb:hover {

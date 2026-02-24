@@ -886,15 +886,59 @@ router.put('/questions/:id', async (req, res, next) => {
       question = result.rows[0];
     }
 
-    // Replace scale items if provided
+    // Replace scale items if provided (upsert to preserve IDs for historical answers)
     if (finalType === 'scale' && scaleItems !== undefined) {
-      await client.query('DELETE FROM question_scale_items WHERE question_id = $1', [id]);
-      for (const item of scaleItems) {
+      const existingResult = await client.query(
+        'SELECT id FROM question_scale_items WHERE question_id = $1',
+        [id]
+      );
+      const existingIds = new Set(existingResult.rows.map(r => r.id));
+
+      const incomingWithId   = scaleItems.filter(item => item.id && existingIds.has(item.id));
+      const incomingNewItems = scaleItems.filter(item => !item.id || !existingIds.has(item.id));
+      const incomingIds      = new Set(incomingWithId.map(item => item.id));
+      const idsToDelete      = [...existingIds].filter(eid => !incomingIds.has(eid));
+
+      // Delete only truly removed items
+      if (idsToDelete.length > 0) {
+        await client.query(
+          'DELETE FROM question_scale_items WHERE id = ANY($1)',
+          [idsToDelete]
+        );
+      }
+
+      // Update items that already exist (preserve their IDs)
+      for (const item of incomingWithId) {
+        await client.query(
+          `UPDATE question_scale_items SET
+             answer_scale_id = $1, label = $2, order_index = $3, display_mode = $4,
+             show_end_labels = $5, show_value_labels = $6, show_item_label = $7,
+             min_label_override = $8, max_label_override = $9, required = $10
+           WHERE id = $11 AND question_id = $12`,
+          [
+            item.answerScaleId,
+            JSON.stringify(item.label || {}),
+            item.orderIndex ?? 0,
+            item.displayMode || null,
+            item.showEndLabels !== undefined ? item.showEndLabels : true,
+            item.showValueLabels !== undefined ? item.showValueLabels : true,
+            item.showItemLabel !== undefined ? item.showItemLabel : true,
+            item.minLabelOverride ? JSON.stringify(item.minLabelOverride) : null,
+            item.maxLabelOverride ? JSON.stringify(item.maxLabelOverride) : null,
+            item.required !== undefined ? item.required : true,
+            item.id,
+            id,
+          ]
+        );
+      }
+
+      // Insert genuinely new items
+      for (const item of incomingNewItems) {
         await client.query(
           `INSERT INTO question_scale_items
-           (question_id, answer_scale_id, label, order_index, display_mode,
-            show_end_labels, show_value_labels, show_item_label,
-            min_label_override, max_label_override, required)
+             (question_id, answer_scale_id, label, order_index, display_mode,
+              show_end_labels, show_value_labels, show_item_label,
+              min_label_override, max_label_override, required)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             id,

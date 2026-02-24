@@ -173,22 +173,26 @@ body.contrast-mode .wordcloud-placeholder {
 
 .answer-buttons {
   display: flex;
-  gap: 15px;
+  gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .answer-btn {
-  flex: 1;
-  min-width: 100px;
+  flex: 1 1 0;
+  min-width: 0;
   padding: calc(10px * var(--ui-scale));
-  font-size: calc(40px * var(--ui-scale));
+  font-size: clamp(16px, 3.5vw, calc(28px * var(--ui-scale)));
   font-weight: 600;
   border: 2px solid transparent;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.18s ease;
   background: #f0f0f0;
   color: #333;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .answer-btn:hover {
@@ -198,46 +202,28 @@ body.contrast-mode .wordcloud-placeholder {
 
 .answer-btn.selected {
   border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.25);
+  box-shadow: 0 0 0 6px rgba(102, 126, 234, 0.12);
   background: #e6eaff;
   color: #333;
 }
 
-/* Enhanced selected styling: larger, red outline and arrow pointer */
+/* Tame selected styling so it doesn't overflow on small screens */
 .answer-buttons { overflow: visible; }
 .answer-btn { position: relative; }
 .answer-btn.selected {
-  transform: scale(1.18);
-  box-shadow: 0 0 0 12px rgba(220, 40, 40, 0.12), 0 6px 18px rgba(0,0,0,0.08);
-  border-color: #ff4d4f;
-
+  transform: scale(1.06);
+}
 .answer-btn.selected::after {
   content: '';
   position: absolute;
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 14px solid rgba(220,40,40,0.95);
+  left: 50%;
+  transform: translateX(-50%);
   bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-  /* wide red ring */
-  box-shadow: 0 0 0 6px rgba(255, 77, 79, 0.08), 0 0 0 3px rgba(255, 77, 79, 0.18) inset;
-  background: #ffecec;
-}
-.answer-btn.selected::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: -12px;
   width: 0;
   height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 12px solid #ff4d4f;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid rgba(255,77,79,0.95);
 }
 
 .text-input {
@@ -278,16 +264,18 @@ body.contrast-mode .wordcloud-placeholder {
 }
 
 .word-chip {
-  padding: calc(12px * var(--ui-scale)) calc(24px * var(--ui-scale));
-  font-size: calc(16px * var(--ui-scale));
+  padding: calc(10px * var(--ui-scale)) calc(18px * var(--ui-scale));
+  font-size: clamp(13px, 2.6vw, calc(16px * var(--ui-scale)));
   font-weight: 600;
   border: 2px solid transparent;
-  border-radius: calc(25px * var(--ui-scale));
+  border-radius: calc(20px * var(--ui-scale));
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.18s ease;
   background: #f0f0f0;
   color: #333;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .word-chip:hover:not(.disabled) {
@@ -320,9 +308,9 @@ body.contrast-mode .wordcloud-placeholder {
 }
 
 .submit-btn {
-  padding: calc(18px * var(--ui-scale)) calc(48px * var(--ui-scale));
-  font-size: calc(40px * var(--ui-scale));
-  min-width: calc(220px * var(--ui-scale));
+  padding: calc(14px * var(--ui-scale)) calc(36px * var(--ui-scale));
+  font-size: clamp(16px, 3.5vw, calc(26px * var(--ui-scale)));
+  min-width: 140px;
 }
 
 .page-indicator-bottom {
@@ -425,43 +413,25 @@ body.contrast-mode .wordcloud-placeholder {
   margin-top: 10px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .feedback-container {
-    transform: scale(1.04);
-    box-shadow: 0 0 0 8px rgba(220, 40, 40, 0.12);
-
-  .answer-buttons {
-    flex-direction: column;
-    width: 92%;
-
-  .answer-btn {
-
-  .word-chip { width: auto; flex: 0 1 48%; }
-    min-width: auto;
+    padding: 24px;
   }
-}
 
-/* Mobile-specific adjustments to prevent selected button overflow */
-@media (max-width: 768px) {
   .answer-buttons {
-    align-items: center;
-    gap: 12px;
+    gap: 10px;
   }
 
   .answer-btn {
-    width: 92%;
-    max-width: 92%;
-    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
   }
 
   .answer-btn.selected {
-    transform: scale(1.06);
+    transform: scale(1.04);
   }
 
-  .answer-btn.selected::after {
-    bottom: -10px;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-top: 10px solid #ff4d4f;
+  .word-chip {
+    flex: 1 1 48%;
   }
 }
