@@ -381,6 +381,84 @@ router.put('/word-cloud-options/:id', async (req, res, next) => {
 });
 
 /**
+ * Word set route aliases (word-sets -> word-cloud-options for backward compat)
+ * GET /api/admin/word-sets
+ * POST /api/admin/word-sets
+ * PUT /api/admin/word-sets/:id
+ */
+router.get('/word-sets', async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM word_cloud_options ORDER BY name'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/word-sets', async (req, res, next) => {
+  try {
+    const { name, words } = req.body;
+
+    if (!name || !words || !Array.isArray(words)) {
+      return res.status(400).json({ error: { message: 'Name and words array are required' } });
+    }
+
+    const result = await db.query(
+      'INSERT INTO word_cloud_options (name, words) VALUES ($1, $2) RETURNING *',
+      [name, JSON.stringify(words)]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/word-sets/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, words } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+
+    if (words !== undefined) {
+      if (!Array.isArray(words)) {
+        return res.status(400).json({ error: { message: 'words must be an array' } });
+      }
+      updates.push(`words = $${paramCount++}`);
+      values.push(JSON.stringify(words));
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `UPDATE word_cloud_options SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Word set not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * DELETE /api/admin/locations/:id
  * Delete a location
  */

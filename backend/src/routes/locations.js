@@ -106,6 +106,7 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
            LEFT JOIN answer_scales a ON q.answer_scale_id = a.id
            LEFT JOIN word_cloud_options wc ON q.word_cloud_options_id = wc.id
            WHERE qq.questionnaire_id = $1
+             AND q.type IN ('scale', 'text', 'wordcloud')
            ORDER BY qq.page_number, qq.order_index`,
           [q.id]
         );

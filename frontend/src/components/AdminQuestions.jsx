@@ -122,7 +122,7 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
           >
             <option value="scale">Scale (buttons)</option>
             <option value="text">Text input</option>
-            <option value="wordcloud">Word cloud</option>
+            <option value="wordcloud">Word set</option>
             <option value="continuous_scale">Continuous Scale (Radar)</option>
           </select>
         </div>
@@ -172,12 +172,12 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
         {formData.type === 'wordcloud' && (
           <>
             <div className="form-group">
-              <label>Word Cloud Options</label>
+              <label>Word Set Options</label>
               <select
                 value={formData.wordCloudOptionsId}
                 onChange={(e) => setFormData({ ...formData, wordCloudOptionsId: e.target.value ? parseInt(e.target.value, 10) : '' })}
               >
-                <option value="">No word cloud options</option>
+                <option value="">No word set options</option>
                 {(wordClouds || []).map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.name}
@@ -284,6 +284,16 @@ export default function AdminQuestions() {
     }
   };
 
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case 'scale': return 'scale';
+      case 'text': return 'text';
+      case 'wordcloud': return 'word set';
+      case 'continuous_scale': return 'continuous_scale';
+      default: return type;
+    }
+  };
+
   if (loading) return <div className="loading">{t('admin.loadingQuestions')}</div>;
   if (error) return <div className="error">{t('common.error')}: {error}</div>;
 
@@ -341,7 +351,7 @@ export default function AdminQuestions() {
                 <tr key={question.id} className={question.archived ? 'archived-row' : ''}>
                   <td>
                     <span className="type-badge" title={question.type}>
-                      {getTypeIcon(question.type)} {question.type}
+                      {getTypeIcon(question.type)} {getTypeLabel(question.type)}
                     </span>
                   </td>
                   <td>{question.text}</td>

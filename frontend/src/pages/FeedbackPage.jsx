@@ -6,9 +6,7 @@ import { api } from '../api';
 import LanguageSelector from '../components/LanguageSelector';
 import SettingsButton from '../components/SettingsButton';
 import SettingsModal from '../components/SettingsModal';
-import RadarChart from '../components/RadarChart';
 import './FeedbackPage.css';
-import WordCloudInput from '../components/WordCloudInput';
 
 export default function FeedbackPage() {
   const { locationSlug } = useParams();
@@ -333,7 +331,11 @@ export default function FeedbackPage() {
         </header>
 
         <div className="feedback-content">
-          {currentPageData.questions.map(question => (
+          {currentPageData.questions.map(question => {
+            // Defense-in-depth: continuous_scale is not shown in kiosk mode
+            if (question.type === 'continuous_scale') return null;
+
+            return (
             <div key={question.id} className="question">
               <h3>{question.text}</h3>
 
@@ -460,15 +462,9 @@ export default function FeedbackPage() {
                 </div>
               )}
 
-              {question.type === 'continuous_scale' && question.answerScale && (
-                <RadarChart
-                  question={question}
-                  value={answers[question.id]?.value}
-                  onChange={(value) => handleAnswer(question.id, value)}
-                />
-              )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="feedback-actions">
