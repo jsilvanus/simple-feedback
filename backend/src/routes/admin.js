@@ -596,7 +596,7 @@ router.delete('/location-groups/:id', async (req, res, next) => {
 router.get('/questions', async (req, res, next) => {
   try {
     const { includeArchived } = req.query;
-    
+
     let query = 'SELECT * FROM questions';
     if (includeArchived !== 'true') {
       query += ' WHERE archived = false';
@@ -604,7 +604,59 @@ router.get('/questions', async (req, res, next) => {
     query += ' ORDER BY id';
 
     const result = await db.query(query);
-    res.json(result.rows);
+    const questions = result.rows;
+
+    // Fetch scale items for all questions
+    if (questions.length > 0) {
+      const questionIds = questions.map(q => q.id);
+      const scaleItemsResult = await db.query(
+        `SELECT qsi.*,
+                a.name as scale_name, a.buttons, a.scale_mode, a.step,
+                a.min_label, a.max_label, a.min_value, a.max_value
+         FROM question_scale_items qsi
+         JOIN answer_scales a ON qsi.answer_scale_id = a.id
+         WHERE qsi.question_id = ANY($1)
+         ORDER BY qsi.question_id, qsi.order_index`,
+        [questionIds]
+      );
+
+      const scaleItemsByQuestion = {};
+      scaleItemsResult.rows.forEach(item => {
+        if (!scaleItemsByQuestion[item.question_id]) {
+          scaleItemsByQuestion[item.question_id] = [];
+        }
+        scaleItemsByQuestion[item.question_id].push({
+          id: item.id,
+          answerScaleId: item.answer_scale_id,
+          label: item.label,
+          orderIndex: item.order_index,
+          displayMode: item.display_mode,
+          showEndLabels: item.show_end_labels,
+          showValueLabels: item.show_value_labels,
+          showItemLabel: item.show_item_label,
+          minLabelOverride: item.min_label_override,
+          maxLabelOverride: item.max_label_override,
+          required: item.required,
+          scale: {
+            id: item.answer_scale_id,
+            name: item.scale_name,
+            buttons: item.buttons || [],
+            scaleMode: item.scale_mode || 'normal',
+            step: item.step !== null ? parseFloat(item.step) : 1,
+            minLabel: item.min_label || null,
+            maxLabel: item.max_label || null,
+            minValue: item.min_value !== null && item.min_value !== undefined ? parseFloat(item.min_value) : null,
+            maxValue: item.max_value !== null && item.max_value !== undefined ? parseFloat(item.max_value) : null,
+          },
+        });
+      });
+
+      questions.forEach(q => {
+        q.scaleItems = scaleItemsByQuestion[q.id] || [];
+      });
+    }
+
+    res.json(questions);
   } catch (error) {
     next(error);
   }
@@ -615,8 +667,12 @@ router.get('/questions', async (req, res, next) => {
  * Create a new question
  */
 router.post('/questions', async (req, res, next) => {
+  const client = await db.pool.connect();
   try {
-    const { text, type, answerScaleId, wordCloudOptionsId, maxSelections, continuousAxes } = req.body;
+    const {
+      text, type, answerScaleId, wordCloudOptionsId, maxSelections, continuousAxes,
+      scaleItems, multiScaleLayout, multiScaleDefaults,
+    } = req.body;
 
     if (!text || !type) {
       return res.status(400).json({ error: { message: 'Text and type are required' } });
@@ -639,6 +695,10 @@ router.post('/questions', async (req, res, next) => {
       }
     }
 
+    if (scaleItems !== undefined && !Array.isArray(scaleItems)) {
+      return res.status(400).json({ error: { message: 'scaleItems must be an array' } });
+    }
+
     const scaleId = ['scale', 'continuous_scale'].includes(type) ? (answerScaleId || null) : null;
     const cloudId = type === 'wordcloud' ? (wordCloudOptionsId || null) : null;
     const normalizedMaxSelections = type === 'wordcloud' ? (maxSelections || 3) : 3;
@@ -649,14 +709,59 @@ router.post('/questions', async (req, res, next) => {
         }))
       : null;
 
-    const result = await db.query(
-      'INSERT INTO questions (text, type, answer_scale_id, word_cloud_options_id, max_selections, continuous_axes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [text, type, scaleId, cloudId, normalizedMaxSelections, normalizedContinuousAxes ? JSON.stringify(normalizedContinuousAxes) : null]
+    const layout = multiScaleLayout || 'stacked';
+    const defaults = multiScaleDefaults || {};
+
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `INSERT INTO questions (text, type, answer_scale_id, word_cloud_options_id, max_selections,
+        continuous_axes, multi_scale_layout, multi_scale_defaults)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        text, type, scaleId, cloudId, normalizedMaxSelections,
+        normalizedContinuousAxes ? JSON.stringify(normalizedContinuousAxes) : null,
+        layout, JSON.stringify(defaults),
+      ]
     );
 
-    res.status(201).json(result.rows[0]);
+    const question = result.rows[0];
+
+    // Insert scale items if provided
+    if (type === 'scale' && Array.isArray(scaleItems) && scaleItems.length > 0) {
+      for (const item of scaleItems) {
+        await client.query(
+          `INSERT INTO question_scale_items
+           (question_id, answer_scale_id, label, order_index, display_mode,
+            show_end_labels, show_value_labels, show_item_label,
+            min_label_override, max_label_override, required)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [
+            question.id,
+            item.answerScaleId,
+            JSON.stringify(item.label || {}),
+            item.orderIndex ?? 0,
+            item.displayMode || null,
+            item.showEndLabels !== undefined ? item.showEndLabels : true,
+            item.showValueLabels !== undefined ? item.showValueLabels : true,
+            item.showItemLabel !== undefined ? item.showItemLabel : true,
+            item.minLabelOverride ? JSON.stringify(item.minLabelOverride) : null,
+            item.maxLabelOverride ? JSON.stringify(item.maxLabelOverride) : null,
+            item.required !== undefined ? item.required : true,
+          ]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    question.scaleItems = [];
+    res.status(201).json(question);
   } catch (error) {
+    await client.query('ROLLBACK');
     next(error);
+  } finally {
+    client.release();
   }
 });
 
@@ -665,9 +770,13 @@ router.post('/questions', async (req, res, next) => {
  * Update a question
  */
 router.put('/questions/:id', async (req, res, next) => {
+  const client = await db.pool.connect();
   try {
     const { id } = req.params;
-    const { text, type, answerScaleId, wordCloudOptionsId, maxSelections, continuousAxes } = req.body;
+    const {
+      text, type, answerScaleId, wordCloudOptionsId, maxSelections, continuousAxes,
+      scaleItems, multiScaleLayout, multiScaleDefaults,
+    } = req.body;
 
     const existingResult = await db.query('SELECT * FROM questions WHERE id = $1', [id]);
     if (existingResult.rows.length === 0) {
@@ -679,6 +788,10 @@ router.put('/questions/:id', async (req, res, next) => {
 
     if (continuousAxes !== undefined && !Array.isArray(continuousAxes)) {
       return res.status(400).json({ error: { message: 'continuousAxes must be an array' } });
+    }
+
+    if (scaleItems !== undefined && !Array.isArray(scaleItems)) {
+      return res.status(400).json({ error: { message: 'scaleItems must be an array' } });
     }
 
     const finalContinuousAxes = continuousAxes !== undefined ? continuousAxes : (existing.continuous_axes || []);
@@ -733,6 +846,16 @@ router.put('/questions/:id', async (req, res, next) => {
       values.push(JSON.stringify(normalizedAxes));
     }
 
+    if (multiScaleLayout !== undefined) {
+      updates.push(`multi_scale_layout = $${paramCount++}`);
+      values.push(multiScaleLayout || 'stacked');
+    }
+
+    if (multiScaleDefaults !== undefined) {
+      updates.push(`multi_scale_defaults = $${paramCount++}`);
+      values.push(JSON.stringify(multiScaleDefaults || {}));
+    }
+
     if (!['scale', 'continuous_scale'].includes(finalType) && answerScaleId === undefined) {
       updates.push(`answer_scale_id = NULL`);
     }
@@ -748,19 +871,56 @@ router.put('/questions/:id', async (req, res, next) => {
       updates.push(`continuous_axes = NULL`);
     }
 
-    if (updates.length === 0) {
+    if (updates.length === 0 && scaleItems === undefined) {
       return res.status(400).json({ error: { message: 'No fields to update' } });
     }
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    values.push(id);
+    await client.query('BEGIN');
 
-    const query = `UPDATE questions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
-    const result = await db.query(query, values);
+    let question = existing;
+    if (updates.length > 0) {
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(id);
+      const query = `UPDATE questions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+      const result = await client.query(query, values);
+      question = result.rows[0];
+    }
 
-    res.json(result.rows[0]);
+    // Replace scale items if provided
+    if (finalType === 'scale' && scaleItems !== undefined) {
+      await client.query('DELETE FROM question_scale_items WHERE question_id = $1', [id]);
+      for (const item of scaleItems) {
+        await client.query(
+          `INSERT INTO question_scale_items
+           (question_id, answer_scale_id, label, order_index, display_mode,
+            show_end_labels, show_value_labels, show_item_label,
+            min_label_override, max_label_override, required)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [
+            id,
+            item.answerScaleId,
+            JSON.stringify(item.label || {}),
+            item.orderIndex ?? 0,
+            item.displayMode || null,
+            item.showEndLabels !== undefined ? item.showEndLabels : true,
+            item.showValueLabels !== undefined ? item.showValueLabels : true,
+            item.showItemLabel !== undefined ? item.showItemLabel : true,
+            item.minLabelOverride ? JSON.stringify(item.minLabelOverride) : null,
+            item.maxLabelOverride ? JSON.stringify(item.maxLabelOverride) : null,
+            item.required !== undefined ? item.required : true,
+          ]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.json(question);
   } catch (error) {
+    await client.query('ROLLBACK');
     next(error);
+  } finally {
+    client.release();
   }
 });
 
@@ -1552,6 +1712,9 @@ router.get('/results', async (req, res, next) => {
         quest.type as question_type,
         fa.value,
         fa.text_value,
+        fa.scale_item_id,
+        qsi.label as scale_item_label,
+        qsi.order_index as scale_item_order,
         quest.answer_scale_id,
         a.buttons as answer_scale_buttons,
         a.scale_mode,
@@ -1570,6 +1733,7 @@ router.get('/results', async (req, res, next) => {
       JOIN questions quest ON fa.question_id = quest.id
       LEFT JOIN answer_scales a ON quest.answer_scale_id = a.id
       LEFT JOIN word_cloud_options wco ON quest.word_cloud_options_id = wco.id
+      LEFT JOIN question_scale_items qsi ON fa.scale_item_id = qsi.id
       WHERE 1=1
     `;
 
@@ -1690,12 +1854,15 @@ router.get('/export', async (req, res, next) => {
     const { locationId, questionnaireId, startDate, endDate } = req.query;
 
     let query = `
-      SELECT 
+      SELECT
         fs.id as session_id,
         fs.timestamp,
         l.name as location_name,
         q.name as questionnaire_name,
+        quest.id as question_id,
         quest.text as question_text,
+        fa.scale_item_id,
+        qsi.label as scale_item_label,
         fa.value,
         fa.text_value
       FROM feedback_sessions fs
@@ -1703,6 +1870,7 @@ router.get('/export', async (req, res, next) => {
       JOIN questionnaires q ON fs.questionnaire_id = q.id
       JOIN feedback_answers fa ON fs.id = fa.session_id
       JOIN questions quest ON fa.question_id = quest.id
+      LEFT JOIN question_scale_items qsi ON fa.scale_item_id = qsi.id
       WHERE 1=1
     `;
 
@@ -1738,10 +1906,18 @@ router.get('/export', async (req, res, next) => {
     const result = await db.query(query, params);
 
     // Convert to CSV
+    const getScaleItemLabel = (label) => {
+      if (!label) return '';
+      if (typeof label === 'string') {
+        try { label = JSON.parse(label); } catch { return label; }
+      }
+      return label.en || label.fi || label.sv || Object.values(label).find(v => v) || '';
+    };
+
     const csv = [
-      'Session ID,Timestamp,Location,Questionnaire,Question,Value,Text Value',
-      ...result.rows.map(row => 
-        `${row.session_id},"${row.timestamp}","${row.location_name}","${row.questionnaire_name}","${row.question_text}",${row.value || ''},"${row.text_value || ''}"`
+      'Session ID,Timestamp,Location,Questionnaire,Question ID,Question,Scale Item ID,Scale Item Label,Value,Text Value',
+      ...result.rows.map(row =>
+        `${row.session_id},"${row.timestamp}","${row.location_name}","${row.questionnaire_name}",${row.question_id},"${row.question_text}",${row.scale_item_id || ''},"${getScaleItemLabel(row.scale_item_label)}",${row.value || ''},"${row.text_value || ''}"`
       )
     ].join('\n');
 

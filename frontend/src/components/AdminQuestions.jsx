@@ -3,6 +3,122 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import './AdminCrud.css';
 
+const DISPLAY_MODES = [
+  { value: '', label: 'Auto (from scale)' },
+  { value: 'buttons', label: 'Buttons' },
+  { value: 'slider', label: 'Slider' },
+  { value: 'labeled-line', label: 'Labeled line' },
+  { value: 'stars', label: 'Stars' },
+  { value: 'thumbs', label: 'Thumbs' },
+];
+
+const EMPTY_LANG = { fi: '', en: '', sv: '' };
+
+function LangInput({ label, value, onChange }) {
+  const val = value && typeof value === 'object' ? value : EMPTY_LANG;
+  return (
+    <div className="lang-input-group">
+      {label && <span className="lang-input-label">{label}</span>}
+      {['fi', 'en', 'sv'].map(lang => (
+        <label key={lang} className="lang-input-item">
+          <span className="lang-badge">{lang}</span>
+          <input
+            type="text"
+            value={val[lang] || ''}
+            onChange={e => onChange({ ...val, [lang]: e.target.value })}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function ScaleItemEditor({ item, index, scales, onUpdate, onRemove, canRemove }) {
+  return (
+    <div className="scale-item-editor">
+      <div className="scale-item-header">
+        <span className="scale-item-index">#{index + 1}</span>
+        {canRemove && (
+          <button type="button" className="btn-icon" onClick={onRemove} title="Remove item">
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className="form-group">
+        <label>Item Label (i18n)</label>
+        <LangInput
+          value={item.label}
+          onChange={val => onUpdate({ ...item, label: val })}
+        />
+      </div>
+
+      <div className="form-row">
+        <div className="form-group flex-1">
+          <label>Answer Scale *</label>
+          <select
+            value={item.answerScaleId || ''}
+            onChange={e => onUpdate({ ...item, answerScaleId: e.target.value ? parseInt(e.target.value, 10) : '' })}
+            required
+          >
+            <option value="">— select scale —</option>
+            {(scales || []).map(scale => (
+              <option key={scale.id} value={scale.id}>{scale.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group flex-1">
+          <label>Display Mode</label>
+          <select
+            value={item.displayMode || ''}
+            onChange={e => onUpdate({ ...item, displayMode: e.target.value || null })}
+          >
+            {DISPLAY_MODES.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="form-row toggles-row">
+        <label className="toggle-label">
+          <input
+            type="checkbox"
+            checked={item.showEndLabels !== false}
+            onChange={e => onUpdate({ ...item, showEndLabels: e.target.checked })}
+          />
+          Show end labels
+        </label>
+        <label className="toggle-label">
+          <input
+            type="checkbox"
+            checked={item.showValueLabels !== false}
+            onChange={e => onUpdate({ ...item, showValueLabels: e.target.checked })}
+          />
+          Show value labels
+        </label>
+        <label className="toggle-label">
+          <input
+            type="checkbox"
+            checked={item.showItemLabel !== false}
+            onChange={e => onUpdate({ ...item, showItemLabel: e.target.checked })}
+          />
+          Show item label
+        </label>
+        <label className="toggle-label">
+          <input
+            type="checkbox"
+            checked={item.required !== false}
+            onChange={e => onUpdate({ ...item, required: e.target.checked })}
+          />
+          Required
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState(
@@ -16,6 +132,9 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
           continuousAxes: Array.isArray(entity.continuous_axes) && entity.continuous_axes.length > 0
             ? entity.continuous_axes
             : [{ id: 'axis_1', label: '' }],
+          scaleItems: Array.isArray(entity.scaleItems) ? entity.scaleItems : [],
+          multiScaleLayout: entity.multi_scale_layout || 'stacked',
+          multiScaleDefaults: entity.multi_scale_defaults || {},
         }
       : {
           text: '',
@@ -24,6 +143,9 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
           wordCloudOptionsId: '',
           maxSelections: 3,
           continuousAxes: [{ id: 'axis_1', label: '' }],
+          scaleItems: [],
+          multiScaleLayout: 'stacked',
+          multiScaleDefaults: {},
         }
   );
   const [error, setError] = useState(null);
@@ -50,6 +172,33 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
     });
   };
 
+  const addScaleItem = () => {
+    const newItem = {
+      answerScaleId: '',
+      label: { fi: '', en: '', sv: '' },
+      orderIndex: formData.scaleItems.length,
+      displayMode: null,
+      showEndLabels: true,
+      showValueLabels: true,
+      showItemLabel: true,
+      required: true,
+    };
+    setFormData({ ...formData, scaleItems: [...formData.scaleItems, newItem] });
+  };
+
+  const updateScaleItem = (index, updatedItem) => {
+    const items = [...formData.scaleItems];
+    items[index] = { ...updatedItem, orderIndex: index };
+    setFormData({ ...formData, scaleItems: items });
+  };
+
+  const removeScaleItem = (index) => {
+    const items = formData.scaleItems
+      .filter((_, i) => i !== index)
+      .map((item, i) => ({ ...item, orderIndex: i }));
+    setFormData({ ...formData, scaleItems: items });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -65,6 +214,13 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
                 label: (axis.label || '').trim(),
               }))
               .filter(axis => axis.label.length > 0)
+          : [],
+        scaleItems: formData.type === 'scale'
+          ? formData.scaleItems.map((item, index) => ({
+              ...item,
+              orderIndex: index,
+              answerScaleId: item.answerScaleId || null,
+            })).filter(item => item.answerScaleId)
           : [],
       };
 
@@ -130,7 +286,88 @@ export function QuestionForm({ entity, scales, wordClouds, onSave, onCancel }) {
           </select>
         </div>
 
-        {['scale', 'continuous_scale'].includes(formData.type) && (
+        {formData.type === 'scale' && (
+          <>
+            {/* Multi-scale layout & defaults */}
+            <div className="form-row">
+              <div className="form-group flex-1">
+                <label>Layout</label>
+                <select
+                  value={formData.multiScaleLayout}
+                  onChange={e => setFormData({ ...formData, multiScaleLayout: e.target.value })}
+                >
+                  <option value="stacked">Stacked (each item full width)</option>
+                  <option value="matrix">Matrix (compact grid, same scale only)</option>
+                  <option value="compact">Compact (tighter spacing)</option>
+                </select>
+              </div>
+              <div className="form-group flex-1">
+                <label>Default Display Mode</label>
+                <select
+                  value={formData.multiScaleDefaults?.displayMode || ''}
+                  onChange={e => setFormData({
+                    ...formData,
+                    multiScaleDefaults: { ...formData.multiScaleDefaults, displayMode: e.target.value || undefined },
+                  })}
+                >
+                  {DISPLAY_MODES.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Legacy single scale (for backward compat when no scaleItems) */}
+            {formData.scaleItems.length === 0 && (
+              <div className="form-group">
+                <label>Answer Scale (single scale — legacy)</label>
+                <select
+                  value={formData.answerScaleId}
+                  onChange={(e) => setFormData({ ...formData, answerScaleId: e.target.value ? parseInt(e.target.value, 10) : '' })}
+                >
+                  <option value="">No scale</option>
+                  {(scales || []).map((scale) => (
+                    <option key={scale.id} value={scale.id}>
+                      {scale.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Scale items editor */}
+            <div className="form-group">
+              <label>
+                Scale Items
+                <span className="hint"> — add items to create a multi-scale question</span>
+              </label>
+
+              {formData.scaleItems.length === 0 ? (
+                <p className="empty-hint">No scale items yet. Click "Add Scale Item" to create a multi-scale question.</p>
+              ) : (
+                <div className="scale-items-list">
+                  {formData.scaleItems.map((item, index) => (
+                    <ScaleItemEditor
+                      key={index}
+                      item={item}
+                      index={index}
+                      scales={scales}
+                      onUpdate={(updated) => updateScaleItem(index, updated)}
+                      onRemove={() => removeScaleItem(index)}
+                      canRemove={formData.scaleItems.length > 1}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addScaleItem}>
+                + Add Scale Item
+              </button>
+            </div>
+          </>
+        )}
+
+        {['continuous_scale'].includes(formData.type) && (
           <div className="form-group">
             <label>Answer Scale</label>
             <select
@@ -344,6 +581,7 @@ export default function AdminQuestions() {
               <tr>
                 <th>Type</th>
                 <th>Question</th>
+                <th>Scale Items</th>
                 <th>Status</th>
                 <th>Created</th>
                 <th>Actions</th>
@@ -358,6 +596,11 @@ export default function AdminQuestions() {
                     </span>
                   </td>
                   <td>{question.text}</td>
+                  <td>
+                    {question.type === 'scale' && Array.isArray(question.scaleItems) && question.scaleItems.length > 0
+                      ? `${question.scaleItems.length} item${question.scaleItems.length !== 1 ? 's' : ''}`
+                      : '—'}
+                  </td>
                   <td>
                     {question.archived ? (
                       <span className="status inactive">📦 Archived</span>

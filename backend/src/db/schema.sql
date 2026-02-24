@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS questions (
     word_cloud_options_id INTEGER REFERENCES word_cloud_options(id) ON DELETE SET NULL,
     max_selections INTEGER DEFAULT 3,
     continuous_axes JSONB,
+    multi_scale_layout TEXT DEFAULT 'stacked' CHECK (multi_scale_layout IN ('stacked', 'matrix', 'compact')),
+    multi_scale_defaults JSONB DEFAULT '{}',
     archived BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -110,10 +112,27 @@ CREATE TABLE IF NOT EXISTS feedback_sessions (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS question_scale_items (
+    id SERIAL PRIMARY KEY,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    answer_scale_id INTEGER NOT NULL REFERENCES answer_scales(id),
+    label JSONB NOT NULL DEFAULT '{}',
+    order_index INTEGER NOT NULL DEFAULT 0,
+    display_mode TEXT CHECK (display_mode IN ('buttons', 'slider', 'labeled-line', 'stars', 'thumbs')),
+    show_end_labels BOOLEAN DEFAULT true,
+    show_value_labels BOOLEAN DEFAULT true,
+    show_item_label BOOLEAN DEFAULT true,
+    min_label_override JSONB,
+    max_label_override JSONB,
+    required BOOLEAN DEFAULT true,
+    UNIQUE(question_id, order_index)
+);
+
 CREATE TABLE IF NOT EXISTS feedback_answers (
     id SERIAL PRIMARY KEY,
     session_id INTEGER NOT NULL REFERENCES feedback_sessions(id) ON DELETE CASCADE,
     question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    scale_item_id INTEGER REFERENCES question_scale_items(id),
     value NUMERIC,
     text_value TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -171,3 +190,5 @@ CREATE INDEX IF NOT EXISTS idx_questions_wordcloud_options ON questions(word_clo
 CREATE INDEX IF NOT EXISTS idx_questions_archived ON questions(archived);
 CREATE INDEX IF NOT EXISTS idx_questions_continuous_axes ON questions USING GIN(continuous_axes);
 CREATE INDEX IF NOT EXISTS idx_questionnaires_archived ON questionnaires(archived);
+CREATE INDEX IF NOT EXISTS idx_question_scale_items_question ON question_scale_items(question_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_answers_scale_item ON feedback_answers(scale_item_id);

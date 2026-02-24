@@ -59,9 +59,13 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
           ? answer.textValue
           : (answer.value && typeof answer.value === 'object' ? JSON.stringify(answer.value) : null);
 
+      const scaleItemId = answer.scaleItemId !== undefined && answer.scaleItemId !== null
+        ? parseInt(answer.scaleItemId, 10)
+        : null;
+
       await client.query(
-        'INSERT INTO feedback_answers (session_id, question_id, value, text_value) VALUES ($1, $2, $3, $4)',
-        [sessionId, answer.questionId, normalizedValue, normalizedTextValue]
+        'INSERT INTO feedback_answers (session_id, question_id, scale_item_id, value, text_value) VALUES ($1, $2, $3, $4, $5)',
+        [sessionId, answer.questionId, scaleItemId, normalizedValue, normalizedTextValue]
       );
     }
 
