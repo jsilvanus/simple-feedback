@@ -11,6 +11,7 @@ import AdminWordSets from '../components/AdminWordSets';
 import AdminQuestionnaires from '../components/AdminQuestionnaires';
 import AdminSchedules from '../components/AdminSchedules';
 import AdminResults from '../components/AdminResults';
+import AdminAnswerViews from '../components/AdminAnswerViews';
 import './AdminPage.css';
 
 export default function AdminPage() {
@@ -113,6 +114,12 @@ export default function AdminPage() {
           >
             {t('admin.results')}
           </button>
+          <button
+            className={activeTab === 'answerViews' ? 'active' : ''}
+            onClick={() => setActiveTab('answerViews')}
+          >
+            {t('admin.answerViews')}
+          </button>
           <button onClick={() => navigate('/admin/map')}>
             {t('admin.map')}
           </button>
@@ -194,6 +201,14 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'results' && <AdminResults />}
+
+          {activeTab === 'answerViews' && (
+            <div className="admin-grouped-sections">
+              <section className="admin-group-section">
+                <AdminAnswerViews />
+              </section>
+            </div>
+          )}
         </div>
       </div>
     </div>

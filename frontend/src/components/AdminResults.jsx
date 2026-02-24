@@ -7,6 +7,7 @@ import './AdminResults.css';
 export default function AdminResults() {
   const { t } = useTranslation();
   const [results, setResults] = useState([]);
+  const [answerViews, setAnswerViews] = useState([]);
   const [locations, setLocations] = useState([]);
   const [questionnaires, setQuestionnaires] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +61,15 @@ export default function AdminResults() {
       if (filters.endDate) queryParams.append('endDate', filters.endDate);
       
       const data = await api.adminRequest(`/results?${queryParams.toString()}`);
-      setResults(data);
+      // Results endpoint returns { rows, answerViews } when questionnaireId is set,
+      // or just an array (legacy). Handle both.
+      if (Array.isArray(data)) {
+        setResults(data);
+        setAnswerViews([]);
+      } else {
+        setResults(data.rows || []);
+        setAnswerViews(data.answerViews || []);
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -569,6 +578,66 @@ export default function AdminResults() {
       {results.length === 0 && (
         <div className="empty-state">
           <p>{t('admin.noFeedbackDataForFilters')}</p>
+        </div>
+      )}
+
+      {answerViews.length > 0 && (
+        <div className="analytics-section">
+          <h3>{t('admin.answerViews')}</h3>
+          {answerViews.map(view => (
+            <div key={view.id} className="question-analytics">
+              <h4>{view.name}</h4>
+              <div className="continuous-analytics">
+                {(() => {
+                  const axes = view.axes || [];
+                  const averages = {};
+                  axes.forEach(axis => {
+                    if (axis.avg !== null) {
+                      averages[`axis_${axis.questionId}`] = axis.avg;
+                    }
+                  });
+                  const radarAxes = axes.map(axis => ({
+                    id: `axis_${axis.questionId}`,
+                    label: axis.axisLabel,
+                  }));
+                  const totalResponses = axes.reduce((max, a) => Math.max(max, a.count || 0), 0);
+
+                  return (
+                    <>
+                      <div className="stat-row">
+                        <span>Total Responses:</span>
+                        <strong>{totalResponses}</strong>
+                      </div>
+                      {radarAxes.length >= 2 && totalResponses > 0 && (
+                        <div className="continuous-chart-wrapper">
+                          <RadarChart
+                            question={{
+                              answerScale: { buttons: [] },
+                              continuousAxes: radarAxes,
+                            }}
+                            value={averages}
+                            onChange={() => {}}
+                            readOnly
+                          />
+                        </div>
+                      )}
+                      <div className="continuous-axis-list">
+                        {axes.map(axis => (
+                          <div key={axis.questionId} className="continuous-axis-item">
+                            <span>{axis.axisLabel}</span>
+                            <strong>
+                              {axis.avg !== null ? axis.avg.toFixed(2) : '-'}
+                              {axis.count ? ` (${axis.count})` : ''}
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -1350,6 +1350,190 @@ router.delete('/schedules/:id', async (req, res, next) => {
 });
 
 /**
+ * GET /api/admin/answer-views
+ * List all answer views (optionally filtered by questionnaire)
+ */
+router.get('/answer-views', async (req, res, next) => {
+  try {
+    const { questionnaireId } = req.query;
+    let query = `
+      SELECT av.*, q.name as questionnaire_name
+      FROM answer_views av
+      JOIN questionnaires q ON av.questionnaire_id = q.id
+      WHERE 1=1
+    `;
+    const params = [];
+    if (questionnaireId) {
+      params.push(questionnaireId);
+      query += ` AND av.questionnaire_id = $${params.length}`;
+    }
+    query += ' ORDER BY av.created_at DESC';
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/answer-views/:id
+ * Get a single answer view with its questions
+ */
+router.get('/answer-views/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const viewResult = await db.query(
+      `SELECT av.*, q.name as questionnaire_name
+       FROM answer_views av
+       JOIN questionnaires q ON av.questionnaire_id = q.id
+       WHERE av.id = $1`,
+      [id]
+    );
+    if (viewResult.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Answer view not found' } });
+    }
+    const questionsResult = await db.query(
+      `SELECT avq.question_id, avq.axis_label, avq.display_order,
+              quest.text as question_text, quest.type as question_type
+       FROM answer_view_questions avq
+       JOIN questions quest ON avq.question_id = quest.id
+       WHERE avq.answer_view_id = $1
+       ORDER BY avq.display_order, avq.question_id`,
+      [id]
+    );
+    const view = viewResult.rows[0];
+    view.questions = questionsResult.rows;
+    res.json(view);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/answer-views
+ * Create a new answer view
+ */
+router.post('/answer-views', async (req, res, next) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { name, viewType, questionnaireId, questions, config } = req.body;
+
+    if (!name || !viewType || !questionnaireId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: { message: 'name, viewType, and questionnaireId are required' } });
+    }
+    if (!['radar'].includes(viewType)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: { message: "viewType must be 'radar'" } });
+    }
+
+    const viewResult = await client.query(
+      `INSERT INTO answer_views (name, view_type, questionnaire_id, config)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [name, viewType, questionnaireId, JSON.stringify(config || {})]
+    );
+    const view = viewResult.rows[0];
+
+    if (Array.isArray(questions) && questions.length > 0) {
+      for (const q of questions) {
+        await client.query(
+          `INSERT INTO answer_view_questions (answer_view_id, question_id, axis_label, display_order)
+           VALUES ($1, $2, $3, $4)`,
+          [view.id, q.questionId, q.axisLabel || null, q.displayOrder || 0]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json(view);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * PUT /api/admin/answer-views/:id
+ * Update an answer view and its questions
+ */
+router.put('/answer-views/:id', async (req, res, next) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { id } = req.params;
+    const { name, viewType, questionnaireId, questions, config } = req.body;
+
+    const fields = [];
+    const params = [];
+
+    if (name !== undefined) { params.push(name); fields.push(`name = $${params.length}`); }
+    if (viewType !== undefined) {
+      if (!['radar'].includes(viewType)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: { message: "viewType must be 'radar'" } });
+      }
+      params.push(viewType); fields.push(`view_type = $${params.length}`);
+    }
+    if (questionnaireId !== undefined) { params.push(questionnaireId); fields.push(`questionnaire_id = $${params.length}`); }
+    if (config !== undefined) { params.push(JSON.stringify(config)); fields.push(`config = $${params.length}`); }
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    if (fields.length > 1) {
+      params.push(id);
+      await client.query(
+        `UPDATE answer_views SET ${fields.join(', ')} WHERE id = $${params.length}`,
+        params
+      );
+    }
+
+    if (Array.isArray(questions)) {
+      await client.query('DELETE FROM answer_view_questions WHERE answer_view_id = $1', [id]);
+      for (const q of questions) {
+        await client.query(
+          `INSERT INTO answer_view_questions (answer_view_id, question_id, axis_label, display_order)
+           VALUES ($1, $2, $3, $4)`,
+          [id, q.questionId, q.axisLabel || null, q.displayOrder || 0]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    const viewResult = await db.query(
+      `SELECT av.*, q.name as questionnaire_name FROM answer_views av
+       JOIN questionnaires q ON av.questionnaire_id = q.id WHERE av.id = $1`,
+      [id]
+    );
+    if (viewResult.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Answer view not found' } });
+    }
+    res.json(viewResult.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * DELETE /api/admin/answer-views/:id
+ * Delete an answer view
+ */
+router.delete('/answer-views/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM answer_views WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/admin/results
  * Get feedback results with optional filters
  */
@@ -1419,7 +1603,79 @@ router.get('/results', async (req, res, next) => {
     query += ' ORDER BY fs.timestamp DESC';
 
     const result = await db.query(query, params);
-    res.json(result.rows);
+
+    // Compute answer view aggregates for the filtered questionnaire
+    let answerViews = [];
+    if (questionnaireId) {
+      const viewsResult = await db.query(
+        `SELECT av.id, av.name, av.view_type, av.config,
+                avq.question_id, avq.axis_label, avq.display_order,
+                quest.text as question_text
+         FROM answer_views av
+         JOIN answer_view_questions avq ON av.id = avq.answer_view_id
+         JOIN questions quest ON avq.question_id = quest.id
+         WHERE av.questionnaire_id = $1
+         ORDER BY av.id, avq.display_order, avq.question_id`,
+        [questionnaireId]
+      );
+
+      // Group by answer view
+      const viewMap = {};
+      viewsResult.rows.forEach(row => {
+        if (!viewMap[row.id]) {
+          viewMap[row.id] = {
+            id: row.id,
+            name: row.name,
+            viewType: row.view_type,
+            config: row.config,
+            axes: [],
+          };
+        }
+        viewMap[row.id].axes.push({
+          questionId: row.question_id,
+          axisLabel: row.axis_label || row.question_text,
+          displayOrder: row.display_order,
+        });
+      });
+
+      // For each view, compute average per axis question
+      for (const view of Object.values(viewMap)) {
+        const questionIds = view.axes.map(a => a.questionId);
+        if (questionIds.length === 0) { answerViews.push(view); continue; }
+
+        let avgQuery = `
+          SELECT fa.question_id, AVG(fa.value::numeric) as avg_value, COUNT(*) as response_count
+          FROM feedback_answers fa
+          JOIN feedback_sessions fs ON fa.session_id = fs.id
+          WHERE fa.question_id = ANY($1) AND fs.questionnaire_id = $2
+        `;
+        const avgParams = [questionIds, questionnaireId];
+        let paramIdx = 2;
+
+        if (locationId) { paramIdx++; avgQuery += ` AND fs.location_id = $${paramIdx}`; avgParams.push(locationId); }
+        if (startDate) { paramIdx++; avgQuery += ` AND fs.timestamp >= $${paramIdx}`; avgParams.push(startDate); }
+        if (endDate) { paramIdx++; avgQuery += ` AND fs.timestamp <= $${paramIdx}`; avgParams.push(endDate); }
+        avgQuery += ' GROUP BY fa.question_id';
+
+        const avgResult = await db.query(avgQuery, avgParams);
+        const avgByQuestion = {};
+        avgResult.rows.forEach(r => {
+          avgByQuestion[r.question_id] = {
+            avg: parseFloat(r.avg_value),
+            count: parseInt(r.response_count, 10),
+          };
+        });
+
+        view.axes = view.axes.map(axis => ({
+          ...axis,
+          avg: avgByQuestion[axis.questionId]?.avg ?? null,
+          count: avgByQuestion[axis.questionId]?.count ?? 0,
+        }));
+        answerViews.push(view);
+      }
+    }
+
+    res.json({ rows: result.rows, answerViews });
   } catch (error) {
     next(error);
   }

@@ -160,7 +160,14 @@
     "resultsDesc": "Näytä ja vie palautedataa",
     "results": "Tulokset",
     "export": "Vie",
-    "answerScales": "Asteikot"
+    "answerScales": "Asteikot",
+    "answerViews": "Vastausnäkymät",
+    "addAnswerView": "Lisää vastausnäkymä",
+    "addNewAnswerView": "Lisää uusi vastausnäkymä",
+    "editAnswerView": "Muokkaa vastausnäkymää",
+    "loadingAnswerViews": "Ladataan vastausnäkymiä...",
+    "noAnswerViewsYet": "Ei vastausnäkymiä vielä. Lisää ensimmäinen vastausnäkymä aloittaaksesi.",
+    "answerViewsDesc": "Luo yhdistettyjä tutkavisualisointeja useista asteikkokysymyksistä"
   },
   "map": {
     "back": "Takaisin",
