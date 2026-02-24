@@ -491,7 +491,7 @@ export default function AdminResults() {
                   <strong>{data.texts.length}</strong>
                 </div>
                 <div className="word-frequency">
-                  <h5>Word Frequency (Finnish):</h5>
+                  <h5>Word Set Frequency (Finnish):</h5>
                   {(() => {
                     const wordFrequency = getWordFrequency(data.texts);
                     const maxCount = wordFrequency.length > 0 ? wordFrequency[0].count : 1;

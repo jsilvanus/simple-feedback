@@ -7,7 +7,7 @@ import AdminLocations from '../components/AdminLocations';
 import AdminLocationGroups from '../components/AdminLocationGroups';
 import AdminQuestions from '../components/AdminQuestions';
 import AdminAnswerScales from '../components/AdminAnswerScales';
-import AdminWordCloudOptions from '../components/AdminWordCloudOptions';
+import AdminWordSets from '../components/AdminWordSets';
 import AdminQuestionnaires from '../components/AdminQuestionnaires';
 import AdminSchedules from '../components/AdminSchedules';
 import AdminResults from '../components/AdminResults';
@@ -166,7 +166,7 @@ export default function AdminPage() {
                 <AdminAnswerScales />
               </section>
               <section className="admin-group-section">
-                <AdminWordCloudOptions />
+                <AdminWordSets />
               </section>
             </div>
           )}
