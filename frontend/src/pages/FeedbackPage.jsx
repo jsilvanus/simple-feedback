@@ -338,23 +338,62 @@ export default function FeedbackPage() {
               <h3>{question.text}</h3>
 
               {question.type === 'scale' && question.answerScale && (
-                <div className="answer-buttons">
-                  {question.answerScale.buttons.map(button => (
-                    <button
-                      key={button.value}
-                      className={`answer-btn ${answers[question.id]?.value === button.value ? 'selected' : ''}`}
-                      style={{
-                        backgroundColor: answers[question.id]?.value === button.value 
-                          ? button.color
-                          : button.color,
-                        color: answers[question.id]?.value === button.value ? 'white' : '#333',
-                      }}
-                      onClick={() => handleAnswer(question.id, button.value)}
-                    >
-                      {button.label}
-                    </button>
-                  ))}
-                </div>
+                question.answerScale.step < 1 ? (() => {
+                  const scale = question.answerScale;
+                  const buttons = scale.buttons || [];
+                  const inferredMin = buttons.length > 0 ? Math.min(...buttons.map(b => Number(b.value))) : 1;
+                  const inferredMax = buttons.length > 0 ? Math.max(...buttons.map(b => Number(b.value))) : 5;
+                  const sliderMin = scale.minValue !== null && scale.minValue !== undefined
+                    ? scale.minValue
+                    : (scale.scaleMode === 'bipolar' ? -inferredMax : inferredMin);
+                  const sliderMax = scale.maxValue !== null && scale.maxValue !== undefined
+                    ? scale.maxValue
+                    : inferredMax;
+                  const defaultVal = scale.scaleMode === 'bipolar' ? 0 : sliderMin;
+                  const currentValue = answers[question.id]?.value !== undefined && answers[question.id]?.value !== null
+                    ? answers[question.id].value
+                    : null;
+                  const getLabelText = (label) => {
+                    if (!label) return '';
+                    return label[i18n.language] || label.en || Object.values(label).find(v => v) || '';
+                  };
+                  return (
+                    <div className="scale-slider-wrapper">
+                      <div className="scale-slider-labels">
+                        <span className="scale-endpoint-label">{getLabelText(scale.minLabel)}</span>
+                        <span className="scale-endpoint-label">{getLabelText(scale.maxLabel)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        className="scale-slider"
+                        min={sliderMin}
+                        max={sliderMax}
+                        step={scale.step}
+                        value={currentValue !== null ? currentValue : defaultVal}
+                        onChange={(e) => handleAnswer(question.id, parseFloat(e.target.value))}
+                      />
+                      <div className="scale-slider-value">
+                        {currentValue !== null ? currentValue : <span className="no-selection">—</span>}
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="answer-buttons">
+                    {question.answerScale.buttons.map(button => (
+                      <button
+                        key={button.value}
+                        className={`answer-btn ${answers[question.id]?.value === button.value ? 'selected' : ''}`}
+                        style={{
+                          backgroundColor: button.color,
+                          color: answers[question.id]?.value === button.value ? 'white' : '#333',
+                        }}
+                        onClick={() => handleAnswer(question.id, button.value)}
+                      >
+                        {button.label}
+                      </button>
+                    ))}
+                  </div>
+                )
               )}
 
               {question.type === 'text' && (

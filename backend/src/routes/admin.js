@@ -204,7 +204,7 @@ router.put('/locations/:id', async (req, res, next) => {
 router.put('/answer-scales/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, buttons } = req.body;
+    const { name, buttons, scaleMode, step, minLabel, maxLabel, minValue, maxValue } = req.body;
 
     const updates = [];
     const values = [];
@@ -220,6 +220,37 @@ router.put('/answer-scales/:id', async (req, res, next) => {
       }
       updates.push(`buttons = $${paramCount++}`);
       values.push(JSON.stringify(buttons));
+    }
+    if (scaleMode !== undefined) {
+      if (!['normal', 'bipolar'].includes(scaleMode)) {
+        return res.status(400).json({ error: { message: "scaleMode must be 'normal' or 'bipolar'" } });
+      }
+      updates.push(`scale_mode = $${paramCount++}`);
+      values.push(scaleMode);
+    }
+    if (step !== undefined) {
+      const stepFloat = parseFloat(step);
+      if (isNaN(stepFloat) || stepFloat < 0.01 || stepFloat > 1) {
+        return res.status(400).json({ error: { message: 'step must be between 0.01 and 1' } });
+      }
+      updates.push(`step = $${paramCount++}`);
+      values.push(stepFloat);
+    }
+    if (minLabel !== undefined) {
+      updates.push(`min_label = $${paramCount++}`);
+      values.push(minLabel !== null ? JSON.stringify(minLabel) : null);
+    }
+    if (maxLabel !== undefined) {
+      updates.push(`max_label = $${paramCount++}`);
+      values.push(maxLabel !== null ? JSON.stringify(maxLabel) : null);
+    }
+    if (minValue !== undefined) {
+      updates.push(`min_value = $${paramCount++}`);
+      values.push(minValue !== null && minValue !== '' ? parseFloat(minValue) : null);
+    }
+    if (maxValue !== undefined) {
+      updates.push(`max_value = $${paramCount++}`);
+      values.push(maxValue !== null && maxValue !== '' ? parseFloat(maxValue) : null);
     }
 
     if (updates.length === 0) {
@@ -704,15 +735,36 @@ router.get('/answer-scales', async (req, res, next) => {
  */
 router.post('/answer-scales', async (req, res, next) => {
   try {
-    const { name, buttons } = req.body;
+    const { name, buttons, scaleMode, step, minLabel, maxLabel, minValue, maxValue } = req.body;
 
     if (!name || !buttons || !Array.isArray(buttons)) {
       return res.status(400).json({ error: { message: 'Name and buttons array are required' } });
     }
 
+    if (scaleMode !== undefined && !['normal', 'bipolar'].includes(scaleMode)) {
+      return res.status(400).json({ error: { message: "scaleMode must be 'normal' or 'bipolar'" } });
+    }
+
+    if (step !== undefined) {
+      const stepFloat = parseFloat(step);
+      if (isNaN(stepFloat) || stepFloat < 0.01 || stepFloat > 1) {
+        return res.status(400).json({ error: { message: 'step must be between 0.01 and 1' } });
+      }
+    }
+
     const result = await db.query(
-      'INSERT INTO answer_scales (name, buttons) VALUES ($1, $2) RETURNING *',
-      [name, JSON.stringify(buttons)]
+      `INSERT INTO answer_scales (name, buttons, scale_mode, step, min_label, max_label, min_value, max_value)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        name,
+        JSON.stringify(buttons),
+        scaleMode || 'normal',
+        step !== undefined ? parseFloat(step) : 1,
+        minLabel ? JSON.stringify(minLabel) : null,
+        maxLabel ? JSON.stringify(maxLabel) : null,
+        minValue !== undefined && minValue !== null && minValue !== '' ? parseFloat(minValue) : null,
+        maxValue !== undefined && maxValue !== null && maxValue !== '' ? parseFloat(maxValue) : null,
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -1228,7 +1280,7 @@ router.get('/results', async (req, res, next) => {
     const { locationId, questionnaireId, startDate, endDate } = req.query;
 
     let query = `
-      SELECT 
+      SELECT
         fs.id as session_id,
         fs.timestamp,
         l.name as location_name,
@@ -1240,6 +1292,12 @@ router.get('/results', async (req, res, next) => {
         fa.text_value,
         quest.answer_scale_id,
         a.buttons as answer_scale_buttons,
+        a.scale_mode,
+        a.step as scale_step,
+        a.min_label,
+        a.max_label,
+        a.min_value,
+        a.max_value,
         quest.continuous_axes,
         quest.word_cloud_options_id,
         wco.words as word_cloud_words
