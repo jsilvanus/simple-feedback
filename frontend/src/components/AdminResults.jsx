@@ -90,12 +90,22 @@ export default function AdminResults() {
           texts: [],
           continuousAnswers: [],
           answerScaleButtons: result.answer_scale_buttons || [],
+          scaleMode: result.scale_mode || 'normal',
+          scaleStep: result.scale_step ? parseFloat(result.scale_step) : 1,
+          minLabel: result.min_label || null,
+          maxLabel: result.max_label || null,
+          minValue: result.min_value !== null && result.min_value !== undefined ? parseFloat(result.min_value) : null,
+          maxValue: result.max_value !== null && result.max_value !== undefined ? parseFloat(result.max_value) : null,
           continuousAxes: result.continuous_axes || [],
           wordCloudWords: result.word_cloud_words || null,
         };
       }
       if (result.value !== null) {
-        byQuestion[result.question_text].values.push(result.value);
+        // Parse to float — feedback_answers.value is NUMERIC (may come as string from pg)
+        const numValue = parseFloat(result.value);
+        if (!isNaN(numValue)) {
+          byQuestion[result.question_text].values.push(numValue);
+        }
       }
       if (result.text_value) {
         if (result.question_type === 'continuous_scale') {
@@ -231,12 +241,22 @@ export default function AdminResults() {
     return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
   };
 
-  const getDistribution = (values) => {
+  const getDistribution = (values, step = 1) => {
     const dist = {};
+    const decimals = step < 1 ? Math.ceil(-Math.log10(step)) : 0;
     values.forEach(v => {
-      dist[v] = (dist[v] || 0) + 1;
+      const key = parseFloat((Math.round(v / step) * step).toFixed(decimals));
+      dist[key] = (dist[key] || 0) + 1;
     });
     return dist;
+  };
+
+  const getLabelText = (label) => {
+    if (!label) return null;
+    if (typeof label === 'string') {
+      try { label = JSON.parse(label); } catch { return label; }
+    }
+    return label.fi || label.en || label.sv || Object.values(label).find(v => v) || null;
   };
 
   const getWordFrequency = (texts) => {
@@ -402,7 +422,20 @@ export default function AdminResults() {
                 <div className="stat-row">
                   <span>Average Score:</span>
                   <strong>{getAverage(data.values)}</strong>
+                  {data.scaleMode === 'bipolar' && (
+                    <span style={{ marginLeft: '8px', color: '#888', fontSize: '0.85em' }}>(bipolar)</span>
+                  )}
                 </div>
+                {(getLabelText(data.minLabel) || getLabelText(data.maxLabel)) && (
+                  <div className="stat-row">
+                    {getLabelText(data.minLabel) && (
+                      <span style={{ marginRight: '12px' }}>Min: <em>{getLabelText(data.minLabel)}</em></span>
+                    )}
+                    {getLabelText(data.maxLabel) && (
+                      <span>Max: <em>{getLabelText(data.maxLabel)}</em></span>
+                    )}
+                  </div>
+                )}
                 <div className="stat-row">
                   <span>Total Responses:</span>
                   <strong>{data.values.length}</strong>
@@ -410,8 +443,8 @@ export default function AdminResults() {
                 <div className="distribution">
                   <h5>Distribution:</h5>
                   <div className="chart">
-                    {Object.entries(getDistribution(data.values))
-                      .sort(([a], [b]) => a - b)
+                    {Object.entries(getDistribution(data.values, data.scaleStep))
+                      .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
                       .map(([value, count]) => (
                         <div key={value} className="bar-container">
                           <span className="bar-label">{value}</span>

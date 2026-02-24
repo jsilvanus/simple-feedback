@@ -23,8 +23,22 @@ export default function RadarChart({ question, value, onChange, readOnly = false
       }).filter(value => !Number.isNaN(value)))
     : 10;
 
-  const resolvedMin = Number.isFinite(minFromScale) ? minFromScale : 0;
-  const resolvedMax = Number.isFinite(maxFromScale) && maxFromScale > resolvedMin ? maxFromScale : 10;
+  // Prefer explicit minValue/maxValue from scale config over inference from buttons
+  const explicitMin = question.answerScale?.minValue !== null && question.answerScale?.minValue !== undefined
+    ? Number(question.answerScale.minValue)
+    : null;
+  const explicitMax = question.answerScale?.maxValue !== null && question.answerScale?.maxValue !== undefined
+    ? Number(question.answerScale.maxValue)
+    : null;
+
+  const resolvedMin = Number.isFinite(explicitMin)
+    ? explicitMin
+    : (Number.isFinite(minFromScale) ? minFromScale : 0);
+  const resolvedMax = Number.isFinite(explicitMax)
+    ? explicitMax
+    : (Number.isFinite(maxFromScale) && maxFromScale > resolvedMin ? maxFromScale : 10);
+
+  const scaleStep = question.answerScale?.step ? Number(question.answerScale.step) : 1;
 
   const axes = axisConfig.map((axis, index) => ({
     label: axis.label || `Axis ${index + 1}`,
@@ -334,9 +348,10 @@ export default function RadarChart({ question, value, onChange, readOnly = false
       ctx.textBaseline = 'middle';
       ctx.fillText(axis.label, labelX, labelY);
 
-      // Draw value label
+      // Draw value label rounded to step precision
+      const stepDecimals = scaleStep < 1 ? Math.ceil(-Math.log10(scaleStep)) : 0;
       ctx.font = '11px sans-serif';
-      ctx.fillText(Math.round(currentValue * 10) / 10, labelX, labelY + 15);
+      ctx.fillText(parseFloat(currentValue.toFixed(stepDecimals)), labelX, labelY + 15);
     });
   };
 
