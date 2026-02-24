@@ -50,6 +50,7 @@
     "questions": "Frågor",
     "questionnaires": "Enkäter",
     "schedules": "Scheman",
+    "map": "Visuell karta",
     "wordCloudOptions": "Ordmolnsalternativ",
     "loadingLocations": "Laddar platser...",
     "loadingLocationGroups": "Laddar platsgrupper...",
@@ -142,6 +143,11 @@
     "never": "ALDRIG",
     "welcomeTitle": "Välkommen till Simple Feedback Admin",
     "welcomeDesc": "Använd navigeringen ovan för att hantera ditt feedbacksystem.",
+    "helpTitle": "Snabbstartshjälp",
+    "helpIntro": "Följ dessa steg för att komma igång med admingränssnittet:",
+    "helpStep1": "Lägg till platser (och platsgrupper) så att feedback kan samlas in på specifika ställen.",
+    "helpStep2": "Skapa frågor och svarsskalor (eller ordmoln) att använda i enkäter.",
+    "helpStep3": "Bygg enkäter, koppla frågor och schemalägg dem till platser. Se resultat under Resultat-fliken.",
     "locationsDesc": "Hantera fysiska eller logiska platser där feedback samlas in",
     "questionsDesc": "Skapa och hantera feedbackfrågor",
     "questionnairesDesc": "Bygg enkäter genom att gruppera frågor",
@@ -150,6 +156,13 @@
     "results": "Resultat",
     "export": "Exportera",
     "answerScales": "Svarsskalor"
+  },
+  "map": {
+    "back": "Tillbaka",
+    "refresh": "Uppdatera",
+    "removeLink": "Ta bort denna länk?",
+    "removeOk": "OK",
+    "removeCancel": "Avbryt"
   },
   "settings": {
     "title": "Inställningar",

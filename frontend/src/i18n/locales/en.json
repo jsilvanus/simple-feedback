@@ -50,6 +50,7 @@
     "questions": "Questions",
     "questionnaires": "Questionnaires",
     "schedules": "Schedules",
+    "map": "Visual Map",
     "wordCloudOptions": "Word Cloud Options",
     "loadingLocations": "Loading locations...",
     "loadingLocationGroups": "Loading location groups...",
@@ -142,6 +143,11 @@
     "never": "NEVER",
     "welcomeTitle": "Welcome to Simple Feedback Admin",
     "welcomeDesc": "Use the navigation above to manage your feedback system.",
+    "helpTitle": "Quick Start Help",
+    "helpIntro": "Follow these steps to get started with the admin UI:",
+    "helpStep1": "Add locations (and location groups) so feedback can be collected at specific places.",
+    "helpStep2": "Create questions and answer scales (or word clouds) to use in questionnaires.",
+    "helpStep3": "Build questionnaires, attach questions and schedule them to locations. View results via the Results tab.",
     "locationsDesc": "Manage physical or logical places where feedback is collected",
     "questionsDesc": "Create and manage feedback questions",
     "questionnairesDesc": "Build questionnaires by grouping questions",
@@ -150,6 +156,13 @@
     "results": "Results",
     "export": "Export",
     "answerScales": "Answer Scales"
+  },
+  "map": {
+    "back": "Back",
+    "refresh": "Refresh",
+    "removeLink":"Remove this link?",
+    "removeOk": "Ok",
+    "removeCancel": "Cancel"
   },
   "settings": {
     "title": "Settings",

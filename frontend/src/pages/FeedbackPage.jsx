@@ -8,6 +8,7 @@ import SettingsButton from '../components/SettingsButton';
 import SettingsModal from '../components/SettingsModal';
 import RadarChart from '../components/RadarChart';
 import './FeedbackPage.css';
+import WordCloudInput from '../components/WordCloudInput';
 
 export default function FeedbackPage() {
   const { locationSlug } = useParams();
@@ -344,8 +345,8 @@ export default function FeedbackPage() {
                       className={`answer-btn ${answers[question.id]?.value === button.value ? 'selected' : ''}`}
                       style={{
                         backgroundColor: answers[question.id]?.value === button.value 
-                          ? button.color 
-                          : '#f0f0f0',
+                          ? button.color
+                          : button.color,
                         color: answers[question.id]?.value === button.value ? 'white' : '#333',
                       }}
                       onClick={() => handleAnswer(question.id, button.value)}

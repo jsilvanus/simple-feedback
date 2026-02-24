@@ -114,7 +114,7 @@ export default function AdminPage() {
             {t('admin.results')}
           </button>
           <button onClick={() => navigate('/admin/map')}>
-            🗺️ Visual Map
+            {t('admin.map')}
           </button>
         </nav>
 
@@ -123,6 +123,15 @@ export default function AdminPage() {
             <div className="admin-section">
               <h2>{t('admin.welcomeTitle')}</h2>
               <p>{t('admin.welcomeDesc')}</p>
+              <div className="admin-help" style={{ border: '1px solid #e5e7eb', padding: 12, borderRadius: 6, marginTop: 12, background: '#fafafa' }}>
+                <h3 style={{ marginTop: 0 }}>{t('admin.helpTitle')}</h3>
+                <p style={{ marginBottom: 8 }}>{t('admin.helpIntro')}</p>
+                <ol style={{ margin: 0, paddingLeft: 18 }}>
+                  <li>{t('admin.helpStep1')}</li>
+                  <li>{t('admin.helpStep2')}</li>
+                  <li>{t('admin.helpStep3')}</li>
+                </ol>
+              </div>
               <div className="feature-grid">
                 <div className="feature-card">
                   <h3>{t('admin.locations')}</h3>

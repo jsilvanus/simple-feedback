@@ -137,13 +137,13 @@ body.contrast-mode .wordcloud-placeholder {
 }
 
 .feedback-header h1 {
-  font-size: calc(32px * var(--ui-scale));
+  font-size: calc(50px * var(--ui-scale));
   color: #333;
   margin-bottom: 10px;
 }
 
 .feedback-header h2 {
-  font-size: calc(24px * var(--ui-scale));
+  font-size: calc(46px * var(--ui-scale));
   color: #666;
   font-weight: normal;
   margin-bottom: 10px;
@@ -166,7 +166,7 @@ body.contrast-mode .wordcloud-placeholder {
 }
 
 .question h3 {
-  font-size: calc(20px * var(--ui-scale));
+  font-size: calc(40px * var(--ui-scale));
   color: #333;
   margin-bottom: 20px;
 }
@@ -180,8 +180,8 @@ body.contrast-mode .wordcloud-placeholder {
 .answer-btn {
   flex: 1;
   min-width: 100px;
-  padding: calc(20px * var(--ui-scale));
-  font-size: calc(18px * var(--ui-scale));
+  padding: calc(10px * var(--ui-scale));
+  font-size: calc(40px * var(--ui-scale));
   font-weight: 600;
   border: 2px solid transparent;
   border-radius: 12px;
@@ -197,8 +197,47 @@ body.contrast-mode .wordcloud-placeholder {
 }
 
 .answer-btn.selected {
-  transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.25);
+  background: #e6eaff;
+  color: #333;
+}
+
+/* Enhanced selected styling: larger, red outline and arrow pointer */
+.answer-buttons { overflow: visible; }
+.answer-btn { position: relative; }
+.answer-btn.selected {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 12px rgba(220, 40, 40, 0.12), 0 6px 18px rgba(0,0,0,0.08);
+  border-color: #ff4d4f;
+
+.answer-btn.selected::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 14px solid rgba(220,40,40,0.95);
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+  /* wide red ring */
+  box-shadow: 0 0 0 6px rgba(255, 77, 79, 0.08), 0 0 0 3px rgba(255, 77, 79, 0.18) inset;
+  background: #ffecec;
+}
+.answer-btn.selected::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -12px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 12px solid #ff4d4f;
 }
 
 .text-input {
@@ -282,7 +321,7 @@ body.contrast-mode .wordcloud-placeholder {
 
 .submit-btn {
   padding: calc(18px * var(--ui-scale)) calc(48px * var(--ui-scale));
-  font-size: calc(20px * var(--ui-scale));
+  font-size: calc(40px * var(--ui-scale));
   min-width: calc(220px * var(--ui-scale));
 }
 
@@ -292,7 +331,7 @@ body.contrast-mode .wordcloud-placeholder {
 
 .btn {
   padding: calc(15px * var(--ui-scale)) calc(40px * var(--ui-scale));
-  font-size: calc(18px * var(--ui-scale));
+  font-size: calc(30px * var(--ui-scale));
   font-weight: 600;
   border: none;
   border-radius: 8px;
@@ -388,14 +427,41 @@ body.contrast-mode .wordcloud-placeholder {
 
 @media (max-width: 768px) {
   .feedback-container {
-    padding: 30px 20px;
-  }
+    transform: scale(1.04);
+    box-shadow: 0 0 0 8px rgba(220, 40, 40, 0.12);
 
   .answer-buttons {
     flex-direction: column;
+    width: 92%;
+
+  .answer-btn {
+
+  .word-chip { width: auto; flex: 0 1 48%; }
+    min-width: auto;
+  }
+}
+
+/* Mobile-specific adjustments to prevent selected button overflow */
+@media (max-width: 768px) {
+  .answer-buttons {
+    align-items: center;
+    gap: 12px;
   }
 
   .answer-btn {
-    min-width: auto;
+    width: 92%;
+    max-width: 92%;
+    box-sizing: border-box;
+  }
+
+  .answer-btn.selected {
+    transform: scale(1.06);
+  }
+
+  .answer-btn.selected::after {
+    bottom: -10px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #ff4d4f;
   }
 }

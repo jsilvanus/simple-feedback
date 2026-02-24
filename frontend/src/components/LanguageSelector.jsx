@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import LanguageIcon from '@mui/icons-material/Language';
 import './LanguageSelector.css';
 
 const LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'fi', name: 'Suomi', flag: '🇫🇮' },
+  { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'sv', name: 'Svenska', flag: '🇸🇪' },
 ];
 
@@ -45,7 +46,7 @@ export default function LanguageSelector({ inline = false }) {
           onClick={handleClick}
           aria-label="Select language"
         >
-          <span className="language-flag">{currentLanguage.flag}</span>
+          <span className="language-flag"><LanguageIcon /></span>
           <span className="language-code">{currentLanguage.code.toUpperCase()}</span>
         </button>
 

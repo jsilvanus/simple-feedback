@@ -16,12 +16,12 @@ import './AdminMapPage.css';
 const LONG_PRESS_DURATION = 2000;
 
 const COLUMNS = [
-  { index: 0, label: 'Scales & Word Clouds', icon: '📊' },
-  { index: 1, label: 'Questions', icon: '❓' },
-  { index: 2, label: 'Questionnaires', icon: '📋' },
-  { index: 3, label: 'Schedules', icon: '📅' },
-  { index: 4, label: 'Location Groups', icon: '🏢' },
-  { index: 5, label: 'Locations', icon: '📍' },
+  { index: 0, label: 'Scales & Word Clouds', icon: '📊', i18nKey: 'admin.answerScales' },
+  { index: 1, label: 'Questions', icon: '❓', i18nKey: 'admin.questions' },
+  { index: 2, label: 'Questionnaires', icon: '📋', i18nKey: 'admin.questionnaires' },
+  { index: 3, label: 'Schedules', icon: '📅', i18nKey: 'admin.schedules' },
+  { index: 4, label: 'Location Groups', icon: '🏢', i18nKey: 'admin.locationGroups' },
+  { index: 5, label: 'Locations', icon: '📍', i18nKey: 'admin.locations' },
 ];
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
@@ -263,8 +263,11 @@ function EntityCard({ entity, colIndex, cardRefs, dragState, selectedId, connect
 
 // ─── AdminMapPage ─────────────────────────────────────────────────────────────
 
+import { useTranslation } from 'react-i18next';
+
 export default function AdminMapPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // Auth check
   useEffect(() => {
@@ -613,8 +616,8 @@ export default function AdminMapPage() {
     return (
       <div className="admin-map-page">
         <div className="map-page-header">
-          <button className="btn btn-secondary" onClick={() => navigate('/admin')}>← Back to Admin</button>
-          <h1>Visual Map</h1>
+          <button className="btn btn-secondary" onClick={() => navigate('/admin')}>← {t('map.back')}</button>
+          <h1>{t('admin.map')}</h1>
         </div>
         <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>Loading data…</div>
       </div>
@@ -624,10 +627,10 @@ export default function AdminMapPage() {
   return (
     <div className="admin-map-page" onClick={() => { setSelectedId(null); setDeleteConfirm(null); }}>
       <div className="map-page-header" onClick={e => e.stopPropagation()}>
-        <button className="btn btn-secondary" onClick={() => navigate('/admin')}>← Back</button>
-        <h1>Visual Map</h1>
+        <button className="btn btn-secondary" onClick={() => navigate('/admin')}>← {t('map.back')}</button>
+        <h1>{t('admin.map')}</h1>
         {dataError && <span className="map-error">{dataError}</span>}
-        <button className="btn btn-secondary" onClick={loadData} style={{ marginLeft: 'auto' }}>↺ Refresh</button>
+        <button className="btn btn-secondary" onClick={loadData} style={{ marginLeft: 'auto' }}>↺ {t('map.refresh')}</button>
       </div>
 
       <div
@@ -645,35 +648,35 @@ export default function AdminMapPage() {
             switch (col.index) {
               case 0:
                 createButton = (
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                    <button className="btn btn-primary btn-xs" onClick={() => setEditModal({ type: 'scale', entity: null })}>+ Add Scale</button>
-                    <button className="btn btn-primary btn-xs" onClick={() => setEditModal({ type: 'wordcloud', entity: null })}>+ Add Word Cloud</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                    <button className="btn btn-primary btn-xs" style={{ width: '100%' }} onClick={() => setEditModal({ type: 'scale', entity: null })}>+ {t('admin.addAnswerScale')}</button>
+                    <button className="btn btn-primary btn-xs" style={{ width: '100%' }} onClick={() => setEditModal({ type: 'wordcloud', entity: null })}>+ {t('admin.addWordCloudOptionSet')}</button>
                   </div>
                 );
                 break;
               case 1:
                 createButton = (
-                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'question', entity: null })}>+ Add Question</button>
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'question', entity: null })}>+ {t('admin.addQuestion')}</button>
                 );
                 break;
               case 2:
                 createButton = (
-                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'questionnaire', entity: null })}>+ Add Questionnaire</button>
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'questionnaire', entity: null })}>+ {t('admin.addQuestionnaire')}</button>
                 );
                 break;
               case 3:
                 createButton = (
-                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'schedule', entity: null })}>+ Add Schedule</button>
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'schedule', entity: null })}>+ {t('admin.addSchedule')}</button>
                 );
                 break;
               case 4:
                 createButton = (
-                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'locationgroup', entity: null })}>+ Add Location Group</button>
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'locationgroup', entity: null })}>+ {t('admin.addLocationGroup')}</button>
                 );
                 break;
               case 5:
                 createButton = (
-                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'location', entity: null })}>+ Add Location</button>
+                  <button className="btn btn-primary btn-xs" style={{ marginBottom: 8 }} onClick={() => setEditModal({ type: 'location', entity: null })}>+ {t('admin.addLocation')}</button>
                 );
                 break;
               default:
@@ -686,7 +689,7 @@ export default function AdminMapPage() {
                 className="map-column"
                 style={hidden ? { display: 'none' } : undefined}
               >
-                <div className="map-column-header">{col.icon} {col.label}</div>
+                <div className="map-column-header">{col.icon} {t(col.i18nKey)}</div>
                 {createButton}
                 <div className="map-card-list">
                   {entities.length === 0 && (
@@ -730,10 +733,10 @@ export default function AdminMapPage() {
             style={{ left: deleteConfirm.x, top: deleteConfirm.y }}
             onClick={e => e.stopPropagation()}
           >
-            <p>Remove this link?</p>
+            <p>{t('map.removeLink')}</p>
             <div className="popover-actions">
-              <button className="btn btn-secondary btn-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn btn-danger btn-sm" onClick={() => removeLink(deleteConfirm.conn)}>Remove</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setDeleteConfirm(null)}>{t('map.removeCancel')}</button>
+              <button className="btn btn-danger btn-sm" onClick={() => removeLink(deleteConfirm.conn)}>{t('map.removeOk')}</button>
             </div>
           </div>
         )}
