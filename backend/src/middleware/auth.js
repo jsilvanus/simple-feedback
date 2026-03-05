@@ -1,5 +1,20 @@
 const jwt = require('jsonwebtoken');
 
+const WEAK_SECRETS = [
+  'your-secret-key-change-in-production',
+  'your-super-secret-jwt-key-change-in-production',
+  'secret',
+  'changeme',
+];
+
+if (!process.env.JWT_SECRET) {
+  console.warn('[SECURITY] JWT_SECRET environment variable is not set. Using insecure default. Set JWT_SECRET in production!');
+} else if (process.env.JWT_SECRET.length < 32) {
+  console.warn('[SECURITY] JWT_SECRET is too short. Use at least 32 characters in production!');
+} else if (WEAK_SECRETS.includes(process.env.JWT_SECRET)) {
+  console.warn('[SECURITY] JWT_SECRET is a known weak/default value. Change it in production!');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Middleware to verify JWT token

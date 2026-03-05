@@ -12,6 +12,16 @@ A configurable feedback application for tablets in kiosk mode and mobile browser
 - **Data Export**: Export feedback data as CSV
 - **Touch-Optimized UI**: Perfect for tablet kiosks
 - **Auto-Reset**: Automatic reset after submission for kiosk mode
+- **Anonymous by Design**: All feedback is anonymous — no personal data is collected
+
+## 🔒 Privacy & Anonymity
+
+Feedback collected through this application is **completely anonymous**:
+
+- No IP addresses, device identifiers, or personal information are stored with submissions
+- Feedback sessions record only the location, questionnaire, timestamp, and answers
+- A privacy notice is shown to users in the kiosk UI before and after submission
+- No cookies or tracking scripts are used on the feedback page
 
 ## 📋 Quick Start
 
@@ -20,42 +30,88 @@ For detailed setup instructions, see the [Setup Guide](docs/SETUP.md).
 ### Prerequisites
 
 - Node.js v18+
-- PostgreSQL v13+
+- Docker & Docker Compose (for PostgreSQL and backend container)
 
-### Installation
-
-1. Clone the repository
-2. Set up PostgreSQL database
-3. Configure backend `.env` file
-4. Install dependencies and start servers
-
-From the project root you can run the full development stack:
+### Development Setup
 
 ```bash
-npm install
+# Clone the repository
+git clone https://github.com/jsilvanus/simple-feedback.git
+cd simple-feedback
+
+# Install dependencies
 npm run install:all
-npm run dev
-```
 
-```bash
-# Backend
-cd backend
-npm install
-npm run dev
+# Copy and configure environment
+cp backend/.env.example backend/.env
+# Edit backend/.env — set a strong JWT_SECRET and change admin credentials
 
-# Frontend (in another terminal)
-cd frontend
-npm install
+# Start database and run schema migration
+npm run dev:setup
+
+# Start full development stack (DB + backend + frontend)
 npm run dev
 ```
 
 Visit `http://localhost:5173` to see the application.
+
+### Production Deployment (Docker)
+
+The backend is containerized. The frontend is built separately and served via a web server or symbolic link.
+
+```bash
+# Copy and configure environment
+cp backend/.env.example backend/.env
+# Edit backend/.env with production values (strong JWT_SECRET, real DB password, CORS_ORIGIN)
+
+# Build and start backend + database
+docker compose up -d --build
+
+# Run database migrations
+docker compose exec backend node src/db/migrate.js
+```
+
+#### Frontend Deployment
+
+Build the frontend and serve the `dist/` output with any static web server (Nginx, Caddy, etc.):
+
+```bash
+cd frontend
+npm install
+npm run build
+# Serve dist/ directory, or symlink it into your web server's document root
+```
+
+#### Automated Deployment with `scripts/deploy.sh`
+
+The `scripts/deploy.sh` script pulls the latest code and restarts services automatically.
+It is **self-updating**: if the script itself changed after the pull, it re-executes the new version.
+
+```bash
+# Basic usage (deploys from the 'main' branch)
+./scripts/deploy.sh
+
+# Deploy a specific branch
+DEPLOY_BRANCH=develop ./scripts/deploy.sh
+
+# Override repository directory
+DEPLOY_DIR=/srv/simple-feedback ./scripts/deploy.sh
+```
+
+**Configuration via environment variables:**
+
+| Variable        | Default                      | Description                        |
+|-----------------|------------------------------|------------------------------------|
+| `DEPLOY_BRANCH` | `main`                       | Git branch to pull and deploy      |
+| `DEPLOY_DIR`    | Parent of `scripts/`         | Absolute path to repository root   |
+| `COMPOSE_FILE`  | `$DEPLOY_DIR/docker-compose.yml` | Path to Docker Compose file    |
 
 ## 📚 Documentation
 
 - **[Setup Guide](docs/SETUP.md)** - Detailed installation and configuration
 - **[API Specification](docs/api-spec.yaml)** - OpenAPI 3.0 specification
 - **[Development Plan](PLAN.md)** - Architecture and roadmap
+- **[TODO](TODO.md)** - Pending tasks and known issues
 
 ## 🏗️ Project Structure
 
@@ -65,14 +121,18 @@ Visit `http://localhost:5173` to see the application.
 │   │   ├── routes/   # API endpoints
 │   │   ├── db/       # Database connection and schema
 │   │   └── app.js    # Express application
-│   └── tests/        # Backend tests
-├── frontend/         # React frontend application
+│   ├── tests/        # Backend tests
+│   └── Dockerfile    # Backend container image
+├── frontend/         # React frontend (deployed separately)
 │   ├── src/
 │   │   ├── pages/    # Page components
 │   │   ├── api/      # API client
 │   │   └── App.jsx   # Main app component
 │   └── index.html    # HTML entry point
+├── scripts/          # Deployment and maintenance scripts
+│   └── deploy.sh     # Self-updating deploy script
 ├── docs/             # Documentation
+├── docker-compose.yml # Backend + database services
 └── PLAN.md           # Architecture and development plan
 ```
 
@@ -88,7 +148,7 @@ Visit `http://localhost:5173` to see the application.
 - **React** 19
 - **React Router** for routing
 - **Vite** for building
-- Vanilla CSS with modern features
+- **i18next** for internationalization (English, Finnish, Swedish)
 
 ## 🔧 Development
 
@@ -127,14 +187,28 @@ See the [API Specification](docs/api-spec.yaml) for complete documentation.
 
 - `GET /health` - Health check
 - `GET /api/locations/:slug/questionnaire` - Get active questionnaire
-- `POST /api/feedback` - Submit feedback
+- `POST /api/feedback` - Submit feedback (rate-limited)
 
 ### Key Admin Endpoints
 
-- `POST /api/admin/login` - Admin login
+- `POST /api/admin/login` - Admin login (rate-limited)
 - `GET /api/admin/locations` - List locations
 - `GET /api/admin/results` - Get feedback results
 - `GET /api/admin/export` - Export results as CSV
+
+## 🔒 Security Notes
+
+⚠️ **Important for Production:**
+
+- **Set a strong `JWT_SECRET`** (at least 32 random characters). Generate with:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+  ```
+- **Change default admin credentials** (`ADMIN_USERNAME`, `ADMIN_PASSWORD`)
+- **Set `CORS_ORIGIN`** to your frontend's URL to restrict cross-origin access
+- **Use a strong database password** — do not use the default `postgres/postgres`
+- Enable HTTPS/SSL (via a reverse proxy like Nginx or Caddy)
+- Enable regular database backups
 
 ## 📊 Development Status
 
@@ -149,6 +223,9 @@ See the [API Specification](docs/api-spec.yaml) for complete documentation.
 - Data export functionality
 - OpenAPI specification
 - Comprehensive documentation
+- Anonymous feedback with privacy notice
+- Docker containerization (backend)
+- Automated deployment script
 
 ### 🚧 In Progress
 
@@ -158,24 +235,12 @@ See the [API Specification](docs/api-spec.yaml) for complete documentation.
 
 ### 📋 Planned
 
-- Multi-language support
+- Multi-language support enhancements
 - QR code generation
 - Live dashboard
 - Role-based access control
-- Production deployment guides
 
-For the complete roadmap, see [PLAN.md](PLAN.md).
-
-## 🔒 Security Notes
-
-⚠️ **Important for Production:**
-
-- Change default admin credentials
-- Use strong JWT secret
-- Enable HTTPS/SSL
-- Configure CORS properly
-- Set up rate limiting
-- Enable database backups
+For the complete roadmap, see [PLAN.md](PLAN.md) and [TODO.md](TODO.md).
 
 ## 📝 License
 

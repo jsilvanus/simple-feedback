@@ -6,10 +6,22 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 
+// Configure CORS: allow specific origins via CORS_ORIGIN env var (comma-separated),
+// or fall back to permissive mode only in development.
+const corsOrigin = process.env.CORS_ORIGIN;
+
+if (!corsOrigin && process.env.NODE_ENV === 'production') {
+  console.warn('[SECURITY] CORS_ORIGIN is not set in production. All cross-origin requests will be blocked. Set CORS_ORIGIN to your frontend URL(s).');
+}
+
+const corsOptions = corsOrigin
+  ? { origin: corsOrigin.split(',').map(o => o.trim()), credentials: true }
+  : { origin: process.env.NODE_ENV === 'production' ? false : true, credentials: true };
+
 // Middleware
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded images statically

@@ -320,6 +320,7 @@ export default function FeedbackPage() {
         <div className="success-icon">✓</div>
         <h1>{t('feedback.thankYou')}</h1>
         <p>{t('feedback.feedbackSubmitted')}</p>
+        <p className="privacy-note">{t('feedback.privacyNoteSuccess')}</p>
       </div>
     );
   }
@@ -533,6 +534,8 @@ export default function FeedbackPage() {
             })}
           </div>
         )}
+
+        <p className="privacy-note">{t('feedback.privacyNote')}</p>
       </div>
     </div>
   );

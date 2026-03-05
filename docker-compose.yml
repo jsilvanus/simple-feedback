@@ -3,14 +3,38 @@ services:
     image: postgres:16-alpine
     container_name: simple_feedback_db
     environment:
-      POSTGRES_DB: simple_feedback
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-simple_feedback}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - db_data_feedback:/var/lib/postgresql/data
-      - C:/Users/jsilv/Code/simple-feedback/backend/src/db:/app/backend_db:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: simple_feedback_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: db
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./backend/uploads:/app/uploads
 
 volumes:
   db_data_feedback:
