@@ -435,3 +435,17 @@ body.contrast-mode .wordcloud-placeholder {
     flex: 1 1 48%;
   }
 }
+
+/* Privacy notice */
+.privacy-note {
+  text-align: center;
+  color: #aaa;
+  font-size: calc(13px * var(--ui-scale));
+  margin-top: 20px;
+  padding: 0 16px 8px;
+  font-style: italic;
+}
+
+body.contrast-mode .privacy-note {
+  color: #888;
+}

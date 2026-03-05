@@ -28,7 +28,9 @@
     "failedToSubmit": "Palautteen lähetys epäonnistui",
     "locationNotFound": "Sijaintia ei löytynyt tai se ei ole aktiivinen",
     "selectUpTo": "Valitse enintään {{max}} sanaa",
-    "selectedCount": "{{current}}/{{max}} valittu"
+    "selectedCount": "{{current}}/{{max}} valittu",
+    "privacyNote": "Palautteesi on täysin anonyymi. Henkilökohtaisia tietoja ei kerätä eikä tallenneta.",
+    "privacyNoteSuccess": "Palaute lähetettiin nimettömänä. Henkilökohtaisia tietoja ei tallennettu."
   },
   "auth": {
     "login": "Kirjaudu sisään",

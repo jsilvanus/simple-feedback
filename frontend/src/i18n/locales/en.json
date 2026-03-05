@@ -28,7 +28,9 @@
     "failedToSubmit": "Failed to submit feedback",
     "locationNotFound": "Location not found or inactive",
     "selectUpTo": "Select up to {{max}} words",
-    "selectedCount": "{{current}}/{{max}} selected"
+    "selectedCount": "{{current}}/{{max}} selected",
+    "privacyNote": "Your feedback is completely anonymous. No personal data is collected or stored.",
+    "privacyNoteSuccess": "This feedback was submitted anonymously. No personal information was recorded."
   },
   "auth": {
     "login": "Login",

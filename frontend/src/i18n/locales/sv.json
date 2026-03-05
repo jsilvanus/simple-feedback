@@ -28,7 +28,9 @@
     "failedToSubmit": "Misslyckades att skicka feedback",
     "locationNotFound": "Platsen hittades inte eller är inte aktiv",
     "selectUpTo": "Välj upp till {{max}} ord",
-    "selectedCount": "{{current}}/{{max}} valda"
+    "selectedCount": "{{current}}/{{max}} valda",
+    "privacyNote": "Din feedback är helt anonym. Inga personuppgifter samlas in eller lagras.",
+    "privacyNoteSuccess": "Denna feedback skickades anonymt. Ingen personlig information registrerades."
   },
   "auth": {
     "login": "Logga in",
