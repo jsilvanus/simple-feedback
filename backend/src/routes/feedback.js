@@ -62,6 +62,31 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
       }
     }
 
+    // Validate that all submitted questionIds belong to the questionnaire
+    const submittedQuestionIds = [...new Set(answers.map(a => a.questionId))];
+    const validQuestionsResult = await client.query(
+      `SELECT question_id FROM questionnaire_questions
+       WHERE questionnaire_id = $1 AND question_id = ANY($2)`,
+      [questionnaireId, submittedQuestionIds]
+    );
+    const validIds = new Set(validQuestionsResult.rows.map(r => r.question_id));
+    const invalidIds = submittedQuestionIds.filter(id => !validIds.has(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        error: { message: `Question IDs not part of this questionnaire: ${invalidIds.join(', ')}` },
+      });
+    }
+
+    // Validate scaleItemId values are integers when provided (M9)
+    for (const answer of answers) {
+      if (answer.scaleItemId !== undefined && answer.scaleItemId !== null) {
+        const parsed = parseInt(answer.scaleItemId, 10);
+        if (isNaN(parsed)) {
+          return res.status(400).json({ error: { message: 'scaleItemId must be an integer' } });
+        }
+      }
+    }
+
     await client.query('BEGIN');
 
     // Create feedback session
@@ -86,9 +111,7 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
           ? answer.textValue
           : (answer.value && typeof answer.value === 'object' ? JSON.stringify(answer.value) : null);
 
-      const scaleItemId = answer.scaleItemId !== undefined && answer.scaleItemId !== null
-        ? parseInt(answer.scaleItemId, 10)
-        : null;
+      const scaleItemId = answer.scaleItemId != null ? parseInt(answer.scaleItemId, 10) : null;
 
       await client.query(
         'INSERT INTO feedback_answers (session_id, question_id, scale_item_id, value, text_value) VALUES ($1, $2, $3, $4, $5)',

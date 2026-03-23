@@ -341,3 +341,18 @@ If a deployment fails mid-migration, there is no documented rollback path.
 | 2026-03-23 | C3 | `backend/src/routes/admin.js` — re-enabled `apiLimiter` for non-development environments |
 | 2026-03-23 | C4 | `backend/src/routes/locations.js` — location login now issues a signed JWT; `backend/src/routes/feedback.js` — validates location token when `password_required`; `frontend/src/api/index.js` — `submitFeedback` accepts and sends `X-Location-Token`; `frontend/src/pages/FeedbackPage.jsx` — stores token from login response in sessionStorage, passes it on submit, clears on logout |
 | 2026-03-23 | H1 | `backend/src/routes/locations.js:56` — null-guarded `pattern.start_hour` / `pattern.end_hour` |
+| 2026-03-23 | H2 | Admin JWT migrated to `httpOnly; Secure; SameSite=Strict` cookie. `auth.js` middleware reads cookie as fallback to Bearer header. `admin.js` sets cookie on login, adds `POST /logout` and `GET /me`. `api/index.js` uses `credentials: 'include'`, removes `localStorage` token usage. `AdminPage.jsx` verifies session via `/me` on mount, uses `sessionStorage` as hint, calls logout endpoint. |
+| 2026-03-23 | H4 | `backend/src/routes/feedback.js` — validates all submitted `questionId`s belong to the questionnaire before inserting |
+| 2026-03-23 | H5 | `backend/src/routes/admin.js` — `startDate`/`endDate` validated with `isValidDate()` on results and export endpoints |
+| 2026-03-23 | H6 | `backend/src/routes/admin.js` — `multiScaleLayout` validated against `VALID_MULTI_SCALE_LAYOUTS` constant before storing |
+| 2026-03-23 | H7 | `backend/src/app.js` — error handler returns generic message for 5xx in production; detail only in development |
+| 2026-03-23 | H8 | `backend/src/server.js` — startup exits if no database config present in production |
+| 2026-03-23 | M1 | `backend/src/routes/admin.js` — schedules list replaced with single `json_agg` query; eliminates 2N+1 queries |
+| 2026-03-23 | M2 | `backend/src/routes/admin.js` — results (max 5000) and export (max 50000) endpoints accept `limit`/`offset` params |
+| 2026-03-23 | M3 | `backend/src/routes/admin.js` — answer view AVG aggregation replaced with single `GROUP BY` query across all views |
+| 2026-03-23 | M5 | `backend/src/routes/locations.js` — added SQL comment explaining intentional `continuous_scale` exclusion |
+| 2026-03-23 | M6 | `backend/src/routes/admin.js` — scale item UPDATE loop now checks `rowCount` and throws 404 if item not found |
+| 2026-03-23 | M9 | `backend/src/routes/feedback.js` — `scaleItemId` `parseInt` NaN validated before transaction begins |
+| 2026-03-23 | L1 | `backend/src/routes/admin.js` — `BCRYPT_ROUNDS`, `VALID_MULTI_SCALE_LAYOUTS`, `isValidDate` extracted as named constants |
+| 2026-03-23 | L3 | `frontend/src/api/index.js` — resolved API base URL logged via `console.debug` on init |
+| 2026-03-23 | L6 | `backend/src/app.js` — CORS_ORIGIN warning elevated to `console.error` |

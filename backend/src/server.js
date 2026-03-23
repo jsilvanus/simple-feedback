@@ -20,6 +20,13 @@ if (!adminPassword || DEFAULT_ADMIN_PASSWORDS.includes(adminPassword)) {
   else console.warn(msg);
 }
 
+// Validate database configuration
+if (!process.env.DATABASE_URL && !process.env.DB_HOST) {
+  const msg = '[CONFIG] No database configuration found. Set DATABASE_URL or DB_HOST/DB_NAME/DB_USER/DB_PASSWORD.';
+  if (isProduction) { console.error(msg); process.exit(1); }
+  else console.warn(msg);
+}
+
 const PORT = process.env.PORT || 3000;
 
 const server = app.listen(PORT, () => {

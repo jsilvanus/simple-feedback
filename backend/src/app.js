@@ -11,7 +11,7 @@ const app = express();
 const corsOrigin = process.env.CORS_ORIGIN;
 
 if (!corsOrigin && process.env.NODE_ENV === 'production') {
-  console.warn('[SECURITY] CORS_ORIGIN is not set in production. All cross-origin requests will be blocked. Set CORS_ORIGIN to your frontend URL(s).');
+  console.error('[SECURITY] CORS_ORIGIN is not set in production. All cross-origin requests will be blocked. Set CORS_ORIGIN to your frontend URL(s).');
 }
 
 const corsOptions = corsOrigin
@@ -41,12 +41,12 @@ app.use('/api/admin/images', require('./routes/images'));
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(err.status || 500).json({
-    error: {
-      message: err.message || 'Internal server error',
-      status: err.status || 500,
-    },
-  });
+  const status = err.status || 500;
+  // In production, hide internal error details from clients
+  const message = (status < 500 || process.env.NODE_ENV !== 'production')
+    ? (err.message || 'Internal server error')
+    : 'Internal server error';
+  res.status(status).json({ error: { message, status } });
 });
 
 // 404 handler

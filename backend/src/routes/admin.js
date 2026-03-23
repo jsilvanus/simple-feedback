@@ -6,6 +6,13 @@ const db = require('../db');
 const { loginLimiter, apiLimiter } = require('../middleware/rateLimiter');
 const { authenticate, JWT_SECRET } = require('../middleware/auth');
 
+// Shared constants
+const BCRYPT_ROUNDS = 10;
+const VALID_MULTI_SCALE_LAYOUTS = ['stacked', 'matrix', 'compact'];
+
+// Validates that a string is a parseable ISO 8601 date
+const isValidDate = (str) => !isNaN(Date.parse(str));
+
 /**
  * POST /api/admin/login
  * Admin login (simplified - no user table for now)
@@ -26,11 +33,16 @@ router.post('/login', loginLimiter, async (req, res, next) => {
         { expiresIn: '24h' }
       );
 
-      res.json({
-        success: true,
-        token,
-        expiresIn: 86400,
+      const isProduction = process.env.NODE_ENV === 'production';
+      res.cookie('adminToken', token, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'strict',
+        maxAge: 86400 * 1000, // 24h in ms
+        path: '/',
       });
+
+      res.json({ success: true, expiresIn: 86400 });
     } else {
       res.status(401).json({ error: { message: 'Invalid credentials' } });
     }
@@ -39,8 +51,25 @@ router.post('/login', loginLimiter, async (req, res, next) => {
   }
 });
 
+/**
+ * POST /api/admin/logout
+ * Clear the admin session cookie
+ */
+router.post('/logout', (req, res) => {
+  res.clearCookie('adminToken', { path: '/' });
+  res.json({ success: true });
+});
+
 // All routes below require authentication and rate limiting
 router.use(authenticate);
+
+/**
+ * GET /api/admin/me
+ * Return current authenticated user (used by frontend to validate cookie on page load)
+ */
+router.get('/me', (req, res) => {
+  res.json({ username: req.user.username, role: req.user.role });
+});
 if (process.env.NODE_ENV !== 'development') {
   router.use(apiLimiter);
 }
@@ -86,7 +115,7 @@ router.post('/locations', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Password is required when password protection is enabled' } });
     }
 
-    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
+    const passwordHash = password ? await bcrypt.hash(password, BCRYPT_ROUNDS) : null;
 
     const result = await db.query(
       `INSERT INTO locations
@@ -174,7 +203,7 @@ router.put('/locations/:id', async (req, res, next) => {
       }
     }
     if (password) {
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
       updates.push(`password_hash = $${paramCount++}`);
       values.push(passwordHash);
     }
@@ -848,8 +877,12 @@ router.put('/questions/:id', async (req, res, next) => {
     }
 
     if (multiScaleLayout !== undefined) {
+      const layout = multiScaleLayout || 'stacked';
+      if (!VALID_MULTI_SCALE_LAYOUTS.includes(layout)) {
+        return res.status(400).json({ error: { message: `multiScaleLayout must be one of: ${VALID_MULTI_SCALE_LAYOUTS.join(', ')}` } });
+      }
       updates.push(`multi_scale_layout = $${paramCount++}`);
-      values.push(multiScaleLayout || 'stacked');
+      values.push(layout);
     }
 
     if (multiScaleDefaults !== undefined) {
@@ -910,7 +943,7 @@ router.put('/questions/:id', async (req, res, next) => {
 
       // Update items that already exist (preserve their IDs)
       for (const item of incomingWithId) {
-        await client.query(
+        const updateResult = await client.query(
           `UPDATE question_scale_items SET
              answer_scale_id = $1, label = $2, order_index = $3, display_mode = $4,
              show_end_labels = $5, show_value_labels = $6, show_item_label = $7,
@@ -931,6 +964,9 @@ router.put('/questions/:id', async (req, res, next) => {
             id,
           ]
         );
+        if (updateResult.rowCount === 0) {
+          throw Object.assign(new Error(`Scale item ${item.id} not found for question ${id}`), { status: 404 });
+        }
       }
 
       // Insert genuinely new items
@@ -1237,59 +1273,49 @@ router.put('/questionnaires/:id', async (req, res, next) => {
  */
 router.get('/schedules', async (req, res, next) => {
   try {
-    // Get all schedules with location and location group info
+    // Single query fetching schedules with questionnaires and location targets via json_agg
     const schedulesResult = await db.query(
-      `SELECT s.*, 
-              l.name as location_name, l.slug as location_slug,
-              lg.name as location_group_name
+      `SELECT
+         s.*,
+         COALESCE(
+           (SELECT json_agg(
+                     json_build_object('id', q.id, 'name', q.name, 'display_order', sq.display_order)
+                     ORDER BY sq.display_order
+                   )
+            FROM schedule_questionnaires sq
+            JOIN questionnaires q ON sq.questionnaire_id = q.id
+            WHERE sq.schedule_id = s.id),
+           -- Legacy fallback: single questionnaire_id column
+           CASE WHEN s.questionnaire_id IS NOT NULL THEN
+             (SELECT json_agg(json_build_object('id', q.id, 'name', q.name, 'display_order', 0))
+              FROM questionnaires q WHERE q.id = s.questionnaire_id)
+           END,
+           '[]'::json
+         ) AS questionnaires,
+         COALESCE(
+           (SELECT json_agg(
+                     json_build_object(
+                       'location_id', sl.location_id,
+                       'location_group_id', sl.location_group_id,
+                       'location_name', l.name,
+                       'location_slug', l.slug,
+                       'location_group_name', lg.name
+                     )
+                   )
+            FROM schedule_locations sl
+            LEFT JOIN locations l ON sl.location_id = l.id
+            LEFT JOIN location_groups lg ON sl.location_group_id = lg.id
+            WHERE sl.schedule_id = s.id),
+           '[]'::json
+         ) AS "locationTargets"
        FROM schedules s
-       LEFT JOIN locations l ON s.location_id = l.id
-       LEFT JOIN location_groups lg ON s.location_group_id = lg.id
        ORDER BY s.start_time DESC`
     );
 
-    // For each schedule, get associated questionnaires and location targets
-    const schedules = await Promise.all(
-      schedulesResult.rows.map(async (schedule) => {
-        // Try to get questionnaires from junction table first
-        let questionnairesResult = await db.query(
-          `SELECT q.id, q.name, sq.display_order
-           FROM schedule_questionnaires sq
-           JOIN questionnaires q ON sq.questionnaire_id = q.id
-           WHERE sq.schedule_id = $1
-           ORDER BY sq.display_order`,
-          [schedule.id]
-        );
-
-        // If no questionnaires in junction table and legacy questionnaire_id exists, use that
-        if (questionnairesResult.rows.length === 0 && schedule.questionnaire_id) {
-          const legacyResult = await db.query(
-            'SELECT id, name FROM questionnaires WHERE id = $1',
-            [schedule.questionnaire_id]
-          );
-          questionnairesResult.rows = legacyResult.rows.map(q => ({ ...q, display_order: 0 }));
-        }
-
-        // Get location targets from junction table
-        const locTargetsResult = await db.query(
-          `SELECT sl.location_id, sl.location_group_id,
-                  l.name  AS location_name,  l.slug AS location_slug,
-                  lg.name AS location_group_name
-           FROM schedule_locations sl
-           LEFT JOIN locations      l  ON sl.location_id       = l.id
-           LEFT JOIN location_groups lg ON sl.location_group_id = lg.id
-           WHERE sl.schedule_id = $1`,
-          [schedule.id]
-        );
-
-        return {
-          ...schedule,
-          questionnaires: questionnairesResult.rows,
-          questionnaire_name: questionnairesResult.rows[0]?.name || null,
-          locationTargets: locTargetsResult.rows,
-        };
-      })
-    );
+    const schedules = schedulesResult.rows.map(s => ({
+      ...s,
+      questionnaire_name: (s.questionnaires[0] || null)?.name || null,
+    }));
 
     res.json(schedules);
   } catch (error) {
@@ -1745,6 +1771,15 @@ router.delete('/answer-views/:id', async (req, res, next) => {
 router.get('/results', async (req, res, next) => {
   try {
     const { locationId, questionnaireId, startDate, endDate } = req.query;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 1000, 5000);
+    const offset = parseInt(req.query.offset, 10) || 0;
+
+    if (startDate && !isValidDate(startDate)) {
+      return res.status(400).json({ error: { message: 'startDate is not a valid date' } });
+    }
+    if (endDate && !isValidDate(endDate)) {
+      return res.status(400).json({ error: { message: 'endDate is not a valid date' } });
+    }
 
     let query = `
       SELECT
@@ -1809,7 +1844,12 @@ router.get('/results', async (req, res, next) => {
       params.push(endDate);
     }
 
-    query += ' ORDER BY fs.timestamp DESC';
+    paramCount++;
+    query += ` ORDER BY fs.timestamp DESC LIMIT $${paramCount}`;
+    params.push(limit);
+    paramCount++;
+    query += ` OFFSET $${paramCount}`;
+    params.push(offset);
 
     const result = await db.query(query, params);
 
@@ -1847,34 +1887,36 @@ router.get('/results', async (req, res, next) => {
         });
       });
 
-      // For each view, compute average per axis question
-      for (const view of Object.values(viewMap)) {
-        const questionIds = view.axes.map(a => a.questionId);
-        if (questionIds.length === 0) { answerViews.push(view); continue; }
+      // Compute averages for all view axes in a single query grouped by question
+      const allAxisQuestionIds = [...new Set(
+        Object.values(viewMap).flatMap(v => v.axes.map(a => a.questionId))
+      )];
 
+      const avgByQuestion = {};
+      if (allAxisQuestionIds.length > 0) {
         let avgQuery = `
-          SELECT fa.question_id, AVG(fa.value::numeric) as avg_value, COUNT(*) as response_count
+          SELECT fa.question_id, AVG(fa.value::numeric) AS avg_value, COUNT(*) AS response_count
           FROM feedback_answers fa
           JOIN feedback_sessions fs ON fa.session_id = fs.id
           WHERE fa.question_id = ANY($1) AND fs.questionnaire_id = $2
         `;
-        const avgParams = [questionIds, questionnaireId];
+        const avgParams = [allAxisQuestionIds, questionnaireId];
         let paramIdx = 2;
-
         if (locationId) { paramIdx++; avgQuery += ` AND fs.location_id = $${paramIdx}`; avgParams.push(locationId); }
-        if (startDate) { paramIdx++; avgQuery += ` AND fs.timestamp >= $${paramIdx}`; avgParams.push(startDate); }
-        if (endDate) { paramIdx++; avgQuery += ` AND fs.timestamp <= $${paramIdx}`; avgParams.push(endDate); }
+        if (startDate)  { paramIdx++; avgQuery += ` AND fs.timestamp >= $${paramIdx}`; avgParams.push(startDate); }
+        if (endDate)    { paramIdx++; avgQuery += ` AND fs.timestamp <= $${paramIdx}`; avgParams.push(endDate); }
         avgQuery += ' GROUP BY fa.question_id';
 
         const avgResult = await db.query(avgQuery, avgParams);
-        const avgByQuestion = {};
         avgResult.rows.forEach(r => {
           avgByQuestion[r.question_id] = {
             avg: parseFloat(r.avg_value),
             count: parseInt(r.response_count, 10),
           };
         });
+      }
 
+      for (const view of Object.values(viewMap)) {
         view.axes = view.axes.map(axis => ({
           ...axis,
           avg: avgByQuestion[axis.questionId]?.avg ?? null,
@@ -1884,7 +1926,7 @@ router.get('/results', async (req, res, next) => {
       }
     }
 
-    res.json({ rows: result.rows, answerViews });
+    res.json({ rows: result.rows, answerViews, limit, offset });
   } catch (error) {
     next(error);
   }
@@ -1897,6 +1939,15 @@ router.get('/results', async (req, res, next) => {
 router.get('/export', async (req, res, next) => {
   try {
     const { locationId, questionnaireId, startDate, endDate } = req.query;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10000, 50000);
+    const offset = parseInt(req.query.offset, 10) || 0;
+
+    if (startDate && !isValidDate(startDate)) {
+      return res.status(400).json({ error: { message: 'startDate is not a valid date' } });
+    }
+    if (endDate && !isValidDate(endDate)) {
+      return res.status(400).json({ error: { message: 'endDate is not a valid date' } });
+    }
 
     let query = `
       SELECT
@@ -1946,7 +1997,12 @@ router.get('/export', async (req, res, next) => {
       params.push(endDate);
     }
 
-    query += ' ORDER BY fs.timestamp DESC';
+    paramCount++;
+    query += ` ORDER BY fs.timestamp DESC LIMIT $${paramCount}`;
+    params.push(limit);
+    paramCount++;
+    query += ` OFFSET $${paramCount}`;
+    params.push(offset);
 
     const result = await db.query(query, params);
 
