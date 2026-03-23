@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { apiLimiter, loginLimiter } = require('../middleware/rateLimiter');
+const { JWT_SECRET } = require('../middleware/auth');
 
 /**
  * GET /api/locations/:slug/questionnaire
@@ -53,7 +55,11 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
       } else if (schedule.schedule_type === 'recurring_weekday' && schedule.weekday_pattern) {
         const pattern = schedule.weekday_pattern;
         const isDayActive = pattern.days && pattern.days.includes(currentDayOfWeek);
-        const isTimeActive = currentTime >= pattern.start_hour && currentTime <= pattern.end_hour;
+        const isTimeActive =
+          pattern.start_hour != null &&
+          pattern.end_hour != null &&
+          currentTime >= pattern.start_hour &&
+          currentTime <= pattern.end_hour;
         return isDayActive && isTimeActive;
       }
       return false;
@@ -270,12 +276,20 @@ router.post('/:slug/login', loginLimiter, async (req, res, next) => {
     }
 
     const isValid = await bcrypt.compare(password, location.password_hash);
-    
+
     if (!isValid) {
       return res.status(401).json({ error: { message: 'Invalid password' } });
     }
 
-    res.json({ success: true, message: 'Authenticated successfully' });
+    // Issue a short-lived token scoped to this location so the feedback endpoint
+    // can verify server-side that the user authenticated before submitting.
+    const locationToken = jwt.sign(
+      { locationId: location.id, role: 'location' },
+      JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    res.json({ success: true, message: 'Authenticated successfully', locationToken });
   } catch (error) {
     next(error);
   }

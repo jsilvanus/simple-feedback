@@ -41,8 +41,9 @@ router.post('/login', loginLimiter, async (req, res, next) => {
 
 // All routes below require authentication and rate limiting
 router.use(authenticate);
-// router.use(apiLimiter);
-// Deactivated in development to avoid hitting limits during testing, but should be enabled in production
+if (process.env.NODE_ENV !== 'development') {
+  router.use(apiLimiter);
+}
 
 /**
  * GET /api/admin/locations

@@ -7,12 +7,24 @@ const WEAK_SECRETS = [
   'changeme',
 ];
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+let jwtSecretError = null;
 if (!process.env.JWT_SECRET) {
-  console.warn('[SECURITY] JWT_SECRET environment variable is not set. Using insecure default. Set JWT_SECRET in production!');
+  jwtSecretError = '[SECURITY] JWT_SECRET environment variable is not set. Set a strong JWT_SECRET.';
 } else if (process.env.JWT_SECRET.length < 32) {
-  console.warn('[SECURITY] JWT_SECRET is too short. Use at least 32 characters in production!');
+  jwtSecretError = '[SECURITY] JWT_SECRET is too short. Use at least 32 characters.';
 } else if (WEAK_SECRETS.includes(process.env.JWT_SECRET)) {
-  console.warn('[SECURITY] JWT_SECRET is a known weak/default value. Change it in production!');
+  jwtSecretError = '[SECURITY] JWT_SECRET is a known weak/default value. Change it before deploying.';
+}
+
+if (jwtSecretError) {
+  if (isProduction) {
+    console.error(jwtSecretError);
+    process.exit(1);
+  } else {
+    console.warn(jwtSecretError);
+  }
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';

@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { feedbackLimiter } = require('../middleware/rateLimiter');
+const { JWT_SECRET } = require('../middleware/auth');
 
 /**
  * POST /api/feedback
@@ -30,9 +32,34 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
     }
 
     if (answers.length === 0) {
-      return res.status(400).json({ 
-        error: { message: 'At least one answer is required' } 
+      return res.status(400).json({
+        error: { message: 'At least one answer is required' },
       });
+    }
+
+    // Check if the target location is password-protected; if so, require a valid location token.
+    const locationRow = await client.query(
+      'SELECT password_required FROM locations WHERE id = $1 AND active = true',
+      [locationId]
+    );
+
+    if (locationRow.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Location not found' } });
+    }
+
+    if (locationRow.rows[0].password_required) {
+      const locationToken = req.headers['x-location-token'];
+      if (!locationToken) {
+        return res.status(401).json({ error: { message: 'Location authentication required' } });
+      }
+      try {
+        const decoded = jwt.verify(locationToken, JWT_SECRET);
+        if (decoded.role !== 'location' || String(decoded.locationId) !== String(locationId)) {
+          return res.status(403).json({ error: { message: 'Location token is not valid for this location' } });
+        }
+      } catch {
+        return res.status(401).json({ error: { message: 'Invalid or expired location token' } });
+      }
     }
 
     await client.query('BEGIN');
