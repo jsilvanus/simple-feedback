@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { loginLimiter, apiLimiter } = require('../middleware/rateLimiter');
 const { authenticate, JWT_SECRET } = require('../middleware/auth');
+const { generateCsrfToken, setCsrfCookie, verifyCsrf } = require('../middleware/csrf');
 
 // Shared constants
 const BCRYPT_ROUNDS = 10;
@@ -38,9 +39,12 @@ router.post('/login', loginLimiter, async (req, res, next) => {
         httpOnly: true,
         secure: isProduction,
         sameSite: 'strict',
-        maxAge: 86400 * 1000, // 24h in ms
+        maxAge: 86400 * 1000,
         path: '/',
       });
+
+      const csrfToken = generateCsrfToken();
+      setCsrfCookie(res, csrfToken);
 
       res.json({ success: true, expiresIn: 86400 });
     } else {
@@ -57,11 +61,16 @@ router.post('/login', loginLimiter, async (req, res, next) => {
  */
 router.post('/logout', (req, res) => {
   res.clearCookie('adminToken', { path: '/' });
+  res.clearCookie('csrfToken', { path: '/' });
   res.json({ success: true });
 });
 
-// All routes below require authentication and rate limiting
+// All routes below require authentication, CSRF verification, and rate limiting
 router.use(authenticate);
+router.use(verifyCsrf);
+if (process.env.NODE_ENV !== 'development') {
+  router.use(apiLimiter);
+}
 
 /**
  * GET /api/admin/me
@@ -70,9 +79,6 @@ router.use(authenticate);
 router.get('/me', (req, res) => {
   res.json({ username: req.user.username, role: req.user.role });
 });
-if (process.env.NODE_ENV !== 'development') {
-  router.use(apiLimiter);
-}
 
 /**
  * GET /api/admin/locations
@@ -1366,7 +1372,8 @@ router.post('/schedules', async (req, res, next) => {
       startTime,        // For date_based
       endTime,          // For date_based
       weekdayPattern,   // For recurring_weekday: {days: [1,2,3], start_hour: "09:00", end_hour: "17:00"}
-      showOnlyOne       // Boolean
+      showOnlyOne,      // Boolean
+      timezone,         // IANA timezone string, e.g. 'Europe/Helsinki' (default 'UTC')
     } = req.body;
 
     if (!questionnaireIds || !Array.isArray(questionnaireIds) || questionnaireIds.length === 0) {
@@ -1409,8 +1416,8 @@ router.post('/schedules', async (req, res, next) => {
 
     const scheduleResult = await client.query(
       `INSERT INTO schedules
-       (schedule_type, start_time, end_time, weekday_pattern, show_only_one, location_id, location_group_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (schedule_type, start_time, end_time, weekday_pattern, show_only_one, timezone, location_id, location_group_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         type,
@@ -1418,8 +1425,9 @@ router.post('/schedules', async (req, res, next) => {
         type === 'date_based' ? endTime : null,
         type === 'recurring_weekday' ? JSON.stringify(weekdayPattern) : null,
         showOnlyOne || false,
+        timezone || 'UTC',
         locationId,
-        locationGroupId
+        locationGroupId,
       ]
     );
 
@@ -1474,7 +1482,8 @@ router.put('/schedules/:id', async (req, res, next) => {
       startTime,
       endTime,
       weekdayPattern,
-      showOnlyOne
+      showOnlyOne,
+      timezone,
     } = req.body;
 
     await client.query('BEGIN');
@@ -1503,6 +1512,10 @@ router.put('/schedules/:id', async (req, res, next) => {
     if (showOnlyOne !== undefined) {
       updates.push(`show_only_one = $${paramCount++}`);
       values.push(showOnlyOne);
+    }
+    if (timezone !== undefined) {
+      updates.push(`timezone = $${paramCount++}`);
+      values.push(timezone || 'UTC');
     }
 
     if (updates.length > 0) {

@@ -28,8 +28,6 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
 
     // Get active schedule for this location
     const now = new Date();
-    const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const currentTime = now.toTimeString().substring(0, 5); // HH:MM format
 
     // Query for active schedules (both location-specific and group-level)
     // Priority: location-specific schedules first, then group-level schedules
@@ -48,18 +46,26 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
       [location.id, location.group_id, now]
     );
 
-    // Filter recurring schedules based on current day and time
+    // Filter recurring schedules based on current day and time in the schedule's timezone
     const activeSchedules = scheduleResult.rows.filter(schedule => {
       if (schedule.schedule_type === 'date_based') {
         return true; // Already filtered in SQL
       } else if (schedule.schedule_type === 'recurring_weekday' && schedule.weekday_pattern) {
+        const tz = schedule.timezone || 'UTC';
+        // Convert "now" into the schedule's timezone using Intl
+        const localStr = now.toLocaleString('en-CA', { timeZone: tz, hour12: false });
+        // en-CA gives YYYY-MM-DD, HH:MM:SS — parse day-of-week and HH:MM
+        const localDate = new Date(localStr.replace(',', ''));
+        const tzDayOfWeek = localDate.getDay();
+        const tzTime = localStr.slice(11, 16); // HH:MM
+
         const pattern = schedule.weekday_pattern;
-        const isDayActive = pattern.days && pattern.days.includes(currentDayOfWeek);
+        const isDayActive = pattern.days && pattern.days.includes(tzDayOfWeek);
         const isTimeActive =
           pattern.start_hour != null &&
           pattern.end_hour != null &&
-          currentTime >= pattern.start_hour &&
-          currentTime <= pattern.end_hour;
+          tzTime >= pattern.start_hour &&
+          tzTime <= pattern.end_hour;
         return isDayActive && isTimeActive;
       }
       return false;

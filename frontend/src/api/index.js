@@ -38,6 +38,13 @@ const buildApiUrl = (path) => {
   return `${API_BASE}${normalizedPath}`;
 };
 
+// Read the CSRF token from the csrfToken cookie (set by the server on login)
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrfToken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
 export const api = {
   // Get questionnaire for a location
   async getQuestionnaire(slug) {
@@ -124,6 +131,7 @@ export const api = {
   // Get admin data with authentication — cookie is sent automatically
   async adminRequest(endpoint, options = {}) {
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const csrfToken = getCsrfToken();
 
     const response = await fetch(buildApiUrl(`/admin${normalizedEndpoint}`), {
       ...options,
@@ -131,6 +139,7 @@ export const api = {
       headers: {
         ...options.headers,
         'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       },
     });
 
