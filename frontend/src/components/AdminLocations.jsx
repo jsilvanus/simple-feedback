@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
+import Pagination from './Pagination';
 import './AdminCrud.css';
+
+const PAGE_SIZE = 20;
 
 export function LocationForm({ entity, locationGroups, onSave, onCancel }) {
   const { t } = useTranslation();
@@ -143,6 +146,7 @@ export default function AdminLocations() {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingEntity, setEditingEntity] = useState(null);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     loadLocations();
@@ -245,7 +249,7 @@ export default function AdminLocations() {
               </tr>
             </thead>
             <tbody>
-              {locations.map((location) => (
+              {locations.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((location) => (
                 <tr key={location.id}>
                   <td><code>/{location.slug}</code></td>
                   <td>{location.name}</td>
@@ -282,6 +286,12 @@ export default function AdminLocations() {
             </tbody>
           </table>
         )}
+        <Pagination
+          total={locations.length}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPage={setPage}
+        />
       </div>
     </div>
   );

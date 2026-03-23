@@ -1,30 +1,37 @@
 const rateLimit = require('express-rate-limit');
 
-// General rate limiter for API endpoints
+
+// General rate limiter for API endpoints — 100 req / 15 min
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({
+    error: { message: 'Too many requests. Please try again later.' },
+  }),
 });
 
-// Strict rate limiter for login endpoint
+// Strict rate limiter for login endpoint — 5 req / 15 min
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login attempts per windowMs
-  message: 'Too many login attempts, please try again later.',
+  windowMs: 15 * 60 * 1000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({
+    error: { message: 'Too many login attempts. Please try again later.' },
+  }),
 });
 
-// Rate limiter for feedback submissions
+// Rate limiter for feedback submissions — 10 req / min
 const feedbackLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // Limit each IP to 10 feedback submissions per minute
-  message: 'Too many feedback submissions, please slow down.',
+  windowMs: 60 * 1000,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({
+    error: { message: 'Too many feedback submissions. Please slow down.' },
+  }),
 });
 
 module.exports = {

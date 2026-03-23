@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { apiLimiter, loginLimiter } = require('../middleware/rateLimiter');
+const { JWT_SECRET } = require('../middleware/auth');
 
 /**
  * GET /api/locations/:slug/questionnaire
@@ -26,8 +28,6 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
 
     // Get active schedule for this location
     const now = new Date();
-    const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const currentTime = now.toTimeString().substring(0, 5); // HH:MM format
 
     // Query for active schedules (both location-specific and group-level)
     // Priority: location-specific schedules first, then group-level schedules
@@ -46,14 +46,26 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
       [location.id, location.group_id, now]
     );
 
-    // Filter recurring schedules based on current day and time
+    // Filter recurring schedules based on current day and time in the schedule's timezone
     const activeSchedules = scheduleResult.rows.filter(schedule => {
       if (schedule.schedule_type === 'date_based') {
         return true; // Already filtered in SQL
       } else if (schedule.schedule_type === 'recurring_weekday' && schedule.weekday_pattern) {
+        const tz = schedule.timezone || 'UTC';
+        // Convert "now" into the schedule's timezone using Intl
+        const localStr = now.toLocaleString('en-CA', { timeZone: tz, hour12: false });
+        // en-CA gives YYYY-MM-DD, HH:MM:SS — parse day-of-week and HH:MM
+        const localDate = new Date(localStr.replace(',', ''));
+        const tzDayOfWeek = localDate.getDay();
+        const tzTime = localStr.slice(11, 16); // HH:MM
+
         const pattern = schedule.weekday_pattern;
-        const isDayActive = pattern.days && pattern.days.includes(currentDayOfWeek);
-        const isTimeActive = currentTime >= pattern.start_hour && currentTime <= pattern.end_hour;
+        const isDayActive = pattern.days && pattern.days.includes(tzDayOfWeek);
+        const isTimeActive =
+          pattern.start_hour != null &&
+          pattern.end_hour != null &&
+          tzTime >= pattern.start_hour &&
+          tzTime <= pattern.end_hour;
         return isDayActive && isTimeActive;
       }
       return false;
@@ -107,6 +119,7 @@ router.get('/:slug/questionnaire', apiLimiter, async (req, res, next) => {
            LEFT JOIN answer_scales a ON q.answer_scale_id = a.id
            LEFT JOIN word_cloud_options wc ON q.word_cloud_options_id = wc.id
            WHERE qq.questionnaire_id = $1
+             -- continuous_scale intentionally excluded from kiosk view; shown only in admin radar/answer views
              AND q.type IN ('scale', 'text', 'wordcloud')
            ORDER BY qq.page_number, qq.order_index`,
           [q.id]
@@ -270,12 +283,20 @@ router.post('/:slug/login', loginLimiter, async (req, res, next) => {
     }
 
     const isValid = await bcrypt.compare(password, location.password_hash);
-    
+
     if (!isValid) {
       return res.status(401).json({ error: { message: 'Invalid password' } });
     }
 
-    res.json({ success: true, message: 'Authenticated successfully' });
+    // Issue a short-lived token scoped to this location so the feedback endpoint
+    // can verify server-side that the user authenticated before submitting.
+    const locationToken = jwt.sign(
+      { locationId: location.id, role: 'location' },
+      JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    res.json({ success: true, message: 'Authenticated successfully', locationToken });
   } catch (error) {
     next(error);
   }

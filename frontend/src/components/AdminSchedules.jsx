@@ -5,6 +5,15 @@ import './AdminCrud.css';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const COMMON_TIMEZONES = [
+  'UTC',
+  'Europe/Helsinki', 'Europe/Stockholm', 'Europe/London',
+  'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid', 'Europe/Rome',
+  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+  'America/Sao_Paulo', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Kolkata',
+  'Australia/Sydney',
+];
+
 const DEFAULT_FORM_DATA = {
   locationTargets: [], // [{type: 'location'|'group', id: string}]
   questionnaireIds: [],
@@ -12,6 +21,7 @@ const DEFAULT_FORM_DATA = {
   dateRanges: [{ startTime: '', endTime: '' }],
   weekdayRules: [{ days: [], start_hour: '09:00', end_hour: '17:00' }],
   showOnlyOne: false,
+  timezone: 'UTC',
 };
 
 function entityToFormData(schedule) {
@@ -30,6 +40,7 @@ function entityToFormData(schedule) {
     }],
     weekdayRules: [schedule.weekday_pattern || { days: [], start_hour: '09:00', end_hour: '17:00' }],
     showOnlyOne: schedule.show_only_one || false,
+    timezone: schedule.timezone || 'UTC',
   };
 }
 
@@ -142,6 +153,7 @@ export function ScheduleForm({ entity, locations, locationGroups, questionnaires
         questionnaireIds: formData.questionnaireIds.map((id) => Number.parseInt(id, 10)),
         scheduleType: formData.scheduleType,
         showOnlyOne: formData.showOnlyOne,
+        timezone: formData.timezone || 'UTC',
       };
 
       const scheduleEntries =
@@ -278,6 +290,19 @@ export function ScheduleForm({ entity, locations, locationGroups, questionnaires
             {t('admin.showOnlyFirstQuestionnaire')}: {formData.showOnlyOne ? t('common.yes') : t('common.no')}
           </button>
           <small>{t('admin.showOnlyFirstQuestionnaireDesc')}</small>
+        </div>
+
+        <div className="form-group">
+          <label>Timezone</label>
+          <select
+            value={formData.timezone}
+            onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+          >
+            {COMMON_TIMEZONES.map(tz => (
+              <option key={tz} value={tz}>{tz}</option>
+            ))}
+          </select>
+          <small>Time comparisons for recurring schedules use this timezone.</small>
         </div>
 
         <div className="form-group">

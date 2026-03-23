@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
@@ -18,28 +18,45 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
-  const [loggedIn, setLoggedIn] = useState(!!localStorage.getItem('adminToken'));
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
+
+  // On mount, verify the httpOnly cookie is still valid if we previously logged in
+  useEffect(() => {
+    if (sessionStorage.getItem('adminLoggedIn') !== 'true') {
+      setAuthChecked(true);
+      return;
+    }
+    api.adminMe()
+      .then(() => setLoggedIn(true))
+      .catch(() => sessionStorage.removeItem('adminLoggedIn'))
+      .finally(() => setAuthChecked(true));
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
-    
+
     try {
-      const result = await api.adminLogin(loginForm.username, loginForm.password);
-      localStorage.setItem('adminToken', result.token);
+      await api.adminLogin(loginForm.username, loginForm.password);
+      sessionStorage.setItem('adminLoggedIn', 'true');
       setLoggedIn(true);
     } catch (err) {
       setLoginError('Invalid credentials');
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
+  const handleLogout = async () => {
+    await api.adminLogout();
+    sessionStorage.removeItem('adminLoggedIn');
     setLoggedIn(false);
     setActiveTab('overview');
   };
+
+  // Show nothing while we verify the cookie to avoid flashing the login form
+  if (!authChecked) return null;
 
   if (!loggedIn) {
     return (
