@@ -45,12 +45,14 @@ export const api = {
   },
 
   // Submit feedback
-  async submitFeedback(locationId, questionnaireId, answers) {
+  async submitFeedback(locationId, questionnaireId, answers, locationToken) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (locationToken) {
+      headers['X-Location-Token'] = locationToken;
+    }
     const response = await fetch(buildApiUrl('/feedback'), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         locationId,
         questionnaireId,

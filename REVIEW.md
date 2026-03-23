@@ -339,5 +339,5 @@ If a deployment fails mid-migration, there is no documented rollback path.
 | 2026-03-23 | C1 | Added startup validation in `backend/src/server.js`; exits if `ADMIN_PASSWORD` / `ADMIN_USERNAME` are unset or default in production |
 | 2026-03-23 | C2 | `backend/src/middleware/auth.js` — weak/missing JWT secret now causes `process.exit(1)` in production instead of a warning |
 | 2026-03-23 | C3 | `backend/src/routes/admin.js` — re-enabled `apiLimiter` for non-development environments |
-| 2026-03-23 | C4 | `backend/src/routes/locations.js` — location login now issues a signed JWT; `backend/src/routes/feedback.js` — validates location token when `password_required` |
+| 2026-03-23 | C4 | `backend/src/routes/locations.js` — location login now issues a signed JWT; `backend/src/routes/feedback.js` — validates location token when `password_required`; `frontend/src/api/index.js` — `submitFeedback` accepts and sends `X-Location-Token`; `frontend/src/pages/FeedbackPage.jsx` — stores token from login response in sessionStorage, passes it on submit, clears on logout |
 | 2026-03-23 | H1 | `backend/src/routes/locations.js:56` — null-guarded `pattern.start_hour` / `pattern.end_hour` |

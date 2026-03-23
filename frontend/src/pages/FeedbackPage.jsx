@@ -50,7 +50,7 @@ export default function FeedbackPage() {
   const checkAuthAndLoad = async () => {
     try {
       const result = await loadQuestionnaire();
-      const isAuthenticated = sessionStorage.getItem(`location_auth_${locationSlug}`) === 'true';
+      const isAuthenticated = !!sessionStorage.getItem(`location_token_${locationSlug}`);
 
       if (result?.location?.passwordRequired && !isAuthenticated) {
         setAuthRequired(true);
@@ -123,8 +123,10 @@ export default function FeedbackPage() {
     try {
       setLoading(true);
       setAuthError('');
-      await api.authenticateLocation(locationSlug, pass);
-      sessionStorage.setItem(`location_auth_${locationSlug}`, 'true');
+      const result = await api.authenticateLocation(locationSlug, pass);
+      if (result.locationToken) {
+        sessionStorage.setItem(`location_token_${locationSlug}`, result.locationToken);
+      }
       setAuthRequired(false);
       await loadQuestionnaire();
     } catch (err) {
@@ -140,7 +142,7 @@ export default function FeedbackPage() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem(`location_auth_${locationSlug}`);
+    sessionStorage.removeItem(`location_token_${locationSlug}`);
     setData(null);
     setAnswers({});
     setCurrentPage(0);
@@ -242,10 +244,12 @@ export default function FeedbackPage() {
         });
       });
 
+      const locationToken = sessionStorage.getItem(`location_token_${locationSlug}`);
       await api.submitFeedback(
         data.location.id,
         data.questionnaire.id,
-        formattedAnswers
+        formattedAnswers,
+        locationToken
       );
 
       setSuccess(true);
