@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/jsilvanus/simple-feedback:main
+    image: ghcr.io/jsilvanus/simple-feedback:${IMAGE_TAG:-latest}
     container_name: simple_feedback_backend
     env_file:
       - ./backend/.env

@@ -11,42 +11,51 @@ This document describes the three-environment deployment architecture for Simple
 - **Backend**: Built locally from source
 - **Usage**: Local development with `npm run dev` or `npm run dev:backend` + `npm run dev:db`
 - **Compose file**: `docker-compose.yml`
-- **Image**: Built on-the-fly from `./backend/Dockerfile`
+- **Image**: Built on-the-fly from `./backend/Dockerfile` (no GHCR needed)
 
 ### Staging
 - **PostgreSQL**: Container (via `docker-compose.staging.yml`)
-- **Backend**: Pre-built image from GHCR
+- **Backend**: Pre-built image from GHCR (tagged release)
 - **Usage**: Test deployments, feature validation
 - **Compose file**: `docker-compose.staging.yml`
-- **Image**: `ghcr.io/jsilvanus/simple-feedback:develop`
-- **Branch**: `develop`
-- **Deploy command**: `DEPLOY_BRANCH=develop ./scripts/deploy.sh` or `ENVIRONMENT=staging ./scripts/deploy.sh`
+- **Image**: `ghcr.io/jsilvanus/simple-feedback:v{version}`
+- **Deploy command**: `IMAGE_TAG=v1.0.0 ENVIRONMENT=staging ./scripts/deploy.sh`
 
 ### Production
 - **PostgreSQL**: External (connection URL provided via `DATABASE_URL` env var)
-- **Backend**: Pre-built image from GHCR
+- **Backend**: Pre-built image from GHCR (tagged release)
 - **Usage**: Live production deployment
 - **Compose file**: `docker-compose.prod.yml`
-- **Image**: `ghcr.io/jsilvanus/simple-feedback:main`
-- **Branch**: `main`
+- **Image**: `ghcr.io/jsilvanus/simple-feedback:v{version}`
 - **Reverse Proxy**: Traefik (external infrastructure project)
-- **Deploy command**: `./scripts/deploy.sh` or `ENVIRONMENT=production ./scripts/deploy.sh`
+- **Deploy command**: `IMAGE_TAG=v1.0.0 ENVIRONMENT=production ./scripts/deploy.sh`
 
 ---
 
 ## Image Publishing (GHCR)
 
-Images are automatically built and pushed to GitHub Container Registry on:
-- Push to `main` branch → tag: `main`
-- Push to `develop` branch → tag: `develop`
-- Push of git tags (v1.0.0, etc.) → tags: `v1.0.0`, `1.0`, `1`
-- Push to any branch → tag: `{branch}-{short-sha}`
+Images are built and pushed to GitHub Container Registry **only on git tags**:
+- Push of git tags (v1.0.0, v2.1.0, etc.) → tags: `v1.0.0`, `v2.1.0`, etc.
 
 **Workflow**: `.github/workflows/publish.yml`
 
 **Authentication**: Uses GitHub Actions `GITHUB_TOKEN` (automatic)
 
 **Registry**: `ghcr.io/jsilvanus/simple-feedback`
+
+### Publishing a Release
+
+To publish a new image:
+
+```bash
+# Tag on main branch
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The GitHub Actions workflow automatically:
+1. Builds the backend image
+2. Pushes to `ghcr.io/jsilvanus/simple-feedback:v1.0.0`
 
 ### Pulling Images
 
@@ -71,42 +80,43 @@ echo $GH_PAT | docker login ghcr.io -u USERNAME --password-stdin
 
 ### Usage
 
-**Production (main branch)**:
+**Production (explicit image tag)**:
 ```bash
-./scripts/deploy.sh
+IMAGE_TAG=v1.0.0 ENVIRONMENT=production ./scripts/deploy.sh
 ```
 
-**Staging (develop branch)**:
+**Staging (explicit image tag)**:
 ```bash
-DEPLOY_BRANCH=develop ./scripts/deploy.sh
+IMAGE_TAG=v1.0.0 ENVIRONMENT=staging ./scripts/deploy.sh
 ```
 
-**Explicit environment override**:
+**Custom repository directory**:
 ```bash
-ENVIRONMENT=staging ./scripts/deploy.sh
-ENVIRONMENT=production ./scripts/deploy.sh
-```
-
-**Custom repository/branch**:
-```bash
-DEPLOY_DIR=/srv/simple-feedback DEPLOY_BRANCH=main ./scripts/deploy.sh
+DEPLOY_DIR=/srv/simple-feedback IMAGE_TAG=v1.0.0 ENVIRONMENT=production ./scripts/deploy.sh
 ```
 
 ### Configuration
 
-| Variable | Default | Example |
-|----------|---------|---------|
-| `DEPLOY_BRANCH` | `main` | `develop`, `hotfix/bug-123` |
-| `ENVIRONMENT` | Auto-detected | `staging`, `production` |
-| `DEPLOY_DIR` | Script's parent dir | `/srv/simple-feedback` |
-| `COMPOSE_FILE` | Auto-selected | Override: `/etc/simple-feedback/docker-compose.prod.yml` |
+| Variable | Default | Required | Example |
+|----------|---------|----------|---------|
+| `IMAGE_TAG` | `latest` | ✅ Yes | `v1.0.0`, `v2.1.0` |
+| `ENVIRONMENT` | (none) | ✅ Yes | `staging`, `production` |
+| `DEPLOY_DIR` | Script's parent dir | ❌ No | `/srv/simple-feedback` |
+| `COMPOSE_FILE` | Auto-selected | ❌ No | Override: `/etc/simple-feedback/docker-compose.prod.yml` |
 
-### Auto-Detection Logic
+### Image Tag Format
 
-```
-DEPLOY_BRANCH=develop  →  ENVIRONMENT=staging
-DEPLOY_BRANCH=main     →  ENVIRONMENT=production
-(any other branch)     →  ENVIRONMENT=production (default)
+Tags must match Git tags from the repository:
+```bash
+# List available tags
+git tag -l
+
+# Create and push a new tag
+git tag v1.0.0
+git push origin v1.0.0
+
+# Deploy that tag
+IMAGE_TAG=v1.0.0 ENVIRONMENT=production ./scripts/deploy.sh
 ```
 
 ### Self-Updating
@@ -308,15 +318,18 @@ docker compose -f docker-compose.staging.yml exec backend ls src/db/migrations/
 
 ## Scheduled Deployments (Cron)
 
-To deploy automatically on a schedule:
+To deploy automatically on a schedule (e.g., after manual image publish):
 
 ```bash
 # /etc/cron.d/simple-feedback-deploy
-0 2 * * * deploy /home/deploy/simple-feedback/scripts/deploy.sh >> /var/log/simple-feedback-deploy.log 2>&1
+# Production: daily at 2 AM with latest tag
+0 2 * * * deploy IMAGE_TAG=v1.0.0 ENVIRONMENT=production /home/deploy/simple-feedback/scripts/deploy.sh >> /var/log/simple-feedback-deploy.log 2>&1
 
-# Staging deployment every hour
-0 * * * * deploy DEPLOY_BRANCH=develop /home/deploy/simple-feedback/scripts/deploy.sh >> /var/log/simple-feedback-staging.log 2>&1
+# Staging: hourly with specific test tag
+0 * * * * deploy IMAGE_TAG=v1.0.0-rc1 ENVIRONMENT=staging /home/deploy/simple-feedback/scripts/deploy.sh >> /var/log/simple-feedback-staging.log 2>&1
 ```
+
+Note: Update `IMAGE_TAG` as needed when deploying new versions. This must match a published tag in GHCR.
 
 ---
 
