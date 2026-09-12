@@ -4,8 +4,8 @@
 - [x] Generate and store a strong `JWT_SECRET` in production (documented in README security notes)
 - [x] Change default admin credentials before first production deploy (env var validation added)
 - [x] Set `CORS_ORIGIN` env var on the backend to restrict allowed origins (configured & validated at startup)
-- [ ] Set up HTTPS via reverse proxy (Nginx / Caddy) in production (see docs/ROLLBACK.md for example)
-- [ ] Enable automated PostgreSQL backups (e.g. pg_dump via cron or cloud snapshot)
+- [x] Set up HTTPS via reverse proxy (Traefik) in production (via external infra project)
+- [x] Enable automated PostgreSQL backups (handled by production database infrastructure)
 - [ ] Set up log rotation for the backend process
 - [ ] Add input length validation on feedback text answers to prevent DB bloat
 - [x] Security hardening completed (see REVIEW.md for all fixes: CSRF, httpOnly cookies, rate limiting, input validation)
@@ -13,9 +13,9 @@
 ## Deployment & Monitoring
 - [ ] Document cron/systemd setup for `scripts/deploy.sh` for unattended deploys
 - [ ] Add health check endpoint monitoring (e.g. UptimeRobot, Grafana)
-- [ ] Provide Nginx/Caddy example config for serving frontend + reverse-proxying API
-- [ ] Document symlink-based frontend deployment workflow
+- [x] Frontend integrated into backend image (multi-stage Docker build)
 - [x] Rollback guide completed (see docs/ROLLBACK.md)
+- [x] Deployment guide completed (see docs/DEPLOYMENT.md with three-env setup)
 
 ## UI/UX & Internationalization
 - [x] Multi-language support (English, Finnish, Swedish) — fully implemented
@@ -38,6 +38,13 @@
 - [ ] Role-based access control (read-only admin, etc.)
 - [ ] Pre-migrated questionnaires template library
 - [ ] Webhook triggers for external systems
+
+## Architecture Decisions (Locked)
+- [x] Database: Raw SQL with hand-written migrations (no ORM)
+  - Rationale: JSONB fields, custom analytics queries, explicit control
+  - Migrations: Manual SQL files in `backend/src/db/migrations/`
+- [x] Frontend deployment: Integrated into backend image (multi-stage Docker build)
+  - Rationale: Simpler deployments, single image, always in sync
 
 ## Known Issues & Improvements
 - [ ] M7 — JSON field structure validation (buttons, words arrays) for malformed objects
