@@ -139,16 +139,17 @@ DEPLOY_DIR=/srv/simple-feedback ./scripts/deploy.sh
 ## 🎨 Technology Stack
 
 ### Backend
-- **Node.js** with Express
-- **PostgreSQL** database
-- **JWT** authentication
-- **Jest** for testing
+- **Node.js** with Express (v18+)
+- **PostgreSQL** database (v16)
+- **JWT** authentication with `httpOnly` cookie storage
+- **CSRF** protection via double-submit cookie pattern
+- **Jest** + **Supertest** for testing
 
 ### Frontend
-- **React** 19
-- **React Router** for routing
-- **Vite** for building
-- **i18next** for internationalization (English, Finnish, Swedish)
+- **React** 19 with Vite build tool
+- **React Router** 7 for routing
+- **Emotion** + **Material UI** for component styling
+- **i18next** for internationalization (English, Finnish, Swedish as default fallback)
 
 ## 🔧 Development
 
@@ -214,33 +215,35 @@ See the [API Specification](docs/api-spec.yaml) for complete documentation.
 
 ### ✅ Completed
 
-- Database schema design
-- Backend API with all core endpoints
-- React frontend with routing
-- Feedback UI with multi-page support
-- Admin dashboard with authentication
-- JWT-based security
-- Data export functionality
-- OpenAPI specification
-- Comprehensive documentation
-- Anonymous feedback with privacy notice
-- Docker containerization (backend)
-- Automated deployment script
+- Database schema design with 11 migrations
+- Backend API with all core endpoints (public & admin)
+- React 19 frontend with routing and component library
+- Multi-page questionnaire support with auto-reset
+- Admin dashboard with full CRUD interfaces (locations, questions, questionnaires, schedules, scales, word sets, answer views)
+- Location-based password authentication with JWT tokens
+- Admin authentication via `httpOnly` cookies with CSRF protection
+- Schedule timezone support for global deployments
+- Analytics dashboard with radar chart visualizations for multi-scale questions
+- Data export (CSV) with pagination
+- OpenAPI 3.0 specification
+- Comprehensive documentation (CLAUDE.md, SETUP.md, TESTING.md, ROLLBACK.md)
+- Anonymous feedback collection with privacy notice
+- Docker containerization (backend + database)
+- Automated deployment script with rollback guide
+- Multi-language UI (English, Finnish, Swedish)
+- Accessibility features (high-contrast mode, adjustable UI scaling)
+- Security hardening (CSRF, CORS, rate limiting, input validation)
+- Comprehensive test suite (auth, feedback, location groups, continuous scale)
 
-### 🚧 In Progress
+### 🚧 In Progress / Planned
 
-- Full admin CRUD interfaces
-- Advanced analytics and charts
-- Word cloud visualization
+- QR code generation for location URLs
+- Live dashboard with auto-refresh
+- Role-based access control (read-only admins, etc.)
+- Input length validation for text answers
+- Cron/systemd setup documentation for automated deploys
 
-### 📋 Planned
-
-- Multi-language support enhancements
-- QR code generation
-- Live dashboard
-- Role-based access control
-
-For the complete roadmap, see [PLAN.md](PLAN.md) and [TODO.md](TODO.md).
+For issues and detailed roadmap, see [PLAN.md](PLAN.md) and [TODO.md](TODO.md). Security review findings and fixes documented in [REVIEW.md](REVIEW.md).
 
 ## 📝 License
 
