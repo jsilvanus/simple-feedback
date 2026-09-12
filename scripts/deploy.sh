@@ -2,13 +2,18 @@
 # deploy.sh — Pull latest code and restart the backend service.
 #
 # Configuration via environment variables:
-#   DEPLOY_BRANCH   Git branch to deploy (default: main)
-#   DEPLOY_DIR      Absolute path to the repository root (default: directory of this script's parent)
-#   COMPOSE_FILE    Path to docker-compose file (default: docker-compose.yml inside DEPLOY_DIR)
+#   DEPLOY_BRANCH    Git branch to deploy (default: main)
+#   DEPLOY_DIR       Absolute path to the repository root (default: directory of this script's parent)
+#   ENVIRONMENT      Deployment environment: staging or production (auto-detected from DEPLOY_BRANCH if omitted)
+#
+# Environment auto-detection:
+#   DEPLOY_BRANCH=develop  → ENVIRONMENT=staging
+#   DEPLOY_BRANCH=main     → ENVIRONMENT=production
 #
 # Usage:
-#   ./scripts/deploy.sh
-#   DEPLOY_BRANCH=develop ./scripts/deploy.sh
+#   ./scripts/deploy.sh                           # Production (main branch)
+#   DEPLOY_BRANCH=develop ./scripts/deploy.sh     # Staging (develop branch)
+#   ENVIRONMENT=staging ./scripts/deploy.sh       # Explicit staging override
 #
 # The script is self-updating: if deploy.sh itself changed after the pull,
 # it re-executes itself so the latest version of the deployment logic runs.
@@ -19,7 +24,22 @@ SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 DEPLOY_DIR="${DEPLOY_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
-COMPOSE_FILE="${COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.yml}"
+
+# Auto-detect environment from branch if not explicitly set
+if [ -z "${ENVIRONMENT:-}" ]; then
+  case "$DEPLOY_BRANCH" in
+    develop) ENVIRONMENT="staging" ;;
+    main)    ENVIRONMENT="production" ;;
+    *)       ENVIRONMENT="production" ;;
+  esac
+fi
+
+# Select compose file based on environment
+case "$ENVIRONMENT" in
+  staging)     COMPOSE_FILE="${COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.staging.yml}" ;;
+  production)  COMPOSE_FILE="${COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.prod.yml}" ;;
+  *)           log "ERROR: Unknown ENVIRONMENT '$ENVIRONMENT'. Use 'staging' or 'production'."; exit 1 ;;
+esac
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -37,8 +57,10 @@ file_hash() {
 cd "$DEPLOY_DIR"
 
 log "=== Simple Feedback Deployment ==="
-log "Repository: $DEPLOY_DIR"
-log "Branch:     $DEPLOY_BRANCH"
+log "Repository:  $DEPLOY_DIR"
+log "Branch:      $DEPLOY_BRANCH"
+log "Environment: $ENVIRONMENT"
+log "Compose:     $COMPOSE_FILE"
 
 # ── 1. Stash any local changes (safety measure) ─────────────────────────────
 git fetch origin "$DEPLOY_BRANCH"
@@ -70,25 +92,39 @@ if [ "$SCRIPT_HASH_BEFORE" != "$SCRIPT_HASH_AFTER" ]; then
   exec "$SCRIPT_PATH" "$@"
 fi
 
-# ── 4. Install/update backend dependencies ──────────────────────────────────
-log "Installing backend dependencies..."
-(cd "$DEPLOY_DIR/backend" && npm ci --omit=dev)
+# ── 4. Ensure Docker and compose file exist ──────────────────────────────────
+if ! command -v docker &>/dev/null; then
+  log "ERROR: docker not found. Deployment requires Docker."
+  exit 1
+fi
 
-# ── 5. Run database migrations ───────────────────────────────────────────────
-if [ -f "$DEPLOY_DIR/backend/src/db/migrate.js" ]; then
+if [ ! -f "$COMPOSE_FILE" ]; then
+  log "ERROR: Compose file not found at $COMPOSE_FILE"
+  exit 1
+fi
+
+# ── 5. Pull latest image from GHCR ───────────────────────────────────────────
+log "Pulling latest image from GHCR..."
+docker compose -f "$COMPOSE_FILE" pull backend || {
+  log "WARNING: Failed to pull image. Continuing with existing image..."
+}
+
+# ── 6. Start/migrate database (staging only) ────────────────────────────────
+if [ "$ENVIRONMENT" = "staging" ]; then
+  log "Starting database service..."
+  docker compose -f "$COMPOSE_FILE" up -d db
+  docker compose -f "$COMPOSE_FILE" exec -T db sh -c 'pg_isready -U postgres' || {
+    log "Waiting for database to be ready..."
+    sleep 5
+  }
+
   log "Running database migrations..."
-  (cd "$DEPLOY_DIR/backend" && node src/db/migrate.js)
+  docker compose -f "$COMPOSE_FILE" run --rm backend node src/db/migrate.js
 fi
 
-# ── 6. Rebuild and restart Docker services ───────────────────────────────────
-if command -v docker &>/dev/null && [ -f "$COMPOSE_FILE" ]; then
-  log "Building and restarting Docker services..."
-  docker compose -f "$COMPOSE_FILE" build backend
-  docker compose -f "$COMPOSE_FILE" up -d --no-deps backend
-  log "Services restarted."
-else
-  log "WARNING: docker not found or compose file missing. Skipping container restart."
-  log "Compose file expected at: $COMPOSE_FILE"
-fi
+# ── 7. Restart backend service ───────────────────────────────────────────────
+log "Restarting backend service..."
+docker compose -f "$COMPOSE_FILE" up -d backend
+log "Backend service restarted."
 
 log "=== Deployment complete (commit: ${REMOTE_COMMIT:0:8}) ==="
