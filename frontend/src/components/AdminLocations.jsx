@@ -17,8 +17,9 @@ export function LocationForm({ entity, locationGroups, onSave, onCancel }) {
           groupId: entity.group_id || '',
           password: '',
           passwordRequired: entity.password_required || false,
+          qrEntryMode: entity.qr_entry_mode || false,
         }
-      : { slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false }
+      : { slug: '', name: '', active: true, groupId: '', password: '', passwordRequired: false, qrEntryMode: false }
   );
   const [error, setError] = useState(null);
 
@@ -124,6 +125,18 @@ export function LocationForm({ entity, locationGroups, onSave, onCancel }) {
             <small>Used for kiosk login and URL parameter authentication</small>
           </div>
         )}
+
+        <div className="form-group checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={formData.qrEntryMode}
+              onChange={(e) => setFormData({ ...formData, qrEntryMode: e.target.checked })}
+            />
+            Enable QR-First Entry Mode
+          </label>
+          <small>Show QR code first, allow users to continue on device or scan on their phone</small>
+        </div>
 
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel}>
@@ -244,6 +257,7 @@ export default function AdminLocations() {
                 <th>Group</th>
                 <th>Status</th>
                 <th>Password</th>
+                <th>QR Mode</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
@@ -270,6 +284,13 @@ export default function AdminLocations() {
                       <span className="status active">🔒 Required</span>
                     ) : (
                       <span className="status inactive">🔓 None</span>
+                    )}
+                  </td>
+                  <td>
+                    {location.qr_entry_mode ? (
+                      <span className="status active">📱 QR First</span>
+                    ) : (
+                      <span className="status inactive">— Off</span>
                     )}
                   </td>
                   <td>{new Date(location.created_at).toLocaleDateString()}</td>

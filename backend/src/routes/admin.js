@@ -111,6 +111,7 @@ router.post('/locations', async (req, res, next) => {
       groupId,
       password,
       passwordRequired,
+      qrEntryMode,
     } = req.body;
 
     if (!slug || !name) {
@@ -125,8 +126,8 @@ router.post('/locations', async (req, res, next) => {
 
     const result = await db.query(
       `INSERT INTO locations
-       (slug, name, active, group_id, password_hash, password_required)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       (slug, name, active, group_id, password_hash, password_required, qr_entry_mode)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         slug,
@@ -135,6 +136,7 @@ router.post('/locations', async (req, res, next) => {
         groupId || null,
         passwordHash,
         passwordRequired === true,
+        qrEntryMode === true,
       ]
     );
 
@@ -161,6 +163,7 @@ router.put('/locations/:id', async (req, res, next) => {
       groupId,
       password,
       passwordRequired,
+      qrEntryMode,
     } = req.body;
 
     const existingResult = await db.query(
@@ -212,6 +215,10 @@ router.put('/locations/:id', async (req, res, next) => {
       const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
       updates.push(`password_hash = $${paramCount++}`);
       values.push(passwordHash);
+    }
+    if (qrEntryMode !== undefined) {
+      updates.push(`qr_entry_mode = $${paramCount++}`);
+      values.push(qrEntryMode);
     }
 
     if (updates.length === 0) {

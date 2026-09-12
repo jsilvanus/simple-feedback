@@ -20,9 +20,10 @@ const { JWT_SECRET } = require('../middleware/auth');
  */
 router.post('/', feedbackLimiter, async (req, res, next) => {
   const client = await db.pool.connect();
-  
+
   try {
-    const { locationId, questionnaireId, answers } = req.body;
+    const { locationId, questionnaireId, answers, entryMethod } = req.body;
+    const method = entryMethod || 'kiosk';
 
     // Validate input
     if (!locationId || !questionnaireId || !answers || !Array.isArray(answers)) {
@@ -91,8 +92,8 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
 
     // Create feedback session
     const sessionResult = await client.query(
-      'INSERT INTO feedback_sessions (location_id, questionnaire_id, timestamp) VALUES ($1, $2, NOW()) RETURNING id',
-      [locationId, questionnaireId]
+      'INSERT INTO feedback_sessions (location_id, questionnaire_id, entry_method, timestamp) VALUES ($1, $2, $3, NOW()) RETURNING id',
+      [locationId, questionnaireId, method]
     );
 
     const sessionId = sessionResult.rows[0].id;

@@ -42,6 +42,10 @@
     "enterPassword": "Ange platslösenord",
     "logoutConfirm": "Är du säker på att du vill logga ut från {{location}}?"
   },
+  "qrFirst": {
+    "scanPrompt": "Scanna för att ge feedback på din telefon eller...",
+    "continueOnDevice": "Fortsätt på denna enhet"
+  },
   "admin": {
     "login": "Admininloggning",
     "backToHome": "Tillbaka till startsidan",

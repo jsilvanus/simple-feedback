@@ -42,6 +42,10 @@
     "enterPassword": "Enter location password",
     "logoutConfirm": "Are you sure you want to logout from {{location}}?"
   },
+  "qrFirst": {
+    "scanPrompt": "Scan to give feedback on your phone or...",
+    "continueOnDevice": "Continue on this device"
+  },
   "admin": {
     "login": "Admin Login",
     "backToHome": "Back to Home",
