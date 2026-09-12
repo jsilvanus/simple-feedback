@@ -1,5 +1,6 @@
 # Development docker-compose.yml
-# Builds backend from local source and runs PostgreSQL in container
+# Builds backend + frontend from local source and runs PostgreSQL in container
+# Backend serves both API and static frontend files
 # For staging, use docker-compose.staging.yml
 # For production, use docker-compose.prod.yml
 

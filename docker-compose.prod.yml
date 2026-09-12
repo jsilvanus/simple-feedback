@@ -1,5 +1,10 @@
+# Production: External PostgreSQL + backend/frontend image + Traefik
+# Backend serves both API (/api/*) and frontend (/)
+# PostgreSQL connection via DATABASE_URL env var (from external infra)
+
 services:
   backend:
+    # Image contains both backend API and frontend React build
     image: ghcr.io/jsilvanus/simple-feedback:${IMAGE_TAG:-latest}
     container_name: simple_feedback_backend
     env_file:

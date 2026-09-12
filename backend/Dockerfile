@@ -1,15 +1,33 @@
-# Backend Dockerfile
-# The frontend is deployed separately (e.g. via symlink or static hosting).
-FROM node:20-alpine AS base
+# Multi-stage Dockerfile: builds frontend + backend
+# Stage 1: Build frontend
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/src ./src
+COPY frontend/index.html ./
+COPY frontend/vite.config.js ./
+COPY frontend/public ./public
+
+RUN npm run build
+
+# Stage 2: Build backend with frontend static files
+FROM node:20-alpine AS backend
 
 WORKDIR /app
 
-# Install dependencies first (layer caching)
-COPY package*.json ./
+# Install backend dependencies
+COPY backend/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy source files
-COPY src/ ./src/
+# Copy backend source
+COPY backend/src ./src
+
+# Copy built frontend from stage 1
+COPY --from=frontend-builder /frontend/dist ./public
 
 # Create uploads directory
 RUN mkdir -p ./uploads

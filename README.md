@@ -73,13 +73,12 @@ docker compose exec backend node src/db/migrate.js
 
 #### Frontend Deployment
 
-Build the frontend and serve the `dist/` output with any static web server (Nginx, Caddy, etc.):
+Frontend is now built into the Docker image automatically:
 
 ```bash
-cd frontend
-npm install
-npm run build
-# Serve dist/ directory, or symlink it into your web server's document root
+# Frontend is built as part of the backend Docker image (multi-stage build)
+# No separate frontend deployment needed — served by backend at /
+# See backend/Dockerfile for build configuration
 ```
 
 #### Automated Deployment with `scripts/deploy.sh`

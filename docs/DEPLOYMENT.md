@@ -6,28 +6,33 @@ This document describes the three-environment deployment architecture for Simple
 
 ## Environments
 
+All environments use a **single image** that contains both backend API and frontend React build.
+
 ### Development (Local)
 - **PostgreSQL**: Container (via `docker-compose.yml`)
-- **Backend**: Built locally from source
+- **Backend + Frontend**: Built locally from source
 - **Usage**: Local development with `npm run dev` or `npm run dev:backend` + `npm run dev:db`
 - **Compose file**: `docker-compose.yml`
-- **Image**: Built on-the-fly from `./backend/Dockerfile` (no GHCR needed)
+- **Image**: Built on-the-fly from `./backend/Dockerfile` (multi-stage: builds frontend, then backend)
+- **URL**: `http://localhost:3000` (both API and UI)
 
 ### Staging
 - **PostgreSQL**: Container (via `docker-compose.staging.yml`)
-- **Backend**: Pre-built image from GHCR (tagged release)
+- **Backend + Frontend**: Pre-built image from GHCR
 - **Usage**: Test deployments, feature validation
 - **Compose file**: `docker-compose.staging.yml`
 - **Image**: `ghcr.io/jsilvanus/simple-feedback:v{version}`
+- **URL**: `http://localhost:3000` (both API and UI)
 - **Deploy command**: `IMAGE_TAG=v1.0.0 ENVIRONMENT=staging ./scripts/deploy.sh`
 
 ### Production
 - **PostgreSQL**: External (connection URL provided via `DATABASE_URL` env var)
-- **Backend**: Pre-built image from GHCR (tagged release)
+- **Backend + Frontend**: Pre-built image from GHCR
 - **Usage**: Live production deployment
 - **Compose file**: `docker-compose.prod.yml`
 - **Image**: `ghcr.io/jsilvanus/simple-feedback:v{version}`
 - **Reverse Proxy**: Traefik (external infrastructure project)
+- **URL**: `https://your-domain.com` (both API and UI via Traefik)
 - **Deploy command**: `IMAGE_TAG=v1.0.0 ENVIRONMENT=production ./scripts/deploy.sh`
 
 ---
