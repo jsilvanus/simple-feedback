@@ -95,16 +95,16 @@ simple-feedback/
 | Layer | Technology | Version |
 |-------|-----------|---------|
 | Backend | Node.js + Express | v18+, ^5.2.1 |
-| Frontend | React | 19.2.4 |
-| Build tool | Vite | 7.3.1 |
-| Routing | React Router | 7.13.0 |
+| Frontend | React | ^19.2.4 |
+| Build tool | Vite | ^7.3.1 |
+| Routing | React Router | ^7.13.0 |
 | Styling | Emotion + Material UI | ^11.14, ^7.3.8 |
 | Database | PostgreSQL | 16 |
-| Auth | JWT (jsonwebtoken) | 9.0.3 |
+| Auth | JWT (jsonwebtoken) | ^9.0.3 |
 | Password hashing | bcryptjs | ^3.0.3 |
 | File uploads | multer | ^2.0.2 |
-| i18n | i18next + react-i18next | 25.8.9 |
-| Testing | Jest + Supertest | 30.2.0 |
+| i18n | i18next + react-i18next | ^25.8.9 |
+| Testing | Jest + Supertest | ^30.2.0 |
 | API spec | OpenAPI | 3.0 |
 
 ---
@@ -238,7 +238,7 @@ The authoritative schema lives in `backend/src/db/schema.sql`. Key tables:
 - **answer_view_questions** — Questions included in a view, with per-question axis labels (JSONB)
 - **schema_migrations** — Migration tracking table
 
-Migrations in `backend/src/db/migrations/` are numbered and run in order by `migrate.js`. Current migrations: 008–010.
+Migrations in `backend/src/db/migrations/` are numbered and run in order by `migrate.js`. Current migrations: 008–011.
 
 ---
 
@@ -333,14 +333,19 @@ Manual test scenarios with curl examples are documented in `docs/TESTING.md`.
 
 ---
 
-## Active Development Areas (as of March 2026)
+## Active Development Areas (as of September 2026)
 
-The following features have been implemented and are reflected in the schema (migrations 008–010) and frontend components. Check corresponding plan files before modifying:
+The following features have been implemented and are reflected in the schema (migrations 008–011) and frontend components. Check corresponding plan files before modifying:
 
 - **Enhanced answer scales** — Normal/bipolar modes (`scale_mode`), configurable step counts (`step`), endpoint labels (`min_label`/`max_label` as JSONB), min/max values. See `plan_scales.md`.
 - **Multi-scale questions** — `question_scale_items` table enables matrix layout with per-row scale and display overrides (`MultiScaleQuestion.jsx`). See `plan_scales.md`.
 - **Answer Views** — Composite radar chart visualizations (`answer_views`, `answer_view_questions` tables; `AdminAnswerViews.jsx`, `RadarChart.jsx`). See `plan_refactor.md`.
 - **Word Set refinements** — UI and admin now use "word set" terminology; DB table remains `word_cloud_options` for compatibility. See `todo_refactor.md`.
 - **Kiosk mode filtering** — `continuous_scale` questions are excluded from the public feedback UI; only shown in admin results/radar views.
+- **Location Password Authentication** — Password-protected locations require client authentication via `/api/locations/:slug/login`, which issues a signed JWT token. Feedback submission validates the token server-side. See `REVIEW.md` for C4.
+- **Schedule Timezone Support** — Schedules now store a timezone (migration 011). Recurring weekday matching uses the schedule's IANA timezone via `Intl.toLocaleString()` for accurate time comparison across deployments. See `REVIEW.md` for M4.
+- **CSRF Protection** — Double-submit cookie CSRF middleware protects all admin state-changing routes. See `REVIEW.md` for H3.
+- **Security Hardening** — Admin JWT migrated to `httpOnly; Secure; SameSite=Strict` cookies. Startup validation of critical env vars (JWT_SECRET, admin credentials, DB config). See `REVIEW.md` for security fixes (C1–C4, H2, H7, H8).
+- **Pagination & Query Optimization** — Admin list views paginate (20 items/page). Query N+1 problems eliminated via `json_agg` and `GROUP BY` aggregates. See `REVIEW.md` for M1, M2, M3, L8.
 
-When modifying these areas, check `plan_refactor.md`, `plan_scales.md`, and `todo_refactor.md` for full context and remaining checklist items.
+When modifying these areas, check `plan_refactor.md`, `plan_scales.md`, `todo_refactor.md`, and `REVIEW.md` for full context and remaining checklist items. For deployment and rollback procedures, see `docs/ROLLBACK.md`.

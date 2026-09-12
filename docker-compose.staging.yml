@@ -1,0 +1,42 @@
+# Staging: PostgreSQL in container + backend/frontend image
+# Backend serves both API (/api/*) and frontend (/)
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: simple_feedback_staging_db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-simple_feedback}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - staging_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    # Image contains both backend API and frontend React build
+    image: ghcr.io/jsilvanus/simple-feedback:${IMAGE_TAG:-latest}
+    container_name: simple_feedback_staging_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: db
+      NODE_ENV: staging
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+volumes:
+  staging_db_data:
