@@ -7,6 +7,7 @@ import LanguageSelector from '../components/LanguageSelector';
 import SettingsButton from '../components/SettingsButton';
 import SettingsModal from '../components/SettingsModal';
 import MultiScaleQuestion from '../components/MultiScaleQuestion';
+import QRFirstEntryScreen from '../components/QRFirstEntryScreen';
 import './FeedbackPage.css';
 
 export default function FeedbackPage() {
@@ -28,6 +29,8 @@ export default function FeedbackPage() {
   const [contrastMode, setContrastMode] = useState(false);
   const [uiSize, setUISize] = useState(100);
   const [showLocationName, setShowLocationName] = useState(true);
+  const [showQRFirst, setShowQRFirst] = useState(false);
+  const [entryMethod, setEntryMethod] = useState(null);
   const uiScaleStyle = { '--ui-scale': uiSize / 100 };
   const uiSizeStorageKey = locationSlug ? `uiSize_${locationSlug}` : 'uiSize';
   const showLocationNameStorageKey = locationSlug ? `showLocationName_${locationSlug}` : 'showLocationName';
@@ -56,6 +59,13 @@ export default function FeedbackPage() {
         setAuthRequired(true);
       } else {
         setAuthRequired(false);
+      }
+
+      // Check if location has QR-First entry mode enabled
+      if (result?.location?.qr_entry_mode && !entryMethod) {
+        setShowQRFirst(true);
+      } else {
+        setShowQRFirst(false);
       }
     } catch {
       // Error state is handled in loadQuestionnaire
@@ -148,6 +158,11 @@ export default function FeedbackPage() {
     setCurrentPage(0);
     setAuthRequired(true);
     setShowSettings(false);
+  };
+
+  const handleContinueFromQR = (method) => {
+    setEntryMethod(method);
+    setShowQRFirst(false);
   };
 
   const handleToggleContrast = () => {
@@ -249,16 +264,22 @@ export default function FeedbackPage() {
         data.location.id,
         data.questionnaire.id,
         formattedAnswers,
-        locationToken
+        locationToken,
+        entryMethod || 'kiosk'
       );
 
       setSuccess(true);
-      
+
       // Auto-reset after 3 seconds
       setTimeout(() => {
         setSuccess(false);
         setAnswers({});
         setCurrentPage(0);
+        // If QR-First mode is enabled, return to QR screen
+        if (data?.location?.qr_entry_mode) {
+          setShowQRFirst(true);
+          setEntryMethod(null);
+        }
       }, 3000);
     } catch (err) {
       setError(t('feedback.failedToSubmit'));
@@ -314,6 +335,17 @@ export default function FeedbackPage() {
         <p>{error}</p>
         <button onClick={loadQuestionnaire}>{t('common.retry')}</button>
       </div>
+    );
+  }
+
+  // QR-First entry mode
+  if (showQRFirst && data && data.location) {
+    return (
+      <QRFirstEntryScreen
+        locationSlug={locationSlug}
+        locationName={data.location.name}
+        onContinue={handleContinueFromQR}
+      />
     );
   }
 

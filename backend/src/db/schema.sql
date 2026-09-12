@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS locations (
     group_id INTEGER REFERENCES location_groups(id) ON DELETE SET NULL,
     password_hash VARCHAR(255),
     password_required BOOLEAN DEFAULT false,
+    qr_entry_mode BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -109,6 +110,7 @@ CREATE TABLE IF NOT EXISTS feedback_sessions (
     id SERIAL PRIMARY KEY,
     location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
     questionnaire_id INTEGER NOT NULL REFERENCES questionnaires(id) ON DELETE CASCADE,
+    entry_method VARCHAR(20) DEFAULT 'kiosk' CHECK (entry_method IN ('kiosk', 'phone')),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
