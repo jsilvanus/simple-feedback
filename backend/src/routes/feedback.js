@@ -122,6 +122,14 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
 
     await client.query('COMMIT');
 
+    // After transaction commits, enqueue webhook notifications (fire & forget)
+    try {
+      await enqueueWebhookNotifications(sessionId, locationId, questionnaireId, method, answers);
+    } catch (err) {
+      // Log error but don't fail the feedback submission
+      console.error('Failed to enqueue webhook notifications:', err);
+    }
+
     res.status(201).json({
       success: true,
       sessionId,
@@ -134,5 +142,136 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
     client.release();
   }
 });
+
+/**
+ * Helper function to enqueue webhook notifications after feedback submission
+ */
+async function enqueueWebhookNotifications(sessionId, locationId, questionnaireId, entryMethod, answers) {
+  // Get location and questionnaire names
+  const [locationResult, questionnaireResult, answersWithMetadata] = await Promise.all([
+    db.query('SELECT name FROM locations WHERE id = $1', [locationId]),
+    db.query('SELECT name FROM questionnaires WHERE id = $1', [questionnaireId]),
+    getAnswerMetadata(answers)
+  ]);
+
+  if (locationResult.rows.length === 0 || questionnaireResult.rows.length === 0) {
+    throw new Error('Location or questionnaire not found');
+  }
+
+  const locationName = locationResult.rows[0].name;
+  const questionnaireName = questionnaireResult.rows[0].name;
+  const timestamp = new Date().toISOString();
+  const eventId = `${sessionId}-${Date.now()}`;
+
+  // Separate structured vs text answers
+  const structuredAnswers = answersWithMetadata.filter(a => a.type !== 'text');
+  const textAnswers = answersWithMetadata.filter(a => a.type === 'text');
+
+  // Event 1: Always enqueue feedback.submitted (structured answers only)
+  if (structuredAnswers.length > 0 || true) { // Always enqueue even if no structured answers
+    const webhookEvent = {
+      event_id: eventId,
+      timestamp,
+      type: 'feedback.submitted',
+      data: {
+        sessionId,
+        locationId,
+        locationName,
+        questionnaireId,
+        questionnaireName,
+        entryMethod,
+        answersCount: answers.length,
+        answers: structuredAnswers.map(a => ({
+          questionId: a.question_id,
+          questionText: a.question_text,
+          type: a.type,
+          value: a.numeric_value
+        }))
+      }
+    };
+
+    // Find all active webhooks for feedback.submitted event
+    const submitWebhooks = await db.query(
+      'SELECT id FROM webhooks WHERE active = true AND event_type = $1',
+      ['feedback.submitted']
+    );
+
+    for (const webhook of submitWebhooks.rows) {
+      await db.query(
+        `INSERT INTO notification_queue
+         (event_type, webhook_id, payload, status)
+         VALUES ('webhook', $1, $2, 'pending')`,
+        [webhook.id, JSON.stringify(webhookEvent)]
+      );
+    }
+  }
+
+  // Event 2: Only enqueue feedback.text_submitted if text answers exist AND webhooks exist
+  if (textAnswers.length > 0) {
+    const textWebhooks = await db.query(
+      'SELECT id FROM webhooks WHERE active = true AND event_type = $1',
+      ['feedback.text_submitted']
+    );
+
+    if (textWebhooks.rows.length > 0) {
+      const textEvent = {
+        event_id: eventId,
+        timestamp,
+        type: 'feedback.text_submitted',
+        data: {
+          sessionId,
+          locationId,
+          locationName,
+          questionnaireId,
+          questionnaireName,
+          entryMethod,
+          textAnswers: textAnswers.map(a => ({
+            questionId: a.question_id,
+            questionText: a.question_text,
+            type: 'text',
+            textValue: a.text_value
+          }))
+        }
+      };
+
+      for (const webhook of textWebhooks.rows) {
+        await db.query(
+          `INSERT INTO notification_queue
+           (event_type, webhook_id, payload, status)
+           VALUES ('webhook', $1, $2, 'pending')`,
+          [webhook.id, JSON.stringify(textEvent)]
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Helper function to get answer metadata (question text, type) from question IDs
+ */
+async function getAnswerMetadata(answers) {
+  if (answers.length === 0) {
+    return [];
+  }
+
+  const questionIds = answers.map(a => a.questionId);
+  const qResult = await db.query(
+    `SELECT id, text as question_text, type FROM questions WHERE id = ANY($1)`,
+    [questionIds]
+  );
+
+  const questionMap = {};
+  qResult.rows.forEach(row => {
+    questionMap[row.id] = row;
+  });
+
+  return answers.map(answer => ({
+    question_id: answer.questionId,
+    question_text: questionMap[answer.questionId]?.question_text || '',
+    type: questionMap[answer.questionId]?.type || 'unknown',
+    numeric_value: answer.value || null,
+    text_value: answer.textValue || null
+  }));
+}
 
 module.exports = router;

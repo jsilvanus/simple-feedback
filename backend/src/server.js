@@ -1,4 +1,5 @@
 const app = require('./app');
+const { processNotificationQueue } = require('./workers/notificationWorker');
 
 // Validate critical environment variables before starting
 const isProduction = process.env.NODE_ENV === 'production';
@@ -34,9 +35,31 @@ const server = app.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
+// Start notification queue worker (runs every 30 seconds)
+let workerHandle = null;
+const startWorker = () => {
+  workerHandle = setInterval(() => {
+    processNotificationQueue().catch(err => {
+      console.error('Worker error:', err);
+    });
+  }, 30000); // Run every 30 seconds
+  console.log('Notification worker started (30s interval)');
+};
+
+startWorker();
+
+// Graceful shutdown for worker
+const shutdownWorker = () => {
+  if (workerHandle) {
+    clearInterval(workerHandle);
+    console.log('Notification worker stopped');
+  }
+};
+
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
+  shutdownWorker();
   server.close(() => {
     console.log('HTTP server closed');
     process.exit(0);
@@ -45,6 +68,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('SIGINT signal received: closing HTTP server');
+  shutdownWorker();
   server.close(() => {
     console.log('HTTP server closed');
     process.exit(0);

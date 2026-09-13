@@ -12,6 +12,7 @@ import AdminQuestionnaires from '../components/AdminQuestionnaires';
 import AdminSchedules from '../components/AdminSchedules';
 import AdminResults from '../components/AdminResults';
 import AdminAnswerViews from '../components/AdminAnswerViews';
+import AdminWebhooks from '../components/AdminWebhooks';
 import './AdminPage.css';
 
 export default function AdminPage() {
@@ -137,6 +138,12 @@ export default function AdminPage() {
           >
             {t('admin.answerViews')}
           </button>
+          <button
+            className={activeTab === 'webhooks' ? 'active' : ''}
+            onClick={() => setActiveTab('webhooks')}
+          >
+            Webhooks
+          </button>
           <button onClick={() => navigate('/admin/map')}>
             {t('admin.map')}
           </button>
@@ -223,6 +230,14 @@ export default function AdminPage() {
             <div className="admin-grouped-sections">
               <section className="admin-group-section">
                 <AdminAnswerViews />
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'webhooks' && (
+            <div className="admin-grouped-sections">
+              <section className="admin-group-section">
+                <AdminWebhooks />
               </section>
             </div>
           )}
