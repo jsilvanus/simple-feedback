@@ -5,8 +5,10 @@ import Pagination from './Pagination';
 import './AdminCrud.css';
 
 const PAGE_SIZE = 20;
-const EVENT_TYPES = ['feedback.submitted', 'feedback.text_submitted'];
+const EVENT_TYPES = ['feedback.submitted', 'feedback.text_submitted', 'feedback.statistics'];
 const PAYLOAD_MODES = ['minimal', 'standard'];
+const STATS_TRIGGERS = ['on_submit', 'on_change'];
+const STATS_TYPES = ['overall', 'per_question', 'both'];
 
 export function WebhookForm({ entity, onSave, onCancel }) {
   const { t } = useTranslation();
@@ -21,6 +23,12 @@ export function WebhookForm({ entity, onSave, onCancel }) {
           retryCount: entity.retry_count || 3,
           timeoutSeconds: entity.timeout_seconds || 10,
           active: entity.active !== false,
+          statsTrigger: entity.stats_trigger || 'on_submit',
+          statsType: entity.stats_type || 'overall',
+          statsChangeThreshold: entity.stats_change_threshold || 5.0,
+          statsThresholds: entity.stats_thresholds ? JSON.stringify(entity.stats_thresholds, null, 2) : '{}',
+          statsDebounceMs: entity.stats_debounce_ms || 1000,
+          statsMinIntervalMs: entity.stats_min_interval_ms || 60000,
         }
       : {
           name: '',
@@ -31,6 +39,12 @@ export function WebhookForm({ entity, onSave, onCancel }) {
           retryCount: 3,
           timeoutSeconds: 10,
           active: true,
+          statsTrigger: 'on_submit',
+          statsType: 'overall',
+          statsChangeThreshold: 5.0,
+          statsThresholds: '{}',
+          statsDebounceMs: 1000,
+          statsMinIntervalMs: 60000,
         }
   );
   const [error, setError] = useState(null);
@@ -60,17 +74,38 @@ export function WebhookForm({ entity, onSave, onCancel }) {
       }
     }
 
+    // Validate stats thresholds JSON if present
+    let statsThresholdsObj = null;
+    if (formData.eventType === 'feedback.statistics' && formData.statsThresholds.trim()) {
+      try {
+        statsThresholdsObj = JSON.parse(formData.statsThresholds);
+      } catch {
+        setError('Invalid JSON in per-question thresholds');
+        return;
+      }
+    }
+
     try {
       const payload = {
         name: formData.name,
         url: formData.url,
         eventType: formData.eventType,
-        payloadMode: formData.payloadMode,
+        payloadMode: formData.eventType === 'feedback.statistics' ? undefined : formData.payloadMode,
         customHeaders: customHeadersObj,
         retryCount: parseInt(formData.retryCount),
         timeoutSeconds: parseInt(formData.timeoutSeconds),
         active: formData.active,
       };
+
+      // Add stats fields for feedback.statistics events
+      if (formData.eventType === 'feedback.statistics') {
+        payload.statsTrigger = formData.statsTrigger;
+        payload.statsType = formData.statsType;
+        payload.statsChangeThreshold = parseFloat(formData.statsChangeThreshold);
+        payload.statsThresholds = statsThresholdsObj;
+        payload.statsDebounceMs = parseInt(formData.statsDebounceMs);
+        payload.statsMinIntervalMs = parseInt(formData.statsMinIntervalMs);
+      }
 
       if (entity) {
         await api.adminRequest(`/webhooks/${entity.id}`, {
@@ -212,6 +247,96 @@ export function WebhookForm({ entity, onSave, onCancel }) {
             onChange={(e) => setFormData({ ...formData, timeoutSeconds: e.target.value })}
           />
         </div>
+
+        {formData.eventType === 'feedback.statistics' && (
+          <>
+            <fieldset style={{ border: '1px solid #ccc', padding: '12px', borderRadius: '4px', marginTop: '12px' }}>
+              <legend style={{ paddingLeft: '8px' }}>Statistics Configuration</legend>
+
+              <div className="form-group">
+                <label>Stats Trigger</label>
+                <select
+                  value={formData.statsTrigger}
+                  onChange={(e) => setFormData({ ...formData, statsTrigger: e.target.value })}
+                >
+                  {STATS_TRIGGERS.map((trigger) => (
+                    <option key={trigger} value={trigger}>
+                      {trigger === 'on_submit' ? 'On Submit (immediate)' : 'On Change (after threshold met)'}
+                    </option>
+                  ))}
+                </select>
+                <small>When to send statistics webhooks</small>
+              </div>
+
+              <div className="form-group">
+                <label>Stats Type</label>
+                <select
+                  value={formData.statsType}
+                  onChange={(e) => setFormData({ ...formData, statsType: e.target.value })}
+                >
+                  {STATS_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type === 'overall' ? 'Overall Only' : type === 'per_question' ? 'Per Question Only' : 'Both'}
+                    </option>
+                  ))}
+                </select>
+                <small>Which statistics to include: mean, median, min, max, count, stdDev</small>
+              </div>
+
+              <div className="form-group">
+                <label>Default Change Threshold (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={formData.statsChangeThreshold}
+                  onChange={(e) => setFormData({ ...formData, statsChangeThreshold: parseFloat(e.target.value) })}
+                />
+                <small>Trigger webhook if mean changes by this percentage (e.g., 5 = 5%)</small>
+              </div>
+
+              {formData.statsTrigger === 'on_change' && (
+                <>
+                  <div className="form-group">
+                    <label>Per-Question Thresholds (JSON)</label>
+                    <textarea
+                      value={formData.statsThresholds}
+                      onChange={(e) => setFormData({ ...formData, statsThresholds: e.target.value })}
+                      placeholder='{"123": 10, "456": 5}'
+                      rows="3"
+                    />
+                    <small>Optional: Override threshold for specific questions (question_id => percentage). Uses default if not specified.</small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Debounce (ms)</label>
+                    <input
+                      type="number"
+                      min="100"
+                      step="100"
+                      value={formData.statsDebounceMs}
+                      onChange={(e) => setFormData({ ...formData, statsDebounceMs: parseInt(e.target.value) })}
+                    />
+                    <small>Wait this long after last submission before checking stats</small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Minimum Interval (ms)</label>
+                    <input
+                      type="number"
+                      min="1000"
+                      step="1000"
+                      value={formData.statsMinIntervalMs}
+                      onChange={(e) => setFormData({ ...formData, statsMinIntervalMs: parseInt(e.target.value) })}
+                    />
+                    <small>Never send stats more often than this (default 60000ms = 1 minute)</small>
+                  </div>
+                </>
+              )}
+            </fieldset>
+          </>
+        )}
 
         <div className="form-group checkbox">
           <label>

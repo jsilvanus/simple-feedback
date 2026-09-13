@@ -125,6 +125,8 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
     // After transaction commits, enqueue webhook notifications (fire & forget)
     try {
       await enqueueWebhookNotifications(sessionId, locationId, questionnaireId, method, answers);
+      // Also check if stats webhooks need to be enqueued
+      await enqueueStatisticsWebhooks(locationId, questionnaireId, answers);
     } catch (err) {
       // Log error but don't fail the feedback submission
       console.error('Failed to enqueue webhook notifications:', err);
@@ -272,6 +274,185 @@ async function getAnswerMetadata(answers) {
     numeric_value: answer.value || null,
     text_value: answer.textValue || null
   }));
+}
+
+/**
+ * Calculate statistics for feedback answers
+ */
+function calculateStatistics(answers) {
+  const numericAnswers = answers
+    .filter(a => a.numeric_value !== null && a.numeric_value !== undefined)
+    .map(a => parseFloat(a.numeric_value));
+
+  if (numericAnswers.length === 0) {
+    return null;
+  }
+
+  const sorted = numericAnswers.sort((a, b) => a - b);
+  const sum = sorted.reduce((a, b) => a + b, 0);
+  const mean = sum / sorted.length;
+  const median = sorted.length % 2 === 0
+    ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+    : sorted[Math.floor(sorted.length / 2)];
+
+  const variance = sorted.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / sorted.length;
+  const stdDev = Math.sqrt(variance);
+
+  return {
+    mean: parseFloat(mean.toFixed(2)),
+    median: parseFloat(median.toFixed(2)),
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    sum: parseFloat(sum.toFixed(2)),
+    count: sorted.length,
+    stdDev: parseFloat(stdDev.toFixed(2))
+  };
+}
+
+/**
+ * Calculate per-question statistics
+ */
+function calculatePerQuestionStats(answers) {
+  const byQuestion = {};
+
+  answers.forEach(answer => {
+    if (!byQuestion[answer.question_id]) {
+      byQuestion[answer.question_id] = [];
+    }
+    if (answer.numeric_value !== null && answer.numeric_value !== undefined) {
+      byQuestion[answer.question_id].push(answer);
+    }
+  });
+
+  return Object.entries(byQuestion).map(([qId, qAnswers]) => ({
+    questionId: parseInt(qId),
+    questionText: qAnswers[0]?.question_text || '',
+    stats: calculateStatistics(qAnswers)
+  })).filter(q => q.stats !== null);
+}
+
+/**
+ * Check if statistics changed beyond threshold
+ */
+function hasStatsChanged(previousStats, currentStats, thresholds, questionThresholds) {
+  if (!previousStats) return true; // First time, always send
+
+  // Check overall stats if present
+  if (previousStats.overall && currentStats.overall) {
+    const threshold = thresholds.overall || 5;
+    const changePercent = Math.abs((currentStats.overall.mean - previousStats.overall.mean) / previousStats.overall.mean * 100);
+    if (changePercent >= threshold) return true;
+  }
+
+  // Check per-question stats
+  if (previousStats.by_question && currentStats.by_question) {
+    for (const curr of currentStats.by_question) {
+      const prev = previousStats.by_question.find(q => q.questionId === curr.questionId);
+      if (!prev || !prev.stats) continue;
+
+      const qThreshold = questionThresholds?.[curr.questionId] || thresholds.default || 5;
+      if (prev.stats.mean === 0) continue; // Avoid division by zero
+
+      const changePercent = Math.abs((curr.stats.mean - prev.stats.mean) / prev.stats.mean * 100);
+      if (changePercent >= qThreshold) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Enqueue statistics webhooks if configured
+ */
+async function enqueueStatisticsWebhooks(locationId, questionnaireId, answers) {
+  try {
+    const answersWithMetadata = await getAnswerMetadata(answers);
+
+    // Get all active stats webhooks
+    const statsWebhooks = await db.query(
+      `SELECT id, stats_trigger, stats_type, stats_change_threshold, stats_thresholds,
+              stats_debounce_ms, stats_min_interval_ms
+       FROM webhooks
+       WHERE active = true AND event_type = $1`,
+      ['feedback.statistics']
+    );
+
+    for (const webhook of statsWebhooks.rows) {
+      // Skip on_change webhooks during debounce or min_interval
+      if (webhook.stats_trigger === 'on_change') {
+        const cache = await db.query(
+          `SELECT last_sent_at FROM webhook_stats_cache
+           WHERE webhook_id = $1 AND questionnaire_id = $2 AND location_id = $3`,
+          [webhook.id, questionnaireId, locationId]
+        );
+
+        if (cache.rows.length > 0) {
+          const lastSent = new Date(cache.rows[0].last_sent_at);
+          const now = new Date();
+
+          if (now - lastSent < webhook.stats_min_interval_ms) {
+            continue; // Skip, still within min_interval
+          }
+        }
+      }
+
+      // Calculate current stats
+      const statsPayload = {
+        overall: webhook.stats_type !== 'per_question' ? calculateStatistics(answersWithMetadata) : null,
+        by_question: webhook.stats_type !== 'overall' ? calculatePerQuestionStats(answersWithMetadata) : null
+      };
+
+      // For on_change, check if stats changed enough
+      if (webhook.stats_trigger === 'on_change') {
+        const cache = await db.query(
+          `SELECT last_stats FROM webhook_stats_cache
+           WHERE webhook_id = $1 AND questionnaire_id = $2 AND location_id = $3`,
+          [webhook.id, questionnaireId, locationId]
+        );
+
+        const previousStats = cache.rows[0]?.last_stats || null;
+        const thresholds = {
+          overall: webhook.stats_change_threshold,
+          default: webhook.stats_change_threshold
+        };
+
+        if (!hasStatsChanged(previousStats, statsPayload, thresholds, webhook.stats_thresholds)) {
+          continue; // Stats didn't change enough
+        }
+      }
+
+      // Enqueue the stats webhook event
+      const timestamp = new Date().toISOString();
+      const statsEvent = {
+        event_id: `stats-${questionnaireId}-${locationId}-${Date.now()}`,
+        timestamp,
+        type: 'feedback.statistics',
+        data: {
+          locationId,
+          questionnaireId,
+          stats: statsPayload
+        }
+      };
+
+      await db.query(
+        `INSERT INTO notification_queue
+         (event_type, webhook_id, payload, status)
+         VALUES ('webhook', $1, $2, 'pending')`,
+        [webhook.id, JSON.stringify(statsEvent)]
+      );
+
+      // Update cache
+      await db.query(
+        `INSERT INTO webhook_stats_cache (webhook_id, questionnaire_id, location_id, last_stats, last_sent_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (webhook_id, questionnaire_id, location_id)
+         DO UPDATE SET last_stats = $4, last_sent_at = NOW()`,
+        [webhook.id, questionnaireId, locationId, JSON.stringify(statsPayload)]
+      );
+    }
+  } catch (err) {
+    console.error('Failed to enqueue statistics webhooks:', err);
+  }
 }
 
 module.exports = router;

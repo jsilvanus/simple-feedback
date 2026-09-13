@@ -2117,14 +2117,15 @@ router.get('/webhooks/:id', async (req, res, next) => {
 router.post('/webhooks', async (req, res, next) => {
   try {
     const {
-      name, url, eventType, payloadMode, customHeaders, retryCount, timeoutSeconds
+      name, url, eventType, payloadMode, customHeaders, retryCount, timeoutSeconds,
+      statsTrigger, statsType, statsChangeThreshold, statsThresholds, statsDebounceMs, statsMinIntervalMs
     } = req.body;
 
     if (!name || !url || !eventType) {
       return res.status(400).json({ error: { message: 'name, url, and eventType are required' } });
     }
 
-    const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch'];
+    const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch', 'feedback.statistics'];
     if (!validEventTypes.includes(eventType)) {
       return res.status(400).json({ error: { message: 'Invalid eventType' } });
     }
@@ -2139,19 +2140,42 @@ router.post('/webhooks', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'customHeaders must be a JSON object' } });
     }
 
+    // Validate stats fields for feedback.statistics event type
+    if (eventType === 'feedback.statistics') {
+      const validStatsTriggers = ['on_submit', 'on_change'];
+      if (statsTrigger && !validStatsTriggers.includes(statsTrigger)) {
+        return res.status(400).json({ error: { message: 'Invalid statsTrigger' } });
+      }
+      const validStatsTypes = ['overall', 'per_question', 'both'];
+      if (statsType && !validStatsTypes.includes(statsType)) {
+        return res.status(400).json({ error: { message: 'Invalid statsType' } });
+      }
+      if (statsThresholds && typeof statsThresholds !== 'object') {
+        return res.status(400).json({ error: { message: 'statsThresholds must be a JSON object' } });
+      }
+    }
+
     // Generate random 64-byte hex secret
     const secret = require('crypto').randomBytes(32).toString('hex');
 
     const result = await db.query(
-      `INSERT INTO webhooks (name, url, event_type, secret, payload_mode, custom_headers, retry_count, timeout_seconds)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, name, url, event_type, active, payload_mode, retry_count, timeout_seconds, secret, created_at`,
+      `INSERT INTO webhooks (name, url, event_type, secret, payload_mode, custom_headers, retry_count, timeout_seconds,
+                             stats_trigger, stats_type, stats_change_threshold, stats_thresholds, stats_debounce_ms, stats_min_interval_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       RETURNING id, name, url, event_type, active, payload_mode, retry_count, timeout_seconds, secret, created_at,
+                 stats_trigger, stats_type, stats_change_threshold, stats_thresholds, stats_debounce_ms, stats_min_interval_ms`,
       [
         name, url, eventType, secret,
         payloadMode || 'minimal',
         customHeaders ? JSON.stringify(customHeaders) : null,
         retryCount || 3,
-        timeoutSeconds || 10
+        timeoutSeconds || 10,
+        statsTrigger || 'on_submit',
+        statsType || 'overall',
+        statsChangeThreshold || 5.0,
+        statsThresholds ? JSON.stringify(statsThresholds) : null,
+        statsDebounceMs || 1000,
+        statsMinIntervalMs || 60000
       ]
     );
 
@@ -2169,7 +2193,8 @@ router.put('/webhooks/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
-      name, url, eventType, active, payloadMode, customHeaders, retryCount, timeoutSeconds
+      name, url, eventType, active, payloadMode, customHeaders, retryCount, timeoutSeconds,
+      statsTrigger, statsType, statsChangeThreshold, statsThresholds, statsDebounceMs, statsMinIntervalMs
     } = req.body;
 
     const existing = await db.query('SELECT * FROM webhooks WHERE id = $1', [id]);
@@ -2190,7 +2215,7 @@ router.put('/webhooks/:id', async (req, res, next) => {
       params.push(url);
     }
     if (eventType !== undefined) {
-      const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch'];
+      const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch', 'feedback.statistics'];
       if (!validEventTypes.includes(eventType)) {
         return res.status(400).json({ error: { message: 'Invalid eventType' } });
       }
@@ -2223,6 +2248,41 @@ router.put('/webhooks/:id', async (req, res, next) => {
     if (timeoutSeconds !== undefined) {
       updates.push(`timeout_seconds = $${paramCount++}`);
       params.push(timeoutSeconds);
+    }
+    if (statsTrigger !== undefined) {
+      const validStatsTriggers = ['on_submit', 'on_change'];
+      if (!validStatsTriggers.includes(statsTrigger)) {
+        return res.status(400).json({ error: { message: 'Invalid statsTrigger' } });
+      }
+      updates.push(`stats_trigger = $${paramCount++}`);
+      params.push(statsTrigger);
+    }
+    if (statsType !== undefined) {
+      const validStatsTypes = ['overall', 'per_question', 'both'];
+      if (!validStatsTypes.includes(statsType)) {
+        return res.status(400).json({ error: { message: 'Invalid statsType' } });
+      }
+      updates.push(`stats_type = $${paramCount++}`);
+      params.push(statsType);
+    }
+    if (statsChangeThreshold !== undefined) {
+      updates.push(`stats_change_threshold = $${paramCount++}`);
+      params.push(statsChangeThreshold);
+    }
+    if (statsThresholds !== undefined) {
+      if (typeof statsThresholds !== 'object') {
+        return res.status(400).json({ error: { message: 'statsThresholds must be a JSON object' } });
+      }
+      updates.push(`stats_thresholds = $${paramCount++}`);
+      params.push(statsThresholds ? JSON.stringify(statsThresholds) : null);
+    }
+    if (statsDebounceMs !== undefined) {
+      updates.push(`stats_debounce_ms = $${paramCount++}`);
+      params.push(statsDebounceMs);
+    }
+    if (statsMinIntervalMs !== undefined) {
+      updates.push(`stats_min_interval_ms = $${paramCount++}`);
+      params.push(statsMinIntervalMs);
     }
 
     if (updates.length === 0) {
