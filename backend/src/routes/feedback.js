@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../db');
 const { feedbackLimiter } = require('../middleware/rateLimiter');
 const { JWT_SECRET } = require('../middleware/auth');
@@ -121,6 +122,11 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
 
     await client.query('COMMIT');
 
+    // Enqueue notifications (fire-and-forget after commit)
+    enqueueNotifications(client, locationId, questionnaireId, sessionId, answers).catch(error => {
+      console.error('[Feedback] Failed to enqueue notifications:', error);
+    });
+
     res.status(201).json({
       success: true,
       sessionId,
@@ -133,5 +139,112 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
     client.release();
   }
 });
+
+async function enqueueNotifications(client, locationId, questionnaireId, sessionId, answers) {
+  try {
+    // Get location and questionnaire info for payload
+    const locationResult = await client.query(
+      'SELECT id, name FROM locations WHERE id = $1',
+      [locationId]
+    );
+    const locationName = locationResult.rows[0]?.name || 'Unknown Location';
+
+    const questionnaireResult = await client.query(
+      'SELECT id, name FROM questionnaires WHERE id = $1',
+      [questionnaireId]
+    );
+    const questionnaireName = questionnaireResult.rows[0]?.name || 'Unknown Questionnaire';
+
+    const eventPayload = {
+      event_id: crypto.randomUUID(),
+      timestamp: Math.floor(Date.now() / 1000),
+      event_type: 'feedback.submitted',
+      location_id: locationId,
+      location_name: locationName,
+      questionnaire_id: questionnaireId,
+      questionnaire_name: questionnaireName,
+      session_id: sessionId,
+      trigger_type: 'on_submit',
+    };
+
+    // Enqueue webhooks (if any configured)
+    const webhooksResult = await client.query(
+      `SELECT id, event_type FROM webhooks
+       WHERE active = true AND event_type = 'feedback.submitted'
+       AND id IN (
+         SELECT webhook_id FROM schedule_webhooks
+         WHERE schedule_id IN (
+           SELECT id FROM schedules
+           WHERE active = true
+           AND (id IN (
+             SELECT schedule_id FROM schedule_locations WHERE location_id = $1
+           ) OR id IN (
+             SELECT schedule_id FROM schedule_location_groups
+             WHERE location_group_id = (
+               SELECT group_id FROM locations WHERE id = $1
+             )
+           ))
+         )
+       )`,
+      [locationId]
+    );
+
+    for (const webhook of webhooksResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, webhook_id, payload, status, attempts, scheduled_at)
+         VALUES ('webhook', $1, $2, 'pending', 0, NOW())`,
+        [webhook.id, JSON.stringify(eventPayload)]
+      );
+    }
+
+    // Enqueue email notifications
+    const emailResult = await client.query(
+      `SELECT id FROM email_recipients
+       WHERE active = true AND questionnaire_id = $1 AND trigger_type = 'on_submit'`,
+      [questionnaireId]
+    );
+
+    for (const recipient of emailResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, recipient_id, recipient_type, payload, status, attempts, scheduled_at)
+         VALUES ('email', $1, 'email_recipients', $2, 'pending', 0, NOW())`,
+        [recipient.id, JSON.stringify(eventPayload)]
+      );
+    }
+
+    // Enqueue SMS notifications
+    const smsResult = await client.query(
+      `SELECT id FROM sms_recipients
+       WHERE active = true AND questionnaire_id = $1 AND trigger_type = 'on_submit'`,
+      [questionnaireId]
+    );
+
+    for (const recipient of smsResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, recipient_id, recipient_type, payload, status, attempts, scheduled_at)
+         VALUES ('sms', $1, 'sms_recipients', $2, 'pending', 0, NOW())`,
+        [recipient.id, JSON.stringify(eventPayload)]
+      );
+    }
+
+    // Enqueue ntfy notifications
+    const ntfyResult = await client.query(
+      `SELECT id FROM ntfy_subscriptions
+       WHERE active = true AND questionnaire_id = $1 AND trigger_type = 'on_submit'`,
+      [questionnaireId]
+    );
+
+    for (const subscription of ntfyResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, recipient_id, recipient_type, payload, status, attempts, scheduled_at)
+         VALUES ('ntfy', $1, 'ntfy_subscriptions', $2, 'pending', 0, NOW())`,
+        [subscription.id, JSON.stringify(eventPayload)]
+      );
+    }
+  } catch (error) {
+    console.error('[Feedback] Error enqueueing notifications:', error);
+    throw error;
+  }
+}
 
 module.exports = router;

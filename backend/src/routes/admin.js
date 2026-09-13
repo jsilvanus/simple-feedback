@@ -2043,4 +2043,404 @@ router.get('/export', async (req, res, next) => {
   }
 });
 
+/**
+ * GET /api/admin/email-recipients
+ * List email notification recipients
+ */
+router.get('/email-recipients', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId } = req.query;
+    let query = 'SELECT * FROM email_recipients WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
+
+    if (questionnaireId) {
+      paramCount++;
+      query += ` AND questionnaire_id = $${paramCount}`;
+      params.push(questionnaireId);
+    }
+
+    if (locationId) {
+      paramCount++;
+      query += ` AND location_id = $${paramCount}`;
+      params.push(locationId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/email-recipients
+ * Create email notification recipient
+ */
+router.post('/email-recipients', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId, email, triggerType, onChangeThreshold } = req.body;
+
+    if (!questionnaireId || !email) {
+      return res.status(400).json({ error: { message: 'questionnaireId and email are required' } });
+    }
+
+    if (triggerType && !['on_submit', 'on_change'].includes(triggerType)) {
+      return res.status(400).json({ error: { message: 'triggerType must be on_submit or on_change' } });
+    }
+
+    const result = await db.query(
+      `INSERT INTO email_recipients (questionnaire_id, location_id, email, trigger_type, on_change_threshold)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [questionnaireId, locationId || null, email, triggerType || 'on_submit', onChangeThreshold || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/email-recipients/:id
+ * Update email notification recipient
+ */
+router.put('/email-recipients/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { email, triggerType, onChangeThreshold, active } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (email !== undefined) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+    if (triggerType !== undefined) {
+      updates.push(`trigger_type = $${paramCount++}`);
+      values.push(triggerType);
+    }
+    if (onChangeThreshold !== undefined) {
+      updates.push(`on_change_threshold = $${paramCount++}`);
+      values.push(onChangeThreshold);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await db.query(
+      `UPDATE email_recipients SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Email recipient not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/email-recipients/:id
+ * Delete email notification recipient
+ */
+router.delete('/email-recipients/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query('DELETE FROM email_recipients WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: { message: 'Email recipient not found' } });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/sms-recipients
+ * List SMS notification recipients
+ */
+router.get('/sms-recipients', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId } = req.query;
+    let query = 'SELECT * FROM sms_recipients WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
+
+    if (questionnaireId) {
+      paramCount++;
+      query += ` AND questionnaire_id = $${paramCount}`;
+      params.push(questionnaireId);
+    }
+
+    if (locationId) {
+      paramCount++;
+      query += ` AND location_id = $${paramCount}`;
+      params.push(locationId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/sms-recipients
+ * Create SMS notification recipient
+ */
+router.post('/sms-recipients', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId, phoneNumber, triggerType, onChangeThreshold } = req.body;
+
+    if (!questionnaireId || !phoneNumber) {
+      return res.status(400).json({ error: { message: 'questionnaireId and phoneNumber are required' } });
+    }
+
+    if (triggerType && !['on_submit', 'on_change'].includes(triggerType)) {
+      return res.status(400).json({ error: { message: 'triggerType must be on_submit or on_change' } });
+    }
+
+    const result = await db.query(
+      `INSERT INTO sms_recipients (questionnaire_id, location_id, phone_number, trigger_type, on_change_threshold)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [questionnaireId, locationId || null, phoneNumber, triggerType || 'on_submit', onChangeThreshold || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/sms-recipients/:id
+ * Update SMS notification recipient
+ */
+router.put('/sms-recipients/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { phoneNumber, triggerType, onChangeThreshold, active } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (phoneNumber !== undefined) {
+      updates.push(`phone_number = $${paramCount++}`);
+      values.push(phoneNumber);
+    }
+    if (triggerType !== undefined) {
+      updates.push(`trigger_type = $${paramCount++}`);
+      values.push(triggerType);
+    }
+    if (onChangeThreshold !== undefined) {
+      updates.push(`on_change_threshold = $${paramCount++}`);
+      values.push(onChangeThreshold);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await db.query(
+      `UPDATE sms_recipients SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'SMS recipient not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/sms-recipients/:id
+ * Delete SMS notification recipient
+ */
+router.delete('/sms-recipients/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query('DELETE FROM sms_recipients WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: { message: 'SMS recipient not found' } });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/ntfy-subscriptions
+ * List ntfy push notification subscriptions
+ */
+router.get('/ntfy-subscriptions', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId } = req.query;
+    let query = 'SELECT * FROM ntfy_subscriptions WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
+
+    if (questionnaireId) {
+      paramCount++;
+      query += ` AND questionnaire_id = $${paramCount}`;
+      params.push(questionnaireId);
+    }
+
+    if (locationId) {
+      paramCount++;
+      query += ` AND location_id = $${paramCount}`;
+      params.push(locationId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/ntfy-subscriptions
+ * Create ntfy push notification subscription
+ */
+router.post('/ntfy-subscriptions', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId, topic, triggerType, onChangeThreshold } = req.body;
+
+    if (!questionnaireId || !topic) {
+      return res.status(400).json({ error: { message: 'questionnaireId and topic are required' } });
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(topic)) {
+      return res.status(400).json({ error: { message: 'topic must contain only alphanumeric characters, dashes, and underscores' } });
+    }
+
+    if (triggerType && !['on_submit', 'on_change'].includes(triggerType)) {
+      return res.status(400).json({ error: { message: 'triggerType must be on_submit or on_change' } });
+    }
+
+    const result = await db.query(
+      `INSERT INTO ntfy_subscriptions (questionnaire_id, location_id, topic, trigger_type, on_change_threshold)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [questionnaireId, locationId || null, topic, triggerType || 'on_submit', onChangeThreshold || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/ntfy-subscriptions/:id
+ * Update ntfy push notification subscription
+ */
+router.put('/ntfy-subscriptions/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { topic, triggerType, onChangeThreshold, active } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (topic !== undefined) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(topic)) {
+        return res.status(400).json({ error: { message: 'topic must contain only alphanumeric characters, dashes, and underscores' } });
+      }
+      updates.push(`topic = $${paramCount++}`);
+      values.push(topic);
+    }
+    if (triggerType !== undefined) {
+      updates.push(`trigger_type = $${paramCount++}`);
+      values.push(triggerType);
+    }
+    if (onChangeThreshold !== undefined) {
+      updates.push(`on_change_threshold = $${paramCount++}`);
+      values.push(onChangeThreshold);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await db.query(
+      `UPDATE ntfy_subscriptions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Ntfy subscription not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/ntfy-subscriptions/:id
+ * Delete ntfy push notification subscription
+ */
+router.delete('/ntfy-subscriptions/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query('DELETE FROM ntfy_subscriptions WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: { message: 'Ntfy subscription not found' } });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
