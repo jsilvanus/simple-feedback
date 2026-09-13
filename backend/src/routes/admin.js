@@ -2050,4 +2050,438 @@ router.get('/export', async (req, res, next) => {
   }
 });
 
+/**
+ * GET /api/admin/webhooks
+ * Get all webhooks (paginated)
+ */
+router.get('/webhooks', async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 0;
+    const pageSize = parseInt(req.query.pageSize) || 20;
+    const offset = page * pageSize;
+
+    const result = await db.query(
+      `SELECT id, name, url, event_type, active, payload_mode, retry_count, timeout_seconds, created_at
+       FROM webhooks
+       ORDER BY created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [pageSize, offset]
+    );
+
+    const countResult = await db.query('SELECT COUNT(*) FROM webhooks');
+    const total = parseInt(countResult.rows[0].count);
+
+    res.json({
+      webhooks: result.rows,
+      total,
+      page,
+      pageSize
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/webhooks/:id
+ * Get a single webhook (mask secret)
+ */
+router.get('/webhooks/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(
+      `SELECT id, name, url, event_type, active, secret, payload_mode, custom_headers,
+              retry_count, timeout_seconds, created_at, updated_at
+       FROM webhooks WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    }
+
+    const webhook = result.rows[0];
+    // Mask secret: show only last 4 chars
+    webhook.secretMasked = webhook.secret ? `****${webhook.secret.slice(-4)}` : '';
+
+    res.json(webhook);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/webhooks
+ * Create a new webhook
+ */
+router.post('/webhooks', async (req, res, next) => {
+  try {
+    const {
+      name, url, eventType, payloadMode, customHeaders, retryCount, timeoutSeconds,
+      statsTrigger, statsType, statsChangeThreshold, statsThresholds, statsDebounceMs, statsMinIntervalMs
+    } = req.body;
+
+    if (!name || !url || !eventType) {
+      return res.status(400).json({ error: { message: 'name, url, and eventType are required' } });
+    }
+
+    const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch', 'feedback.statistics'];
+    if (!validEventTypes.includes(eventType)) {
+      return res.status(400).json({ error: { message: 'Invalid eventType' } });
+    }
+
+    const validPayloadModes = ['minimal', 'standard', 'custom'];
+    if (payloadMode && !validPayloadModes.includes(payloadMode)) {
+      return res.status(400).json({ error: { message: 'Invalid payloadMode' } });
+    }
+
+    // Validate custom_headers is valid JSON
+    if (customHeaders && typeof customHeaders !== 'object') {
+      return res.status(400).json({ error: { message: 'customHeaders must be a JSON object' } });
+    }
+
+    // Validate stats fields for feedback.statistics event type
+    if (eventType === 'feedback.statistics') {
+      const validStatsTriggers = ['on_submit', 'on_change'];
+      if (statsTrigger && !validStatsTriggers.includes(statsTrigger)) {
+        return res.status(400).json({ error: { message: 'Invalid statsTrigger' } });
+      }
+      const validStatsTypes = ['overall', 'per_question', 'both'];
+      if (statsType && !validStatsTypes.includes(statsType)) {
+        return res.status(400).json({ error: { message: 'Invalid statsType' } });
+      }
+      if (statsThresholds && typeof statsThresholds !== 'object') {
+        return res.status(400).json({ error: { message: 'statsThresholds must be a JSON object' } });
+      }
+    }
+
+    // Generate random 64-byte hex secret
+    const secret = require('crypto').randomBytes(32).toString('hex');
+
+    const result = await db.query(
+      `INSERT INTO webhooks (name, url, event_type, secret, payload_mode, custom_headers, retry_count, timeout_seconds,
+                             stats_trigger, stats_type, stats_change_threshold, stats_thresholds, stats_debounce_ms, stats_min_interval_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       RETURNING id, name, url, event_type, active, payload_mode, retry_count, timeout_seconds, secret, created_at,
+                 stats_trigger, stats_type, stats_change_threshold, stats_thresholds, stats_debounce_ms, stats_min_interval_ms`,
+      [
+        name, url, eventType, secret,
+        payloadMode || 'minimal',
+        customHeaders ? JSON.stringify(customHeaders) : null,
+        retryCount || 3,
+        timeoutSeconds || 10,
+        statsTrigger || 'on_submit',
+        statsType || 'overall',
+        statsChangeThreshold || 5.0,
+        statsThresholds ? JSON.stringify(statsThresholds) : null,
+        statsDebounceMs || 1000,
+        statsMinIntervalMs || 60000
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/webhooks/:id
+ * Update a webhook
+ */
+router.put('/webhooks/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      name, url, eventType, active, payloadMode, customHeaders, retryCount, timeoutSeconds,
+      statsTrigger, statsType, statsChangeThreshold, statsThresholds, statsDebounceMs, statsMinIntervalMs
+    } = req.body;
+
+    const existing = await db.query('SELECT * FROM webhooks WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    }
+
+    const updates = [];
+    const params = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      params.push(name);
+    }
+    if (url !== undefined) {
+      updates.push(`url = $${paramCount++}`);
+      params.push(url);
+    }
+    if (eventType !== undefined) {
+      const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch', 'feedback.statistics'];
+      if (!validEventTypes.includes(eventType)) {
+        return res.status(400).json({ error: { message: 'Invalid eventType' } });
+      }
+      updates.push(`event_type = $${paramCount++}`);
+      params.push(eventType);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      params.push(active);
+    }
+    if (payloadMode !== undefined) {
+      const validPayloadModes = ['minimal', 'standard', 'custom'];
+      if (!validPayloadModes.includes(payloadMode)) {
+        return res.status(400).json({ error: { message: 'Invalid payloadMode' } });
+      }
+      updates.push(`payload_mode = $${paramCount++}`);
+      params.push(payloadMode);
+    }
+    if (customHeaders !== undefined) {
+      if (typeof customHeaders !== 'object') {
+        return res.status(400).json({ error: { message: 'customHeaders must be a JSON object' } });
+      }
+      updates.push(`custom_headers = $${paramCount++}`);
+      params.push(customHeaders ? JSON.stringify(customHeaders) : null);
+    }
+    if (retryCount !== undefined) {
+      updates.push(`retry_count = $${paramCount++}`);
+      params.push(retryCount);
+    }
+    if (timeoutSeconds !== undefined) {
+      updates.push(`timeout_seconds = $${paramCount++}`);
+      params.push(timeoutSeconds);
+    }
+    if (statsTrigger !== undefined) {
+      const validStatsTriggers = ['on_submit', 'on_change'];
+      if (!validStatsTriggers.includes(statsTrigger)) {
+        return res.status(400).json({ error: { message: 'Invalid statsTrigger' } });
+      }
+      updates.push(`stats_trigger = $${paramCount++}`);
+      params.push(statsTrigger);
+    }
+    if (statsType !== undefined) {
+      const validStatsTypes = ['overall', 'per_question', 'both'];
+      if (!validStatsTypes.includes(statsType)) {
+        return res.status(400).json({ error: { message: 'Invalid statsType' } });
+      }
+      updates.push(`stats_type = $${paramCount++}`);
+      params.push(statsType);
+    }
+    if (statsChangeThreshold !== undefined) {
+      updates.push(`stats_change_threshold = $${paramCount++}`);
+      params.push(statsChangeThreshold);
+    }
+    if (statsThresholds !== undefined) {
+      if (typeof statsThresholds !== 'object') {
+        return res.status(400).json({ error: { message: 'statsThresholds must be a JSON object' } });
+      }
+      updates.push(`stats_thresholds = $${paramCount++}`);
+      params.push(statsThresholds ? JSON.stringify(statsThresholds) : null);
+    }
+    if (statsDebounceMs !== undefined) {
+      updates.push(`stats_debounce_ms = $${paramCount++}`);
+      params.push(statsDebounceMs);
+    }
+    if (statsMinIntervalMs !== undefined) {
+      updates.push(`stats_min_interval_ms = $${paramCount++}`);
+      params.push(statsMinIntervalMs);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = NOW()`);
+
+    params.push(id);
+    const query = `UPDATE webhooks SET ${updates.join(', ')} WHERE id = $${paramCount + 1} RETURNING *`;
+
+    const result = await db.query(query, params);
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/webhooks/:id
+ * Delete a webhook
+ */
+router.delete('/webhooks/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query('DELETE FROM webhooks WHERE id = $1 RETURNING id', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    }
+
+    res.json({ success: true, id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/webhooks/:id/test
+ * Send a test webhook payload
+ */
+router.post('/webhooks/:id/test', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const webhook = await db.query('SELECT * FROM webhooks WHERE id = $1', [id]);
+    if (webhook.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    }
+
+    const w = webhook.rows[0];
+    const timestamp = new Date().toISOString();
+    const eventId = `999999-${Date.now()}`;
+
+    // Build payload based on mode
+    let payload;
+    if (w.payload_mode === 'minimal') {
+      payload = {
+        event_id: eventId,
+        timestamp,
+        type: w.event_type
+      };
+    } else {
+      // standard mode
+      payload = {
+        event_id: eventId,
+        timestamp,
+        type: w.event_type,
+        data: {
+          sessionId: 999999,
+          locationId: 1,
+          locationName: 'Test Location',
+          questionnaireId: 1,
+          questionnaireName: 'Test Questionnaire',
+          entryMethod: 'kiosk',
+          answersCount: 1,
+          answers: [{
+            questionId: 1,
+            questionText: 'How satisfied are you?',
+            type: 'scale',
+            value: 4.5
+          }]
+        }
+      };
+    }
+
+    // Generate HMAC
+    const crypto = require('crypto');
+    const message = `${Date.now()}.${JSON.stringify(payload)}`;
+    const signature = crypto
+      .createHmac('sha256', w.secret)
+      .update(message)
+      .digest('hex');
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Webhook-Signature': `sha256=${signature}`,
+      'X-Webhook-Timestamp': Date.now().toString(),
+      'X-Event-ID': `test-${Date.now()}`,
+      ...(w.custom_headers || {})
+    };
+
+    try {
+      const startTime = Date.now();
+      const response = await fetch(w.url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        timeout: w.timeout_seconds * 1000
+      });
+      const duration = Date.now() - startTime;
+      const responseBody = await response.text();
+
+      res.json({
+        success: true,
+        statusCode: response.status,
+        responseBody,
+        durationMs: duration
+      });
+    } catch (fetchError) {
+      res.status(502).json({
+        success: false,
+        error: fetchError.message
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/webhooks/:id/regenerate-secret
+ * Generate a new secret for a webhook
+ */
+router.post('/webhooks/:id/regenerate-secret', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const webhook = await db.query('SELECT * FROM webhooks WHERE id = $1', [id]);
+    if (webhook.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    }
+
+    // Generate new secret
+    const secret = require('crypto').randomBytes(32).toString('hex');
+
+    const result = await db.query(
+      'UPDATE webhooks SET secret = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [secret, id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/webhooks/:id/logs
+ * Get delivery logs for a webhook (paginated)
+ */
+router.get('/webhooks/:id/logs', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 0;
+    const pageSize = parseInt(req.query.pageSize) || 20;
+    const offset = page * pageSize;
+
+    // Verify webhook exists
+    const webhook = await db.query('SELECT id FROM webhooks WHERE id = $1', [id]);
+    if (webhook.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    }
+
+    const result = await db.query(
+      `SELECT id, status_code, response_body, duration_ms, delivered_at
+       FROM webhook_delivery_logs
+       WHERE webhook_id = $1
+       ORDER BY delivered_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, pageSize, offset]
+    );
+
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM webhook_delivery_logs WHERE webhook_id = $1',
+      [id]
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    res.json({
+      logs: result.rows,
+      total,
+      page,
+      pageSize
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

@@ -43,7 +43,7 @@ const publicPath = path.join(__dirname, '../public');
 app.use(express.static(publicPath));
 
 // SPA fallback: serve index.html for client-side routes (React Router)
-app.get('*', (req, res) => {
+app.get(/^\/(?!api\/)/, (req, res) => {
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 
