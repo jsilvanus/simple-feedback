@@ -38,6 +38,15 @@ app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin/images', require('./routes/images'));
 
+// Serve frontend static files (React build output)
+const publicPath = path.join(__dirname, '../public');
+app.use(express.static(publicPath));
+
+// SPA fallback: serve index.html for client-side routes (React Router)
+app.get(/^\/(?!api\/)/, (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

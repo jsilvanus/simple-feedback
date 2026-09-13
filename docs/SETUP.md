@@ -5,8 +5,9 @@
 Before you begin, ensure you have the following installed:
 
 - **Node.js** v18 or higher
-- **PostgreSQL** v13 or higher
-- **npm** or **yarn** package manager
+- **PostgreSQL** v16 (Docker: `postgres:16-alpine` is provided in docker-compose.yml)
+- **Docker** & **Docker Compose** (for PostgreSQL containerization)
+- **npm** package manager
 
 ## Quick Start
 

@@ -42,6 +42,10 @@
     "enterPassword": "Syötä sijainnin salasana",
     "logoutConfirm": "Haluatko varmasti kirjautua ulos sijainnista {{location}}?"
   },
+  "qrFirst": {
+    "scanPrompt": "Skannaa antaaksesi palautetta puhelimellasi tai...",
+    "continueOnDevice": "Jatka tällä laitteella"
+  },
   "admin": {
     "login": "Ylläpitäjän kirjautuminen",
     "backToHome": "Takaisin etusivulle",

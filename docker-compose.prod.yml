@@ -1,0 +1,30 @@
+# Production: External PostgreSQL + backend/frontend image + Traefik
+# Backend serves both API (/api/*) and frontend (/)
+# PostgreSQL connection via DATABASE_URL env var (from external infra)
+
+services:
+  backend:
+    # Image contains both backend API and frontend React build
+    image: ghcr.io/jsilvanus/simple-feedback:${IMAGE_TAG:-latest}
+    container_name: simple_feedback_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    volumes:
+      - ./backend/uploads:/app/uploads
+    networks:
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.simple-feedback.rule=Host(`${DOMAIN:-feedback.example.com}`)"
+      - "traefik.http.routers.simple-feedback.entrypoints=websecure"
+      - "traefik.http.routers.simple-feedback.tls.certresolver=letsencrypt"
+      - "traefik.http.services.simple-feedback.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.simple-feedback-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.simple-feedback.middlewares=simple-feedback-headers"
+
+networks:
+  traefik_public:
+    external: true

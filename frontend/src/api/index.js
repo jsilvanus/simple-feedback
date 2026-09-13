@@ -56,7 +56,7 @@ export const api = {
   },
 
   // Submit feedback
-  async submitFeedback(locationId, questionnaireId, answers, locationToken) {
+  async submitFeedback(locationId, questionnaireId, answers, locationToken, entryMethod = 'kiosk') {
     const headers = { 'Content-Type': 'application/json' };
     if (locationToken) {
       headers['X-Location-Token'] = locationToken;
@@ -68,13 +68,14 @@ export const api = {
         locationId,
         questionnaireId,
         answers,
+        entryMethod,
       }),
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to submit feedback');
     }
-    
+
     return response.json();
   },
 

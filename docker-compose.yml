@@ -1,7 +1,13 @@
+# Development docker-compose.yml
+# Builds backend + frontend from local source and runs PostgreSQL in container
+# Backend serves both API and static frontend files
+# For staging, use docker-compose.staging.yml
+# For production, use docker-compose.prod.yml
+
 services:
   db:
     image: postgres:16-alpine
-    container_name: simple_feedback_db
+    container_name: simple_feedback_dev_db
     environment:
       POSTGRES_DB: ${DB_NAME:-simple_feedback}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -21,12 +27,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: simple_feedback_backend
+    container_name: simple_feedback_dev_backend
     env_file:
       - ./backend/.env
     environment:
       DB_HOST: db
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: development
     ports:
       - "${PORT:-3000}:3000"
     depends_on:
