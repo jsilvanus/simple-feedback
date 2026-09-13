@@ -111,7 +111,6 @@ router.post('/locations', async (req, res, next) => {
       groupId,
       password,
       passwordRequired,
-      qrEntryMode,
     } = req.body;
 
     if (!slug || !name) {
@@ -126,8 +125,8 @@ router.post('/locations', async (req, res, next) => {
 
     const result = await db.query(
       `INSERT INTO locations
-       (slug, name, active, group_id, password_hash, password_required, qr_entry_mode)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (slug, name, active, group_id, password_hash, password_required)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
         slug,
@@ -136,7 +135,6 @@ router.post('/locations', async (req, res, next) => {
         groupId || null,
         passwordHash,
         passwordRequired === true,
-        qrEntryMode === true,
       ]
     );
 
@@ -163,7 +161,6 @@ router.put('/locations/:id', async (req, res, next) => {
       groupId,
       password,
       passwordRequired,
-      qrEntryMode,
     } = req.body;
 
     const existingResult = await db.query(
@@ -215,10 +212,6 @@ router.put('/locations/:id', async (req, res, next) => {
       const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
       updates.push(`password_hash = $${paramCount++}`);
       values.push(passwordHash);
-    }
-    if (qrEntryMode !== undefined) {
-      updates.push(`qr_entry_mode = $${paramCount++}`);
-      values.push(qrEntryMode);
     }
 
     if (updates.length === 0) {
@@ -2051,132 +2044,57 @@ router.get('/export', async (req, res, next) => {
 });
 
 /**
- * GET /api/admin/webhooks
- * Get all webhooks (paginated)
+ * GET /api/admin/email-recipients
+ * List email notification recipients
  */
-router.get('/webhooks', async (req, res, next) => {
+router.get('/email-recipients', async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 0;
-    const pageSize = parseInt(req.query.pageSize) || 20;
-    const offset = page * pageSize;
+    const { questionnaireId, locationId } = req.query;
+    let query = 'SELECT * FROM email_recipients WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
 
-    const result = await db.query(
-      `SELECT id, name, url, event_type, active, payload_mode, retry_count, timeout_seconds, created_at
-       FROM webhooks
-       ORDER BY created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [pageSize, offset]
-    );
+    if (questionnaireId) {
+      paramCount++;
+      query += ` AND questionnaire_id = $${paramCount}`;
+      params.push(questionnaireId);
+    }
 
-    const countResult = await db.query('SELECT COUNT(*) FROM webhooks');
-    const total = parseInt(countResult.rows[0].count);
+    if (locationId) {
+      paramCount++;
+      query += ` AND location_id = $${paramCount}`;
+      params.push(locationId);
+    }
 
-    res.json({
-      webhooks: result.rows,
-      total,
-      page,
-      pageSize
-    });
+    query += ' ORDER BY created_at DESC';
+    const result = await db.query(query, params);
+    res.json(result.rows);
   } catch (error) {
     next(error);
   }
 });
 
 /**
- * GET /api/admin/webhooks/:id
- * Get a single webhook (mask secret)
+ * POST /api/admin/email-recipients
+ * Create email notification recipient
  */
-router.get('/webhooks/:id', async (req, res, next) => {
+router.post('/email-recipients', async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const result = await db.query(
-      `SELECT id, name, url, event_type, active, secret, payload_mode, custom_headers,
-              retry_count, timeout_seconds, created_at, updated_at
-       FROM webhooks WHERE id = $1`,
-      [id]
-    );
+    const { questionnaireId, locationId, email, triggerType, onChangeThreshold } = req.body;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    if (!questionnaireId || !email) {
+      return res.status(400).json({ error: { message: 'questionnaireId and email are required' } });
     }
 
-    const webhook = result.rows[0];
-    // Mask secret: show only last 4 chars
-    webhook.secretMasked = webhook.secret ? `****${webhook.secret.slice(-4)}` : '';
-
-    res.json(webhook);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * POST /api/admin/webhooks
- * Create a new webhook
- */
-router.post('/webhooks', async (req, res, next) => {
-  try {
-    const {
-      name, url, eventType, payloadMode, customHeaders, retryCount, timeoutSeconds,
-      statsTrigger, statsType, statsChangeThreshold, statsThresholds, statsDebounceMs, statsMinIntervalMs
-    } = req.body;
-
-    if (!name || !url || !eventType) {
-      return res.status(400).json({ error: { message: 'name, url, and eventType are required' } });
+    if (triggerType && !['on_submit', 'on_change'].includes(triggerType)) {
+      return res.status(400).json({ error: { message: 'triggerType must be on_submit or on_change' } });
     }
-
-    const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch', 'feedback.statistics'];
-    if (!validEventTypes.includes(eventType)) {
-      return res.status(400).json({ error: { message: 'Invalid eventType' } });
-    }
-
-    const validPayloadModes = ['minimal', 'standard', 'custom'];
-    if (payloadMode && !validPayloadModes.includes(payloadMode)) {
-      return res.status(400).json({ error: { message: 'Invalid payloadMode' } });
-    }
-
-    // Validate custom_headers is valid JSON
-    if (customHeaders && typeof customHeaders !== 'object') {
-      return res.status(400).json({ error: { message: 'customHeaders must be a JSON object' } });
-    }
-
-    // Validate stats fields for feedback.statistics event type
-    if (eventType === 'feedback.statistics') {
-      const validStatsTriggers = ['on_submit', 'on_change'];
-      if (statsTrigger && !validStatsTriggers.includes(statsTrigger)) {
-        return res.status(400).json({ error: { message: 'Invalid statsTrigger' } });
-      }
-      const validStatsTypes = ['overall', 'per_question', 'both'];
-      if (statsType && !validStatsTypes.includes(statsType)) {
-        return res.status(400).json({ error: { message: 'Invalid statsType' } });
-      }
-      if (statsThresholds && typeof statsThresholds !== 'object') {
-        return res.status(400).json({ error: { message: 'statsThresholds must be a JSON object' } });
-      }
-    }
-
-    // Generate random 64-byte hex secret
-    const secret = require('crypto').randomBytes(32).toString('hex');
 
     const result = await db.query(
-      `INSERT INTO webhooks (name, url, event_type, secret, payload_mode, custom_headers, retry_count, timeout_seconds,
-                             stats_trigger, stats_type, stats_change_threshold, stats_thresholds, stats_debounce_ms, stats_min_interval_ms)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       RETURNING id, name, url, event_type, active, payload_mode, retry_count, timeout_seconds, secret, created_at,
-                 stats_trigger, stats_type, stats_change_threshold, stats_thresholds, stats_debounce_ms, stats_min_interval_ms`,
-      [
-        name, url, eventType, secret,
-        payloadMode || 'minimal',
-        customHeaders ? JSON.stringify(customHeaders) : null,
-        retryCount || 3,
-        timeoutSeconds || 10,
-        statsTrigger || 'on_submit',
-        statsType || 'overall',
-        statsChangeThreshold || 5.0,
-        statsThresholds ? JSON.stringify(statsThresholds) : null,
-        statsDebounceMs || 1000,
-        statsMinIntervalMs || 60000
-      ]
+      `INSERT INTO email_recipients (questionnaire_id, location_id, email, trigger_type, on_change_threshold)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [questionnaireId, locationId || null, email, triggerType || 'on_submit', onChangeThreshold || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -2186,103 +2104,33 @@ router.post('/webhooks', async (req, res, next) => {
 });
 
 /**
- * PUT /api/admin/webhooks/:id
- * Update a webhook
+ * PUT /api/admin/email-recipients/:id
+ * Update email notification recipient
  */
-router.put('/webhooks/:id', async (req, res, next) => {
+router.put('/email-recipients/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      name, url, eventType, active, payloadMode, customHeaders, retryCount, timeoutSeconds,
-      statsTrigger, statsType, statsChangeThreshold, statsThresholds, statsDebounceMs, statsMinIntervalMs
-    } = req.body;
-
-    const existing = await db.query('SELECT * FROM webhooks WHERE id = $1', [id]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Webhook not found' } });
-    }
+    const { email, triggerType, onChangeThreshold, active } = req.body;
 
     const updates = [];
-    const params = [];
+    const values = [];
     let paramCount = 1;
 
-    if (name !== undefined) {
-      updates.push(`name = $${paramCount++}`);
-      params.push(name);
+    if (email !== undefined) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
     }
-    if (url !== undefined) {
-      updates.push(`url = $${paramCount++}`);
-      params.push(url);
+    if (triggerType !== undefined) {
+      updates.push(`trigger_type = $${paramCount++}`);
+      values.push(triggerType);
     }
-    if (eventType !== undefined) {
-      const validEventTypes = ['feedback.submitted', 'feedback.text_submitted', 'feedback.batch', 'feedback.statistics'];
-      if (!validEventTypes.includes(eventType)) {
-        return res.status(400).json({ error: { message: 'Invalid eventType' } });
-      }
-      updates.push(`event_type = $${paramCount++}`);
-      params.push(eventType);
+    if (onChangeThreshold !== undefined) {
+      updates.push(`on_change_threshold = $${paramCount++}`);
+      values.push(onChangeThreshold);
     }
     if (active !== undefined) {
       updates.push(`active = $${paramCount++}`);
-      params.push(active);
-    }
-    if (payloadMode !== undefined) {
-      const validPayloadModes = ['minimal', 'standard', 'custom'];
-      if (!validPayloadModes.includes(payloadMode)) {
-        return res.status(400).json({ error: { message: 'Invalid payloadMode' } });
-      }
-      updates.push(`payload_mode = $${paramCount++}`);
-      params.push(payloadMode);
-    }
-    if (customHeaders !== undefined) {
-      if (typeof customHeaders !== 'object') {
-        return res.status(400).json({ error: { message: 'customHeaders must be a JSON object' } });
-      }
-      updates.push(`custom_headers = $${paramCount++}`);
-      params.push(customHeaders ? JSON.stringify(customHeaders) : null);
-    }
-    if (retryCount !== undefined) {
-      updates.push(`retry_count = $${paramCount++}`);
-      params.push(retryCount);
-    }
-    if (timeoutSeconds !== undefined) {
-      updates.push(`timeout_seconds = $${paramCount++}`);
-      params.push(timeoutSeconds);
-    }
-    if (statsTrigger !== undefined) {
-      const validStatsTriggers = ['on_submit', 'on_change'];
-      if (!validStatsTriggers.includes(statsTrigger)) {
-        return res.status(400).json({ error: { message: 'Invalid statsTrigger' } });
-      }
-      updates.push(`stats_trigger = $${paramCount++}`);
-      params.push(statsTrigger);
-    }
-    if (statsType !== undefined) {
-      const validStatsTypes = ['overall', 'per_question', 'both'];
-      if (!validStatsTypes.includes(statsType)) {
-        return res.status(400).json({ error: { message: 'Invalid statsType' } });
-      }
-      updates.push(`stats_type = $${paramCount++}`);
-      params.push(statsType);
-    }
-    if (statsChangeThreshold !== undefined) {
-      updates.push(`stats_change_threshold = $${paramCount++}`);
-      params.push(statsChangeThreshold);
-    }
-    if (statsThresholds !== undefined) {
-      if (typeof statsThresholds !== 'object') {
-        return res.status(400).json({ error: { message: 'statsThresholds must be a JSON object' } });
-      }
-      updates.push(`stats_thresholds = $${paramCount++}`);
-      params.push(statsThresholds ? JSON.stringify(statsThresholds) : null);
-    }
-    if (statsDebounceMs !== undefined) {
-      updates.push(`stats_debounce_ms = $${paramCount++}`);
-      params.push(statsDebounceMs);
-    }
-    if (statsMinIntervalMs !== undefined) {
-      updates.push(`stats_min_interval_ms = $${paramCount++}`);
-      params.push(statsMinIntervalMs);
+      values.push(active);
     }
 
     if (updates.length === 0) {
@@ -2290,150 +2138,16 @@ router.put('/webhooks/:id', async (req, res, next) => {
     }
 
     updates.push(`updated_at = NOW()`);
+    values.push(id);
 
-    params.push(id);
-    const query = `UPDATE webhooks SET ${updates.join(', ')} WHERE id = $${paramCount + 1} RETURNING *`;
-
-    const result = await db.query(query, params);
-    res.json(result.rows[0]);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * DELETE /api/admin/webhooks/:id
- * Delete a webhook
- */
-router.delete('/webhooks/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const result = await db.query('DELETE FROM webhooks WHERE id = $1 RETURNING id', [id]);
+    const result = await db.query(
+      `UPDATE email_recipients SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Webhook not found' } });
+      return res.status(404).json({ error: { message: 'Email recipient not found' } });
     }
-
-    res.json({ success: true, id });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * POST /api/admin/webhooks/:id/test
- * Send a test webhook payload
- */
-router.post('/webhooks/:id/test', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const webhook = await db.query('SELECT * FROM webhooks WHERE id = $1', [id]);
-    if (webhook.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Webhook not found' } });
-    }
-
-    const w = webhook.rows[0];
-    const timestamp = new Date().toISOString();
-    const eventId = `999999-${Date.now()}`;
-
-    // Build payload based on mode
-    let payload;
-    if (w.payload_mode === 'minimal') {
-      payload = {
-        event_id: eventId,
-        timestamp,
-        type: w.event_type
-      };
-    } else {
-      // standard mode
-      payload = {
-        event_id: eventId,
-        timestamp,
-        type: w.event_type,
-        data: {
-          sessionId: 999999,
-          locationId: 1,
-          locationName: 'Test Location',
-          questionnaireId: 1,
-          questionnaireName: 'Test Questionnaire',
-          entryMethod: 'kiosk',
-          answersCount: 1,
-          answers: [{
-            questionId: 1,
-            questionText: 'How satisfied are you?',
-            type: 'scale',
-            value: 4.5
-          }]
-        }
-      };
-    }
-
-    // Generate HMAC
-    const crypto = require('crypto');
-    const message = `${Date.now()}.${JSON.stringify(payload)}`;
-    const signature = crypto
-      .createHmac('sha256', w.secret)
-      .update(message)
-      .digest('hex');
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Webhook-Signature': `sha256=${signature}`,
-      'X-Webhook-Timestamp': Date.now().toString(),
-      'X-Event-ID': `test-${Date.now()}`,
-      ...(w.custom_headers || {})
-    };
-
-    try {
-      const startTime = Date.now();
-      const response = await fetch(w.url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-        timeout: w.timeout_seconds * 1000
-      });
-      const duration = Date.now() - startTime;
-      const responseBody = await response.text();
-
-      res.json({
-        success: true,
-        statusCode: response.status,
-        responseBody,
-        durationMs: duration
-      });
-    } catch (fetchError) {
-      res.status(502).json({
-        success: false,
-        error: fetchError.message
-      });
-    }
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * POST /api/admin/webhooks/:id/regenerate-secret
- * Generate a new secret for a webhook
- */
-router.post('/webhooks/:id/regenerate-secret', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const webhook = await db.query('SELECT * FROM webhooks WHERE id = $1', [id]);
-    if (webhook.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Webhook not found' } });
-    }
-
-    // Generate new secret
-    const secret = require('crypto').randomBytes(32).toString('hex');
-
-    const result = await db.query(
-      'UPDATE webhooks SET secret = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-      [secret, id]
-    );
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -2442,43 +2156,288 @@ router.post('/webhooks/:id/regenerate-secret', async (req, res, next) => {
 });
 
 /**
- * GET /api/admin/webhooks/:id/logs
- * Get delivery logs for a webhook (paginated)
+ * DELETE /api/admin/email-recipients/:id
+ * Delete email notification recipient
  */
-router.get('/webhooks/:id/logs', async (req, res, next) => {
+router.delete('/email-recipients/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const page = parseInt(req.query.page) || 0;
-    const pageSize = parseInt(req.query.pageSize) || 20;
-    const offset = page * pageSize;
+    const result = await db.query('DELETE FROM email_recipients WHERE id = $1', [id]);
 
-    // Verify webhook exists
-    const webhook = await db.query('SELECT id FROM webhooks WHERE id = $1', [id]);
-    if (webhook.rows.length === 0) {
-      return res.status(404).json({ error: { message: 'Webhook not found' } });
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: { message: 'Email recipient not found' } });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/sms-recipients
+ * List SMS notification recipients
+ */
+router.get('/sms-recipients', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId } = req.query;
+    let query = 'SELECT * FROM sms_recipients WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
+
+    if (questionnaireId) {
+      paramCount++;
+      query += ` AND questionnaire_id = $${paramCount}`;
+      params.push(questionnaireId);
+    }
+
+    if (locationId) {
+      paramCount++;
+      query += ` AND location_id = $${paramCount}`;
+      params.push(locationId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/sms-recipients
+ * Create SMS notification recipient
+ */
+router.post('/sms-recipients', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId, phoneNumber, triggerType, onChangeThreshold } = req.body;
+
+    if (!questionnaireId || !phoneNumber) {
+      return res.status(400).json({ error: { message: 'questionnaireId and phoneNumber are required' } });
+    }
+
+    if (triggerType && !['on_submit', 'on_change'].includes(triggerType)) {
+      return res.status(400).json({ error: { message: 'triggerType must be on_submit or on_change' } });
     }
 
     const result = await db.query(
-      `SELECT id, status_code, response_body, duration_ms, delivered_at
-       FROM webhook_delivery_logs
-       WHERE webhook_id = $1
-       ORDER BY delivered_at DESC
-       LIMIT $2 OFFSET $3`,
-      [id, pageSize, offset]
+      `INSERT INTO sms_recipients (questionnaire_id, location_id, phone_number, trigger_type, on_change_threshold)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [questionnaireId, locationId || null, phoneNumber, triggerType || 'on_submit', onChangeThreshold || null]
     );
 
-    const countResult = await db.query(
-      'SELECT COUNT(*) FROM webhook_delivery_logs WHERE webhook_id = $1',
-      [id]
-    );
-    const total = parseInt(countResult.rows[0].count);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
 
-    res.json({
-      logs: result.rows,
-      total,
-      page,
-      pageSize
-    });
+/**
+ * PUT /api/admin/sms-recipients/:id
+ * Update SMS notification recipient
+ */
+router.put('/sms-recipients/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { phoneNumber, triggerType, onChangeThreshold, active } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (phoneNumber !== undefined) {
+      updates.push(`phone_number = $${paramCount++}`);
+      values.push(phoneNumber);
+    }
+    if (triggerType !== undefined) {
+      updates.push(`trigger_type = $${paramCount++}`);
+      values.push(triggerType);
+    }
+    if (onChangeThreshold !== undefined) {
+      updates.push(`on_change_threshold = $${paramCount++}`);
+      values.push(onChangeThreshold);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await db.query(
+      `UPDATE sms_recipients SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'SMS recipient not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/sms-recipients/:id
+ * Delete SMS notification recipient
+ */
+router.delete('/sms-recipients/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query('DELETE FROM sms_recipients WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: { message: 'SMS recipient not found' } });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/ntfy-subscriptions
+ * List ntfy push notification subscriptions
+ */
+router.get('/ntfy-subscriptions', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId } = req.query;
+    let query = 'SELECT * FROM ntfy_subscriptions WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
+
+    if (questionnaireId) {
+      paramCount++;
+      query += ` AND questionnaire_id = $${paramCount}`;
+      params.push(questionnaireId);
+    }
+
+    if (locationId) {
+      paramCount++;
+      query += ` AND location_id = $${paramCount}`;
+      params.push(locationId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/ntfy-subscriptions
+ * Create ntfy push notification subscription
+ */
+router.post('/ntfy-subscriptions', async (req, res, next) => {
+  try {
+    const { questionnaireId, locationId, topic, triggerType, onChangeThreshold } = req.body;
+
+    if (!questionnaireId || !topic) {
+      return res.status(400).json({ error: { message: 'questionnaireId and topic are required' } });
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(topic)) {
+      return res.status(400).json({ error: { message: 'topic must contain only alphanumeric characters, dashes, and underscores' } });
+    }
+
+    if (triggerType && !['on_submit', 'on_change'].includes(triggerType)) {
+      return res.status(400).json({ error: { message: 'triggerType must be on_submit or on_change' } });
+    }
+
+    const result = await db.query(
+      `INSERT INTO ntfy_subscriptions (questionnaire_id, location_id, topic, trigger_type, on_change_threshold)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [questionnaireId, locationId || null, topic, triggerType || 'on_submit', onChangeThreshold || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/admin/ntfy-subscriptions/:id
+ * Update ntfy push notification subscription
+ */
+router.put('/ntfy-subscriptions/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { topic, triggerType, onChangeThreshold, active } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (topic !== undefined) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(topic)) {
+        return res.status(400).json({ error: { message: 'topic must contain only alphanumeric characters, dashes, and underscores' } });
+      }
+      updates.push(`topic = $${paramCount++}`);
+      values.push(topic);
+    }
+    if (triggerType !== undefined) {
+      updates.push(`trigger_type = $${paramCount++}`);
+      values.push(triggerType);
+    }
+    if (onChangeThreshold !== undefined) {
+      updates.push(`on_change_threshold = $${paramCount++}`);
+      values.push(onChangeThreshold);
+    }
+    if (active !== undefined) {
+      updates.push(`active = $${paramCount++}`);
+      values.push(active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: { message: 'No fields to update' } });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await db.query(
+      `UPDATE ntfy_subscriptions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: { message: 'Ntfy subscription not found' } });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/admin/ntfy-subscriptions/:id
+ * Delete ntfy push notification subscription
+ */
+router.delete('/ntfy-subscriptions/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query('DELETE FROM ntfy_subscriptions WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: { message: 'Ntfy subscription not found' } });
+    }
+
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }

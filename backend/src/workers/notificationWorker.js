@@ -1,172 +1,350 @@
-const crypto = require('crypto');
 const db = require('../db');
+const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
+const { sendEmail, sendSMS } = require('../services/brevoClient');
+const { sendNotification } = require('../services/ntfyClient');
+
+const MAX_RETRIES = 5;
+const RETRY_BASE_SECONDS = 60;
 
 async function processNotificationQueue() {
+  const client = await db.pool.connect();
+
   try {
-    const batch = await db.query(
-      `SELECT id, event_type, webhook_id, payload
+    const result = await client.query(
+      `SELECT id, event_type, webhook_id, recipient_type, recipient_id, payload, attempts
        FROM notification_queue
-       WHERE status = 'pending'
-       ORDER BY scheduled_at ASC
+       WHERE status = 'pending' AND scheduled_at <= NOW()
+       ORDER BY created_at ASC
        LIMIT 10`
     );
 
-    for (const job of batch.rows) {
+    for (const job of result.rows) {
       try {
-        // Mark as processing
-        await db.query(
+        await client.query('BEGIN');
+        await client.query(
           'UPDATE notification_queue SET status = $1 WHERE id = $2',
           ['processing', job.id]
         );
+        await client.query('COMMIT');
 
-        if (job.event_type === 'webhook') {
-          await deliverWebhook(job);
+        let deliveryResult;
+
+        if (job.webhook_id) {
+          deliveryResult = await deliverWebhook(client, job);
+        } else if (job.recipient_type === 'email_recipients') {
+          deliveryResult = await deliverEmail(client, job);
+        } else if (job.recipient_type === 'sms_recipients') {
+          deliveryResult = await deliverSMS(client, job);
+        } else if (job.recipient_type === 'ntfy_subscriptions') {
+          deliveryResult = await deliverNtfy(client, job);
+        } else {
+          throw new Error(`Unknown notification type: webhook_id=${job.webhook_id}, recipient_type=${job.recipient_type}`);
         }
-        // Future: else if (job.event_type === 'sms') { ... }
-        // Future: else if (job.event_type === 'email') { ... }
 
-        // Mark as delivered
-        await db.query(
-          'UPDATE notification_queue SET status = $1, processed_at = NOW() WHERE id = $2',
-          ['delivered', job.id]
+        await client.query('BEGIN');
+        await client.query(
+          `UPDATE notification_queue
+           SET status = 'delivered', processed_at = NOW(), attempts = $1
+           WHERE id = $2`,
+          [job.attempts + 1, job.id]
         );
+        await client.query('COMMIT');
+
+        const notificationType = job.webhook_id ? 'webhook' : job.recipient_type;
+        console.log(`[Notification] Delivered ${notificationType} notification (job_id: ${job.id})`);
       } catch (error) {
-        await handleFailedJob(job, error);
+        console.error(`[Notification] Failed to deliver notification (job_id: ${job.id}):`, error.message);
+        await handleFailedJob(client, job, error);
       }
     }
   } catch (error) {
-    console.error('Error processing notification queue:', error);
+    console.error('[Notification] Error processing queue:', error);
+  } finally {
+    client.release();
   }
 }
 
-async function deliverWebhook(job) {
-  const webhookResult = await db.query(
-    'SELECT url, secret, timeout_seconds, payload_mode, custom_headers FROM webhooks WHERE id = $1',
+async function deliverWebhook(client, job) {
+  const webhookResult = await client.query(
+    `SELECT id, url, secret, payload_mode, custom_headers, timeout_seconds
+     FROM webhooks WHERE id = $1`,
     [job.webhook_id]
   );
 
   if (webhookResult.rows.length === 0) {
-    throw new Error('Webhook not found');
+    throw new Error(`Webhook ${job.webhook_id} not found`);
   }
 
   const webhook = webhookResult.rows[0];
-
-  // Determine payload based on mode
-  let payload;
-  if (webhook.payload_mode === 'minimal') {
-    payload = {
-      event_id: job.payload.event_id || `${job.id}-${Date.now()}`,
-      timestamp: job.payload.timestamp,
-      type: job.payload.type
-    };
-  } else {
-    // 'standard' or 'custom' mode uses full payload (custom transform happens here in future)
-    payload = job.payload;
-  }
-
-  const timestamp = Date.now();
+  const timestamp = Math.floor(Date.now() / 1000);
+  const payload = filterWebhookPayload(job.payload, webhook.payload_mode);
   const signature = generateHMAC(payload, webhook.secret, timestamp);
 
-  // Merge standard headers with custom headers
   const headers = {
     'Content-Type': 'application/json',
     'X-Webhook-Signature': signature,
     'X-Webhook-Timestamp': timestamp.toString(),
-    'X-Event-ID': `${job.id}-${timestamp}`,
-    ...(webhook.custom_headers || {})  // Merge custom headers (may override standard)
+    'X-Event-ID': job.payload.event_id || crypto.randomUUID(),
+    ...(webhook.custom_headers || {}),
   };
 
   const startTime = Date.now();
-  const response = await fetch(webhook.url, {
-    method: 'POST',
+  const response = await makeHttpRequest(
+    webhook.url,
+    'POST',
+    JSON.stringify(payload),
     headers,
-    body: JSON.stringify(payload),
-    timeout: webhook.timeout_seconds * 1000
-  });
-
+    webhook.timeout_seconds || 30
+  );
   const duration = Date.now() - startTime;
-  const responseBody = await response.text();
 
-  // Log delivery
-  await db.query(
-    `INSERT INTO webhook_delivery_logs
-     (webhook_id, queue_id, status_code, response_body, duration_ms)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [job.webhook_id, job.id, response.status, responseBody, duration]
+  await client.query(
+    `INSERT INTO webhook_delivery_logs (webhook_id, queue_id, status_code, response_body, duration_ms, delivered_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())`,
+    [webhook.id, job.id, response.statusCode, response.body, duration]
   );
 
-  if (!response.ok) {
-    throw new Error(`Webhook failed with status ${response.status}`);
-  }
+  return { statusCode: response.statusCode, duration };
 }
 
-async function handleFailedJob(job, error) {
-  const webhookResult = await db.query(
-    'SELECT retry_count FROM webhooks WHERE id = $1',
-    [job.webhook_id]
+async function deliverEmail(client, job) {
+  const recipientResult = await client.query(
+    `SELECT id, email, questionnaire_id, location_id FROM email_recipients WHERE id = $1`,
+    [job.recipient_id]
   );
 
-  if (webhookResult.rows.length === 0) {
-    // Webhook deleted, mark as dead_letter
-    await db.query(
-      `UPDATE notification_queue
-       SET status = 'dead_letter', last_error = $1, attempts = attempts + 1
-       WHERE id = $2`,
-      ['Webhook not found', job.id]
-    );
-    return;
+  if (recipientResult.rows.length === 0) {
+    throw new Error(`Email recipient ${job.recipient_id} not found`);
   }
 
-  const webhook = webhookResult.rows[0];
-  const attemptsResult = await db.query(
-    'SELECT attempts FROM notification_queue WHERE id = $1',
-    [job.id]
+  const recipient = recipientResult.rows[0];
+  const { subject, htmlContent, textContent } = formatEmailContent(job.payload);
+
+  const result = await sendEmail(
+    recipient.email,
+    subject,
+    htmlContent,
+    textContent
   );
 
-  const currentAttempts = attemptsResult.rows[0].attempts;
-  const nextAttempts = currentAttempts + 1;
+  await client.query(
+    `INSERT INTO notification_template_logs (recipient_type, recipient_id, event_type, trigger_type, message_preview, status, sent_at)
+     VALUES ('email', $1, $2, $3, $4, 'sent', NOW())`,
+    [
+      recipient.id,
+      job.payload.event_type || 'feedback.submitted',
+      job.payload.trigger_type || 'on_submit',
+      `To: ${recipient.email}`,
+    ]
+  );
 
-  if (nextAttempts >= webhook.retry_count) {
-    // Give up after max retries
-    await db.query(
+  return result;
+}
+
+async function deliverSMS(client, job) {
+  const recipientResult = await client.query(
+    `SELECT id, phone_number, questionnaire_id, location_id FROM sms_recipients WHERE id = $1`,
+    [job.recipient_id]
+  );
+
+  if (recipientResult.rows.length === 0) {
+    throw new Error(`SMS recipient ${job.recipient_id} not found`);
+  }
+
+  const recipient = recipientResult.rows[0];
+  const message = formatSMSContent(job.payload);
+
+  const result = await sendSMS(recipient.phone_number, message);
+
+  await client.query(
+    `INSERT INTO notification_template_logs (recipient_type, recipient_id, event_type, trigger_type, message_preview, status, sent_at)
+     VALUES ('sms', $1, $2, $3, $4, 'sent', NOW())`,
+    [
+      recipient.id,
+      job.payload.event_type || 'feedback.submitted',
+      job.payload.trigger_type || 'on_submit',
+      message.substring(0, 160),
+    ]
+  );
+
+  return result;
+}
+
+async function deliverNtfy(client, job) {
+  const subscriptionResult = await client.query(
+    `SELECT id, topic, questionnaire_id, location_id FROM ntfy_subscriptions WHERE id = $1`,
+    [job.recipient_id]
+  );
+
+  if (subscriptionResult.rows.length === 0) {
+    throw new Error(`Ntfy subscription ${job.recipient_id} not found`);
+  }
+
+  const subscription = subscriptionResult.rows[0];
+  const { title, message } = formatNtfyContent(job.payload);
+
+  const result = await sendNotification(
+    subscription.topic,
+    title,
+    message,
+    ['feedback'],
+    job.payload.event_type === 'feedback.statistics' ? 'high' : 'default'
+  );
+
+  await client.query(
+    `INSERT INTO notification_template_logs (recipient_type, recipient_id, event_type, trigger_type, message_preview, status, sent_at)
+     VALUES ('ntfy', $1, $2, $3, $4, 'sent', NOW())`,
+    [
+      subscription.id,
+      job.payload.event_type || 'feedback.submitted',
+      job.payload.trigger_type || 'on_submit',
+      message,
+    ]
+  );
+
+  return result;
+}
+
+async function handleFailedJob(client, job, error) {
+  const nextAttempt = job.attempts + 1;
+
+  if (nextAttempt > MAX_RETRIES) {
+    await client.query('BEGIN');
+    await client.query(
       `UPDATE notification_queue
-       SET status = 'dead_letter', last_error = $1, attempts = $2
+       SET status = 'dead_letter', last_error = $1, processed_at = NOW(), attempts = $2
        WHERE id = $3`,
-      [error.message, nextAttempts, job.id]
+      [error.message, nextAttempt, job.id]
     );
+    await client.query('COMMIT');
+    console.error(`[Notification] Job moved to dead letter queue (job_id: ${job.id})`);
   } else {
-    // Exponential backoff: 60s, 300s, 900s (5^1*12, 5^2*12, 5^3*12)
-    const backoffSeconds = Math.pow(5, nextAttempts) * 12;
+    const backoffSeconds = Math.pow(RETRY_BASE_SECONDS, nextAttempt);
+    const nextSchedule = new Date(Date.now() + backoffSeconds * 1000);
 
-    await db.query(
+    await client.query('BEGIN');
+    await client.query(
       `UPDATE notification_queue
-       SET status = 'pending',
-           scheduled_at = NOW() + INTERVAL '${backoffSeconds} seconds',
-           last_error = $1,
-           attempts = $2
-       WHERE id = $3`,
-      [error.message, nextAttempts, job.id]
+       SET status = 'pending', scheduled_at = $1, last_error = $2, attempts = $3
+       WHERE id = $4`,
+      [nextSchedule, error.message, nextAttempt, job.id]
     );
+    await client.query('COMMIT');
+    console.log(`[Notification] Scheduled retry (job_id: ${job.id}, next_attempt: ${nextSchedule.toISOString()})`);
   }
 }
 
 function generateHMAC(payload, secret, timestamp) {
-  const message = `${timestamp}.${JSON.stringify(payload)}`;
-  const signature = crypto
+  const message = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const hmac = crypto
     .createHmac('sha256', secret)
-    .update(message)
+    .update(`${message}${timestamp}`)
     .digest('hex');
-  return `sha256=${signature}`;
+  return `sha256=${hmac}`;
 }
 
-function validateWebhookSignature(body, secret, signature, timestamp) {
-  // Check timestamp is not too old (5 min window)
-  if (Math.abs(Date.now() - timestamp) > 300000) {
-    return false;
+function filterWebhookPayload(payload, mode) {
+  if (mode === 'minimal') {
+    return {
+      event_id: payload.event_id,
+      timestamp: payload.timestamp,
+      type: payload.event_type,
+    };
+  }
+  return payload;
+}
+
+function formatEmailContent(payload) {
+  const subject = `Feedback Notification: ${payload.event_type}`;
+  let htmlContent = `<h2>Feedback Notification</h2>`;
+  let textContent = `Feedback Notification: ${payload.event_type}\n\n`;
+
+  if (payload.event_type === 'feedback.submitted') {
+    htmlContent += `<p>New feedback received at location <strong>${payload.location_name || 'Unknown'}</strong>.</p>`;
+    textContent += `New feedback received at location: ${payload.location_name || 'Unknown'}\n`;
+  } else if (payload.event_type === 'feedback.statistics') {
+    htmlContent += `<p>Statistics update for <strong>${payload.location_name || 'Unknown'}</strong>:</p>`;
+    textContent += `Statistics update for: ${payload.location_name || 'Unknown'}\n`;
+    if (payload.statistics && payload.statistics.mean !== undefined) {
+      htmlContent += `<ul><li>Mean: ${payload.statistics.mean.toFixed(2)}</li>`;
+      textContent += `Mean: ${payload.statistics.mean.toFixed(2)}\n`;
+    }
   }
 
-  const expectedSig = generateHMAC(body, secret, timestamp);
-  return signature === expectedSig;
+  htmlContent += `<p>Event ID: ${payload.event_id}</p>`;
+  textContent += `\nEvent ID: ${payload.event_id}`;
+
+  return { subject, htmlContent, textContent };
 }
 
-module.exports = { processNotificationQueue, validateWebhookSignature };
+function formatSMSContent(payload) {
+  if (payload.event_type === 'feedback.statistics') {
+    const mean = payload.statistics?.mean?.toFixed(2) || 'N/A';
+    return `Feedback: ${payload.location_name || 'Location'} - Avg: ${mean}`;
+  }
+  return `New feedback received at ${payload.location_name || 'your location'}. ID: ${payload.event_id}`;
+}
+
+function formatNtfyContent(payload) {
+  let title = 'Feedback Notification';
+  let message = '';
+
+  if (payload.event_type === 'feedback.submitted') {
+    title = 'New Feedback';
+    message = `Feedback received at ${payload.location_name || 'your location'}`;
+  } else if (payload.event_type === 'feedback.statistics') {
+    title = 'Statistics Update';
+    const mean = payload.statistics?.mean?.toFixed(2) || 'N/A';
+    message = `${payload.location_name || 'Location'} - Average: ${mean}`;
+  }
+
+  return { title, message };
+}
+
+function makeHttpRequest(url, method, body, headers, timeoutSeconds) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === 'https:';
+    const client = isHttps ? https : http;
+
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      method: method,
+      headers: headers,
+      timeout: timeoutSeconds * 1000,
+    };
+
+    const req = client.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        resolve({ statusCode: res.statusCode, body: data });
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`HTTP request timeout (${timeoutSeconds}s)`));
+    });
+
+    if (body) {
+      req.write(body);
+    }
+
+    req.end();
+  });
+}
+
+module.exports = {
+  processNotificationQueue,
+};

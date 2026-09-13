@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../db');
 const { feedbackLimiter } = require('../middleware/rateLimiter');
 const { JWT_SECRET } = require('../middleware/auth');
@@ -122,14 +123,13 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    // After transaction commits, enqueue webhook notifications (fire & forget)
+    // After transaction commits, enqueue all notifications (fire & forget)
     try {
+      await enqueueNotifications(client, locationId, questionnaireId, sessionId, answers);
       await enqueueWebhookNotifications(sessionId, locationId, questionnaireId, method, answers);
-      // Also check if stats webhooks need to be enqueued
       await enqueueStatisticsWebhooks(locationId, questionnaireId, answers);
     } catch (err) {
-      // Log error but don't fail the feedback submission
-      console.error('Failed to enqueue webhook notifications:', err);
+      console.error('[Feedback] Failed to enqueue notifications:', err);
     }
 
     res.status(201).json({
@@ -145,11 +145,114 @@ router.post('/', feedbackLimiter, async (req, res, next) => {
   }
 });
 
-/**
- * Helper function to enqueue webhook notifications after feedback submission
- */
+async function enqueueNotifications(client, locationId, questionnaireId, sessionId, answers) {
+  try {
+    // Get location and questionnaire info for payload
+    const locationResult = await client.query(
+      'SELECT id, name FROM locations WHERE id = $1',
+      [locationId]
+    );
+    const locationName = locationResult.rows[0]?.name || 'Unknown Location';
+
+    const questionnaireResult = await client.query(
+      'SELECT id, name FROM questionnaires WHERE id = $1',
+      [questionnaireId]
+    );
+    const questionnaireName = questionnaireResult.rows[0]?.name || 'Unknown Questionnaire';
+
+    const eventPayload = {
+      event_id: crypto.randomUUID(),
+      timestamp: Math.floor(Date.now() / 1000),
+      event_type: 'feedback.submitted',
+      location_id: locationId,
+      location_name: locationName,
+      questionnaire_id: questionnaireId,
+      questionnaire_name: questionnaireName,
+      session_id: sessionId,
+      trigger_type: 'on_submit',
+    };
+
+    // Enqueue webhooks (if any configured)
+    const webhooksResult = await client.query(
+      `SELECT id, event_type FROM webhooks
+       WHERE active = true AND event_type = 'feedback.submitted'
+       AND id IN (
+         SELECT webhook_id FROM schedule_webhooks
+         WHERE schedule_id IN (
+           SELECT id FROM schedules
+           WHERE active = true
+           AND (id IN (
+             SELECT schedule_id FROM schedule_locations WHERE location_id = $1
+           ) OR id IN (
+             SELECT schedule_id FROM schedule_location_groups
+             WHERE location_group_id = (
+               SELECT group_id FROM locations WHERE id = $1
+             )
+           ))
+         )
+       )`,
+      [locationId]
+    );
+
+    for (const webhook of webhooksResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, webhook_id, payload, status, attempts, scheduled_at)
+         VALUES ('webhook', $1, $2, 'pending', 0, NOW())`,
+        [webhook.id, JSON.stringify(eventPayload)]
+      );
+    }
+
+    // Enqueue email notifications
+    const emailResult = await client.query(
+      `SELECT id FROM email_recipients
+       WHERE active = true AND questionnaire_id = $1 AND trigger_type = 'on_submit'`,
+      [questionnaireId]
+    );
+
+    for (const recipient of emailResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, recipient_id, recipient_type, payload, status, attempts, scheduled_at)
+         VALUES ('email', $1, 'email_recipients', $2, 'pending', 0, NOW())`,
+        [recipient.id, JSON.stringify(eventPayload)]
+      );
+    }
+
+    // Enqueue SMS notifications
+    const smsResult = await client.query(
+      `SELECT id FROM sms_recipients
+       WHERE active = true AND questionnaire_id = $1 AND trigger_type = 'on_submit'`,
+      [questionnaireId]
+    );
+
+    for (const recipient of smsResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, recipient_id, recipient_type, payload, status, attempts, scheduled_at)
+         VALUES ('sms', $1, 'sms_recipients', $2, 'pending', 0, NOW())`,
+        [recipient.id, JSON.stringify(eventPayload)]
+      );
+    }
+
+    // Enqueue ntfy notifications
+    const ntfyResult = await client.query(
+      `SELECT id FROM ntfy_subscriptions
+       WHERE active = true AND questionnaire_id = $1 AND trigger_type = 'on_submit'`,
+      [questionnaireId]
+    );
+
+    for (const subscription of ntfyResult.rows) {
+      await client.query(
+        `INSERT INTO notification_queue (event_type, recipient_id, recipient_type, payload, status, attempts, scheduled_at)
+         VALUES ('ntfy', $1, 'ntfy_subscriptions', $2, 'pending', 0, NOW())`,
+        [subscription.id, JSON.stringify(eventPayload)]
+      );
+    }
+  } catch (error) {
+    console.error('[Feedback] Error enqueueing notifications:', error);
+    throw error;
+  }
+}
+
 async function enqueueWebhookNotifications(sessionId, locationId, questionnaireId, entryMethod, answers) {
-  // Get location and questionnaire names
   const [locationResult, questionnaireResult, answersWithMetadata] = await Promise.all([
     db.query('SELECT name FROM locations WHERE id = $1', [locationId]),
     db.query('SELECT name FROM questionnaires WHERE id = $1', [questionnaireId]),
@@ -165,12 +268,10 @@ async function enqueueWebhookNotifications(sessionId, locationId, questionnaireI
   const timestamp = new Date().toISOString();
   const eventId = `${sessionId}-${Date.now()}`;
 
-  // Separate structured vs text answers
   const structuredAnswers = answersWithMetadata.filter(a => a.type !== 'text');
   const textAnswers = answersWithMetadata.filter(a => a.type === 'text');
 
-  // Event 1: Always enqueue feedback.submitted (structured answers only)
-  if (structuredAnswers.length > 0 || true) { // Always enqueue even if no structured answers
+  if (structuredAnswers.length > 0 || true) {
     const webhookEvent = {
       event_id: eventId,
       timestamp,
@@ -192,7 +293,6 @@ async function enqueueWebhookNotifications(sessionId, locationId, questionnaireI
       }
     };
 
-    // Find all active webhooks for feedback.submitted event
     const submitWebhooks = await db.query(
       'SELECT id FROM webhooks WHERE active = true AND event_type = $1',
       ['feedback.submitted']
@@ -208,7 +308,6 @@ async function enqueueWebhookNotifications(sessionId, locationId, questionnaireI
     }
   }
 
-  // Event 2: Only enqueue feedback.text_submitted if text answers exist AND webhooks exist
   if (textAnswers.length > 0) {
     const textWebhooks = await db.query(
       'SELECT id FROM webhooks WHERE active = true AND event_type = $1',
@@ -248,9 +347,6 @@ async function enqueueWebhookNotifications(sessionId, locationId, questionnaireI
   }
 }
 
-/**
- * Helper function to get answer metadata (question text, type) from question IDs
- */
 async function getAnswerMetadata(answers) {
   if (answers.length === 0) {
     return [];
@@ -276,9 +372,6 @@ async function getAnswerMetadata(answers) {
   }));
 }
 
-/**
- * Calculate statistics for feedback answers
- */
 function calculateStatistics(answers) {
   const numericAnswers = answers
     .filter(a => a.numeric_value !== null && a.numeric_value !== undefined)
@@ -309,9 +402,6 @@ function calculateStatistics(answers) {
   };
 }
 
-/**
- * Calculate per-question statistics
- */
 function calculatePerQuestionStats(answers) {
   const byQuestion = {};
 
@@ -331,27 +421,22 @@ function calculatePerQuestionStats(answers) {
   })).filter(q => q.stats !== null);
 }
 
-/**
- * Check if statistics changed beyond threshold
- */
 function hasStatsChanged(previousStats, currentStats, thresholds, questionThresholds) {
-  if (!previousStats) return true; // First time, always send
+  if (!previousStats) return true;
 
-  // Check overall stats if present
   if (previousStats.overall && currentStats.overall) {
     const threshold = thresholds.overall || 5;
     const changePercent = Math.abs((currentStats.overall.mean - previousStats.overall.mean) / previousStats.overall.mean * 100);
     if (changePercent >= threshold) return true;
   }
 
-  // Check per-question stats
   if (previousStats.by_question && currentStats.by_question) {
     for (const curr of currentStats.by_question) {
       const prev = previousStats.by_question.find(q => q.questionId === curr.questionId);
       if (!prev || !prev.stats) continue;
 
       const qThreshold = questionThresholds?.[curr.questionId] || thresholds.default || 5;
-      if (prev.stats.mean === 0) continue; // Avoid division by zero
+      if (prev.stats.mean === 0) continue;
 
       const changePercent = Math.abs((curr.stats.mean - prev.stats.mean) / prev.stats.mean * 100);
       if (changePercent >= qThreshold) return true;
@@ -361,14 +446,10 @@ function hasStatsChanged(previousStats, currentStats, thresholds, questionThresh
   return false;
 }
 
-/**
- * Enqueue statistics webhooks if configured
- */
 async function enqueueStatisticsWebhooks(locationId, questionnaireId, answers) {
   try {
     const answersWithMetadata = await getAnswerMetadata(answers);
 
-    // Get all active stats webhooks
     const statsWebhooks = await db.query(
       `SELECT id, stats_trigger, stats_type, stats_change_threshold, stats_thresholds,
               stats_debounce_ms, stats_min_interval_ms
@@ -378,7 +459,6 @@ async function enqueueStatisticsWebhooks(locationId, questionnaireId, answers) {
     );
 
     for (const webhook of statsWebhooks.rows) {
-      // Skip on_change webhooks during debounce or min_interval
       if (webhook.stats_trigger === 'on_change') {
         const cache = await db.query(
           `SELECT last_sent_at FROM webhook_stats_cache
@@ -391,18 +471,16 @@ async function enqueueStatisticsWebhooks(locationId, questionnaireId, answers) {
           const now = new Date();
 
           if (now - lastSent < webhook.stats_min_interval_ms) {
-            continue; // Skip, still within min_interval
+            continue;
           }
         }
       }
 
-      // Calculate current stats
       const statsPayload = {
         overall: webhook.stats_type !== 'per_question' ? calculateStatistics(answersWithMetadata) : null,
         by_question: webhook.stats_type !== 'overall' ? calculatePerQuestionStats(answersWithMetadata) : null
       };
 
-      // For on_change, check if stats changed enough
       if (webhook.stats_trigger === 'on_change') {
         const cache = await db.query(
           `SELECT last_stats FROM webhook_stats_cache
@@ -417,11 +495,10 @@ async function enqueueStatisticsWebhooks(locationId, questionnaireId, answers) {
         };
 
         if (!hasStatsChanged(previousStats, statsPayload, thresholds, webhook.stats_thresholds)) {
-          continue; // Stats didn't change enough
+          continue;
         }
       }
 
-      // Enqueue the stats webhook event
       const timestamp = new Date().toISOString();
       const statsEvent = {
         event_id: `stats-${questionnaireId}-${locationId}-${Date.now()}`,
@@ -441,7 +518,6 @@ async function enqueueStatisticsWebhooks(locationId, questionnaireId, answers) {
         [webhook.id, JSON.stringify(statsEvent)]
       );
 
-      // Update cache
       await db.query(
         `INSERT INTO webhook_stats_cache (webhook_id, questionnaire_id, location_id, last_stats, last_sent_at)
          VALUES ($1, $2, $3, $4, NOW())

@@ -12,7 +12,9 @@ import AdminQuestionnaires from '../components/AdminQuestionnaires';
 import AdminSchedules from '../components/AdminSchedules';
 import AdminResults from '../components/AdminResults';
 import AdminAnswerViews from '../components/AdminAnswerViews';
-import AdminWebhooks from '../components/AdminWebhooks';
+import AdminEmailRecipients from '../components/AdminEmailRecipients';
+import AdminSmsRecipients from '../components/AdminSmsRecipients';
+import AdminNtfySubscriptions from '../components/AdminNtfySubscriptions';
 import './AdminPage.css';
 
 export default function AdminPage() {
@@ -139,10 +141,10 @@ export default function AdminPage() {
             {t('admin.answerViews')}
           </button>
           <button
-            className={activeTab === 'webhooks' ? 'active' : ''}
-            onClick={() => setActiveTab('webhooks')}
+            className={activeTab === 'notifications' ? 'active' : ''}
+            onClick={() => setActiveTab('notifications')}
           >
-            Webhooks
+            {t('admin.notifications')}
           </button>
           <button onClick={() => navigate('/admin/map')}>
             {t('admin.map')}
@@ -234,10 +236,19 @@ export default function AdminPage() {
             </div>
           )}
 
-          {activeTab === 'webhooks' && (
+          {activeTab === 'notifications' && (
             <div className="admin-grouped-sections">
               <section className="admin-group-section">
-                <AdminWebhooks />
+                <h2>Email Notifications</h2>
+                <AdminEmailRecipients />
+              </section>
+              <section className="admin-group-section">
+                <h2>SMS Notifications</h2>
+                <AdminSmsRecipients />
+              </section>
+              <section className="admin-group-section">
+                <h2>Push Notifications (ntfy.sh)</h2>
+                <AdminNtfySubscriptions />
               </section>
             </div>
           )}
