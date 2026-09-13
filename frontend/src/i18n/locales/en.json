@@ -169,7 +169,9 @@
     "editAnswerView": "Edit Answer View",
     "loadingAnswerViews": "Loading answer views...",
     "noAnswerViewsYet": "No answer views yet. Add your first answer view to get started.",
-    "answerViewsDesc": "Create composite radar visualizations combining multiple scale questions"
+    "answerViewsDesc": "Create composite radar visualizations combining multiple scale questions",
+    "notifications": "Notifications",
+    "notificationsDesc": "Manage email, SMS, and push notifications for feedback events"
   },
   "map": {
     "back": "Back",

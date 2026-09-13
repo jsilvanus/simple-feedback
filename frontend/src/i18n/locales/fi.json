@@ -169,7 +169,9 @@
     "editAnswerView": "Muokkaa vastausnäkymää",
     "loadingAnswerViews": "Ladataan vastausnäkymiä...",
     "noAnswerViewsYet": "Ei vastausnäkymiä vielä. Lisää ensimmäinen vastausnäkymä aloittaaksesi.",
-    "answerViewsDesc": "Luo yhdistettyjä tutkavisualisointeja useista asteikkokysymyksistä"
+    "answerViewsDesc": "Luo yhdistettyjä tutkavisualisointeja useista asteikkokysymyksistä",
+    "notifications": "Ilmoitukset",
+    "notificationsDesc": "Hallinnoi sähköposti-, tekstiviesti- ja push-ilmoituksia palautetapahtumille"
   },
   "map": {
     "back": "Takaisin",

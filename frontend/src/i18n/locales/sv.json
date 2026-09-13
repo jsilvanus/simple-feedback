@@ -169,7 +169,9 @@
     "editAnswerView": "Redigera svarsvy",
     "loadingAnswerViews": "Laddar svarsvyer...",
     "noAnswerViewsYet": "Inga svarsvyer ännu. Lägg till din första svarsvy för att komma igång.",
-    "answerViewsDesc": "Skapa sammansatta radarvisualiseringar som kombinerar flera skalafrågor"
+    "answerViewsDesc": "Skapa sammansatta radarvisualiseringar som kombinerar flera skalafrågor",
+    "notifications": "Meddelanden",
+    "notificationsDesc": "Hantera e-post-, SMS- och push-meddelanden för återkoppling"
   },
   "map": {
     "back": "Tillbaka",
