@@ -2,36 +2,14 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs').promises;
 const db = require('../db');
+const storage = require('../services/storage');
 const { authenticate } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 
 // All routes require authentication
 router.use(authenticate);
 router.use(apiLimiter);
-
-// Configure multer for image uploads
-const uploadsDir = path.join(__dirname, '../../uploads');
-
-// Ensure uploads directory exists
-(async () => {
-  try {
-    await fs.mkdir(uploadsDir, { recursive: true });
-  } catch (err) {
-    console.error('Error creating uploads directory:', err);
-  }
-})();
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'image-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
 
 const fileFilter = (req, file, cb) => {
   // Accept images only
@@ -44,7 +22,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
@@ -55,17 +33,17 @@ const upload = multer({
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ 
-        error: { message: 'File size exceeds 5MB limit' } 
+      return res.status(400).json({
+        error: { message: 'File size exceeds 5MB limit' }
       });
     }
-    return res.status(400).json({ 
-      error: { message: `Upload error: ${err.message}` } 
+    return res.status(400).json({
+      error: { message: `Upload error: ${err.message}` }
     });
   }
   if (err) {
-    return res.status(400).json({ 
-      error: { message: err.message } 
+    return res.status(400).json({
+      error: { message: err.message }
     });
   }
   next();
@@ -91,28 +69,34 @@ router.get('/', async (req, res, next) => {
  * Upload a new image
  */
 router.post('/', upload.single('image'), handleUploadError, async (req, res, next) => {
+  if (!req.file) {
+    return res.status(400).json({ error: { message: 'No image file provided' } });
+  }
+
+  const { originalname, mimetype, size, buffer } = req.file;
+  const key = 'image-' + Date.now() + '-' + Math.round(Math.random() * 1e9) + path.extname(originalname);
+
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: { message: 'No image file provided' } });
-    }
+    await storage.ready();
+    await storage.put(key, buffer, mimetype);
+  } catch (error) {
+    return next(error);
+  }
 
-    const { filename, originalname, mimetype, size } = req.file;
-    const url = `/uploads/${filename}`;
-
+  try {
+    const url = `/api/images/${key}`;
     const result = await db.query(
-      'INSERT INTO images (filename, original_name, mime_type, size, url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [filename, originalname, mimetype, size, url]
+      'INSERT INTO images (filename, original_name, mime_type, size, url, storage_key) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [key, originalname, mimetype, size, url, key]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    // Clean up uploaded file if database insert fails
-    if (req.file) {
-      try {
-        await fs.unlink(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error deleting file:', unlinkError);
-      }
+    // Clean up uploaded object if database insert fails
+    try {
+      await storage.delete(key);
+    } catch (deleteError) {
+      console.error('Error deleting stored object after failed insert:', deleteError);
     }
     next(error);
   }
@@ -141,13 +125,12 @@ router.delete('/:id', async (req, res, next) => {
     // Delete from database
     await db.query('DELETE FROM images WHERE id = $1', [id]);
 
-    // Delete file from filesystem
-    const filePath = path.join(uploadsDir, image.filename);
+    // Delete stored object
     try {
-      await fs.unlink(filePath);
+      await storage.delete(image.storage_key);
     } catch (err) {
-      console.error('Error deleting file:', err);
-      // Continue even if file deletion fails
+      console.error('Error deleting stored object:', err);
+      // Continue even if object deletion fails
     }
 
     res.json({ success: true, message: 'Image deleted successfully' });

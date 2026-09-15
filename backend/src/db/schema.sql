@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS images (
     mime_type VARCHAR(100) NOT NULL,
     size INTEGER NOT NULL,
     url TEXT NOT NULL,
+    storage_key VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

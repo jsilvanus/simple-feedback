@@ -24,9 +24,6 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded images statically
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -37,6 +34,7 @@ app.use('/api/locations', require('./routes/locations'));
 app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin/images', require('./routes/images'));
+app.use('/api/images', require('./routes/imagePublic'));
 
 // Serve frontend static files (React build output)
 const publicPath = path.join(__dirname, '../public');
