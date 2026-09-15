@@ -36,13 +36,12 @@ function ready() {
   if (!initPromise) {
     initPromise = adapter.init().catch((err) => {
       console.error(`[STORAGE] Failed to initialize "${driver}" storage driver:`, err.message);
+      initPromise = null; // allow a retry on the next call instead of caching the failure forever
       throw err;
     });
   }
   return initPromise;
 }
-
-ready();
 
 module.exports = adapter;
 module.exports.ready = ready;

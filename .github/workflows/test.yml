@@ -1,0 +1,65 @@
+name: Backend Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: simple_feedback
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: simple_feedback
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: test-jwt-secret-at-least-32-characters-long
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+      STORAGE_DRIVER: local
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Load base schema
+        working-directory: backend
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d simple_feedback -f src/db/schema.sql
+
+      - name: Run migrations
+        working-directory: backend
+        run: npm run db:migrate
+
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test -- --ci
