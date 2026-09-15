@@ -9,5 +9,3 @@ ALTER TABLE feedback_sessions
   ADD COLUMN IF NOT EXISTS entry_method VARCHAR(20) DEFAULT 'kiosk'
   CHECK (entry_method IN ('kiosk', 'phone'));
 
-INSERT INTO schema_migrations (version) VALUES ('012_add_qr_entry_mode')
-ON CONFLICT DO NOTHING;
