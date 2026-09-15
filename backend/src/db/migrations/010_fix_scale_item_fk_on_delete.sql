@@ -13,6 +13,3 @@ ALTER TABLE feedback_answers
   REFERENCES question_scale_items(id)
   ON DELETE SET NULL;
 
--- Record this migration
-INSERT INTO schema_migrations (version) VALUES ('010_fix_scale_item_fk_on_delete')
-ON CONFLICT DO NOTHING;

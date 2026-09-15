@@ -41,10 +41,9 @@ beforeAll(async () => {
   questionId = questionRes.body.id;
 
   await agent
-    .post(`/api/admin/questionnaires/${questionnaireId}/questions`)
+    .put(`/api/admin/questionnaires/${questionnaireId}`)
     .set('X-CSRF-Token', csrfToken)
-    .send({ questionId, pageNumber: 1, orderIndex: 0 })
-    .catch(() => {}); // endpoint may not exist; link checked below separately
+    .send({ questions: [{ questionId, pageNumber: 1, orderIndex: 0 }] });
 });
 
 afterAll(async () => {

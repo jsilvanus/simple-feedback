@@ -44,6 +44,3 @@ ADD COLUMN IF NOT EXISTS scale_item_id INTEGER REFERENCES question_scale_items(i
 CREATE INDEX IF NOT EXISTS idx_question_scale_items_question ON question_scale_items(question_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_answers_scale_item ON feedback_answers(scale_item_id);
 
--- Record this migration
-INSERT INTO schema_migrations (version) VALUES ('009_multi_scale_questions')
-ON CONFLICT DO NOTHING;

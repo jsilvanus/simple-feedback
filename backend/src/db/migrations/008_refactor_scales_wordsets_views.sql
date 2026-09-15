@@ -50,7 +50,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Record all prior migrations as already applied
+-- Record migrations that predate this migrations directory (no corresponding
+-- file exists for these, so migrate.js can never apply/track them itself).
+-- This migration's own version is recorded by migrate.js after this file runs.
 INSERT INTO schema_migrations (version) VALUES
     ('001_add_features'),
     ('add_word_cloud_support'),
@@ -59,6 +61,5 @@ INSERT INTO schema_migrations (version) VALUES
     ('004_add_location_groups'),
     ('005_move_question_config_to_question_level'),
     ('006_add_continuous_axes_to_questions'),
-    ('007_schedule_multi_location'),
-    ('008_refactor_scales_wordsets_views')
+    ('007_schedule_multi_location')
 ON CONFLICT DO NOTHING;

@@ -6,5 +6,3 @@
 ALTER TABLE schedules
   ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'UTC';
 
-INSERT INTO schema_migrations (version) VALUES ('011_schedule_timezone')
-ON CONFLICT DO NOTHING;
