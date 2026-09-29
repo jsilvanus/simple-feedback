@@ -6,6 +6,14 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 
+// Behind a reverse proxy (e.g. nginx on the host), set TRUST_PROXY so req.ip is the client address
+// and the rate limiters count clients instead of the proxy: a hop count ("1"), "true", or an
+// address/subnet list, as Express's `trust proxy` setting accepts.
+if (process.env.TRUST_PROXY) {
+  const trustProxy = process.env.TRUST_PROXY.trim();
+  app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy === 'true' ? true : trustProxy);
+}
+
 // Configure CORS: allow specific origins via CORS_ORIGIN env var (comma-separated),
 // or fall back to permissive mode only in development.
 const corsOrigin = process.env.CORS_ORIGIN;

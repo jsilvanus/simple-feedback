@@ -10,7 +10,6 @@ RUN npm ci
 COPY frontend/src ./src
 COPY frontend/index.html ./
 COPY frontend/vite.config.js ./
-COPY frontend/public ./public
 
 RUN npm run build
 

@@ -1,0 +1,45 @@
+# Server deployment behind the host's nginx (scripts/server-deploy.sh).
+# App + bundled PostgreSQL; the app is published on 127.0.0.1 only. Settings and secrets come from
+# .env.server (created by the script, never committed):
+#   docker compose -p simple-feedback -f docker-compose.server.yml --env-file .env.server ...
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-simple_feedback}
+      POSTGRES_USER: ${DB_USER:-simple_feedback}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.server}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    # Image with the API and the built frontend.
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: simple-feedback-server:latest
+    restart: unless-stopped
+    env_file:
+      - .env.server
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: "5432"
+    ports:
+      - "127.0.0.1:${HOST_PORT:-4101}:3000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  uploads:
