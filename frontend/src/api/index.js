@@ -45,6 +45,32 @@ const getCsrfToken = () => {
   return match ? decodeURIComponent(match[1]) : null;
 };
 
+// Authenticated admin request — the httpOnly session cookie is sent automatically
+// and the CSRF token is echoed back in the X-CSRF-Token header.
+const adminFetch = async (endpoint, options = {}) => {
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const csrfToken = getCsrfToken();
+
+  const response = await fetch(buildApiUrl(`/admin${normalizedEndpoint}`), {
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...options.headers,
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Request failed');
+  }
+
+  return response.json();
+};
+
 export const api = {
   // Get questionnaire for a location
   async getQuestionnaire(slug) {
@@ -130,27 +156,13 @@ export const api = {
   },
 
   // Get admin data with authentication — cookie is sent automatically
-  async adminRequest(endpoint, options = {}) {
-    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const csrfToken = getCsrfToken();
-
-    const response = await fetch(buildApiUrl(`/admin${normalizedEndpoint}`), {
-      ...options,
-      credentials: 'include',
-      headers: {
-        ...options.headers,
-        'Content-Type': 'application/json',
-        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Unauthorized');
-      }
-      throw new Error('Request failed');
-    }
-
-    return response.json();
-  },
+  adminRequest: adminFetch,
 };
+
+// Admin request with (path, method, body) signature. `path` is relative to the
+// admin API root, e.g. '/email-recipients'. `body` is JSON-encoded when given.
+export const adminRequest = (path, method = 'GET', body) =>
+  adminFetch(path, {
+    method,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });

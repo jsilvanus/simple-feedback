@@ -14,3 +14,6 @@ coverage/
 *.swo
 .env.local
 .env.*.local
+
+# Server deployment settings (scripts/server-deploy.sh)
+.env.server*
