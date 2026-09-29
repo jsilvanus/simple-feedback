@@ -40,7 +40,7 @@ export default function AdminEmailRecipients() {
   const loadRecipients = async () => {
     try {
       setLoading(true);
-      const data = await adminRequest('/api/admin/email-recipients');
+      const data = await adminRequest('/email-recipients');
       setRecipients(data);
     } catch (error) {
       console.error('Failed to load email recipients:', error);
@@ -51,7 +51,7 @@ export default function AdminEmailRecipients() {
 
   const loadQuestionnaires = async () => {
     try {
-      const data = await adminRequest('/api/admin/questionnaires');
+      const data = await adminRequest('/questionnaires');
       setQuestionnaires(data);
     } catch (error) {
       console.error('Failed to load questionnaires:', error);
@@ -87,9 +87,9 @@ export default function AdminEmailRecipients() {
   const handleSave = async () => {
     try {
       if (editingId) {
-        await adminRequest(`/api/admin/email-recipients/${editingId}`, 'PUT', formData);
+        await adminRequest(`/email-recipients/${editingId}`, 'PUT', formData);
       } else {
-        await adminRequest('/api/admin/email-recipients', 'POST', formData);
+        await adminRequest('/email-recipients', 'POST', formData);
       }
       loadRecipients();
       handleClose();
@@ -102,7 +102,7 @@ export default function AdminEmailRecipients() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this email recipient?')) return;
     try {
-      await adminRequest(`/api/admin/email-recipients/${id}`, 'DELETE');
+      await adminRequest(`/email-recipients/${id}`, 'DELETE');
       loadRecipients();
     } catch (error) {
       console.error('Failed to delete email recipient:', error);

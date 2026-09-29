@@ -40,7 +40,7 @@ export default function AdminSmsRecipients() {
   const loadRecipients = async () => {
     try {
       setLoading(true);
-      const data = await adminRequest('/api/admin/sms-recipients');
+      const data = await adminRequest('/sms-recipients');
       setRecipients(data);
     } catch (error) {
       console.error('Failed to load SMS recipients:', error);
@@ -51,7 +51,7 @@ export default function AdminSmsRecipients() {
 
   const loadQuestionnaires = async () => {
     try {
-      const data = await adminRequest('/api/admin/questionnaires');
+      const data = await adminRequest('/questionnaires');
       setQuestionnaires(data);
     } catch (error) {
       console.error('Failed to load questionnaires:', error);
@@ -87,9 +87,9 @@ export default function AdminSmsRecipients() {
   const handleSave = async () => {
     try {
       if (editingId) {
-        await adminRequest(`/api/admin/sms-recipients/${editingId}`, 'PUT', formData);
+        await adminRequest(`/sms-recipients/${editingId}`, 'PUT', formData);
       } else {
-        await adminRequest('/api/admin/sms-recipients', 'POST', formData);
+        await adminRequest('/sms-recipients', 'POST', formData);
       }
       loadRecipients();
       handleClose();
@@ -102,7 +102,7 @@ export default function AdminSmsRecipients() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this SMS recipient?')) return;
     try {
-      await adminRequest(`/api/admin/sms-recipients/${id}`, 'DELETE');
+      await adminRequest(`/sms-recipients/${id}`, 'DELETE');
       loadRecipients();
     } catch (error) {
       console.error('Failed to delete SMS recipient:', error);

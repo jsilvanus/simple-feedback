@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Button, Box, Typography, Container, CircularProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 
@@ -39,12 +39,12 @@ export default function QRFirstEntryScreen({ locationSlug, locationName, onConti
 
         {/* QR Code */}
         <Box sx={{ my: 4, p: 2, bgcolor: '#f5f5f5', borderRadius: 2, display: 'flex', justifyContent: 'center' }}>
-          <QRCode
+          <QRCodeSVG
             value={feedbackUrl}
             size={300}
             level="H"
-            includeMargin={true}
-            qrStyle={{ cursor: 'pointer' }}
+            marginSize={4}
+            style={{ cursor: 'pointer' }}
           />
         </Box>
 

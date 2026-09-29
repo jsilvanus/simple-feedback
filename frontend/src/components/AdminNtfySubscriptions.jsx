@@ -41,7 +41,7 @@ export default function AdminNtfySubscriptions() {
   const loadSubscriptions = async () => {
     try {
       setLoading(true);
-      const data = await adminRequest('/api/admin/ntfy-subscriptions');
+      const data = await adminRequest('/ntfy-subscriptions');
       setSubscriptions(data);
     } catch (error) {
       console.error('Failed to load ntfy subscriptions:', error);
@@ -52,7 +52,7 @@ export default function AdminNtfySubscriptions() {
 
   const loadQuestionnaires = async () => {
     try {
-      const data = await adminRequest('/api/admin/questionnaires');
+      const data = await adminRequest('/questionnaires');
       setQuestionnaires(data);
     } catch (error) {
       console.error('Failed to load questionnaires:', error);
@@ -88,9 +88,9 @@ export default function AdminNtfySubscriptions() {
   const handleSave = async () => {
     try {
       if (editingId) {
-        await adminRequest(`/api/admin/ntfy-subscriptions/${editingId}`, 'PUT', formData);
+        await adminRequest(`/ntfy-subscriptions/${editingId}`, 'PUT', formData);
       } else {
-        await adminRequest('/api/admin/ntfy-subscriptions', 'POST', formData);
+        await adminRequest('/ntfy-subscriptions', 'POST', formData);
       }
       loadSubscriptions();
       handleClose();
@@ -103,7 +103,7 @@ export default function AdminNtfySubscriptions() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this ntfy subscription?')) return;
     try {
-      await adminRequest(`/api/admin/ntfy-subscriptions/${id}`, 'DELETE');
+      await adminRequest(`/ntfy-subscriptions/${id}`, 'DELETE');
       loadSubscriptions();
     } catch (error) {
       console.error('Failed to delete ntfy subscription:', error);
