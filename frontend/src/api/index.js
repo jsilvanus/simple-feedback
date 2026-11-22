@@ -1,6 +1,26 @@
 export const getBasePath = () => {
-  if (typeof window !== 'undefined' && typeof window.__BASE_PATH__ === 'string') {
-    return window.__BASE_PATH__.replace(/\/+$/, '');
+  if (typeof window !== 'undefined') {
+    if (typeof window.__BASE_PATH__ === 'string' && window.__BASE_PATH__) {
+      return window.__BASE_PATH__.replace(/\/+$/, '');
+    }
+    const metaTag = document.querySelector('meta[name="base-path"]');
+    if (metaTag) {
+      const content = metaTag.getAttribute('content');
+      if (content) return content.replace(/\/+$/, '');
+    }
+    const baseTag = document.querySelector('base');
+    if (baseTag) {
+      const href = baseTag.getAttribute('href');
+      if (href) {
+        try {
+          const path = new URL(href, window.location.origin).pathname.replace(/\/+$/, '');
+          if (path) return path;
+        } catch {
+          const trimmed = href.replace(/\/+$/, '');
+          if (trimmed) return trimmed;
+        }
+      }
+    }
   }
   const viteBase = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
   return viteBase === '.' ? '' : viteBase;
@@ -42,17 +62,16 @@ const getDefaultApiBase = () => {
   return withBasePath('/api');
 };
 
-const API_BASE =
-  normalizeApiBase(rawApiBase) ||
-  (rawApiTarget ? `${rawApiTarget.replace(/\/+$/, '')}/api` : getDefaultApiBase());
+export const getApiBase = () => {
+  return (
+    normalizeApiBase(rawApiBase) ||
+    (rawApiTarget ? `${rawApiTarget.replace(/\/+$/, '')}/api` : getDefaultApiBase())
+  );
+};
 
-if (typeof window !== 'undefined') {
-  console.debug('[api] Base URL resolved to:', API_BASE);
-}
-
-const buildApiUrl = (path) => {
+export const buildApiUrl = (path) => {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE}${normalizedPath}`;
+  return `${getApiBase()}${normalizedPath}`;
 };
 
 // Read the CSRF token from the csrfToken cookie (set by the server on login)

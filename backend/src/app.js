@@ -28,7 +28,14 @@ const corsOptions = corsOrigin
   : { origin: process.env.NODE_ENV === 'production' ? false : true, credentials: true };
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'script-src': ["'self'", "'unsafe-inline'"],
+    },
+  },
+}));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -61,7 +68,7 @@ function getSubpath() {
 
 function injectSubpathIntoHtml(html, subpath) {
   if (!subpath) return html;
-  const injection = `<base href="${subpath}/" /><script>window.__BASE_PATH__ = ${JSON.stringify(subpath)};</script>`;
+  const injection = `<base href="${subpath}/" />\n  <meta name="base-path" content="${subpath}" />\n  <script>window.__BASE_PATH__ = ${JSON.stringify(subpath)};</script>`;
   if (html.includes('<head>')) {
     return html.replace('<head>', `<head>\n  ${injection}`);
   }

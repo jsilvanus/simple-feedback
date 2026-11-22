@@ -8,8 +8,9 @@ import { getBasePath } from './api';
 import './i18n';
 
 function App() {
+  const basename = getBasePath();
   return (
-    <BrowserRouter basename={getBasePath() || '/'}>
+    <BrowserRouter basename={basename || undefined}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/admin" element={<AdminPage />} />

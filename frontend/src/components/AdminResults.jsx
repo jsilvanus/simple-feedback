@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api';
+import { api, buildApiUrl } from '../api';
 import RadarChart from './RadarChart';
 import './AdminResults.css';
 
@@ -251,9 +251,10 @@ export default function AdminResults() {
       if (filters.endDate) queryParams.append('endDate', filters.endDate);
       
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`/api/admin/export?${queryParams.toString()}`, {
+      const response = await fetch(buildApiUrl(`/admin/export?${queryParams.toString()}`), {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
       });
       
