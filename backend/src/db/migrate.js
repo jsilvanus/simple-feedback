@@ -5,17 +5,37 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'simple_feedback',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-});
+const poolConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'simple_feedback',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+    };
+
+const pool = new Pool(poolConfig);
 
 async function migrate() {
   const client = await pool.connect();
   try {
+    // If database is empty, apply base schema.sql first
+    const { rows: tableCheck } = await client.query(
+      "SELECT to_regclass('public.locations') IS NOT NULL AS has_schema"
+    );
+    if (!tableCheck[0].has_schema) {
+      console.log('Empty database detected: applying initial schema.sql...');
+      const schemaPath = path.join(__dirname, 'schema.sql');
+      if (fs.existsSync(schemaPath)) {
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+        await client.query('BEGIN');
+        await client.query(schemaSql);
+        await client.query('COMMIT');
+        console.log('Initial schema.sql applied successfully.');
+      }
+    }
+
     // Ensure tracking table exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
