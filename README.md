@@ -283,4 +283,4 @@ For issues and detailed roadmap, see [PLAN.md](PLAN.md) and [TODO.md](TODO.md). 
 
 ## 📝 License
 
-ISC
+European Union Public Licence (EUPL-1.2). See [LICENSE](LICENSE) for details.

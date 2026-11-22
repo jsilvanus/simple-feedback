@@ -1,6 +1,7 @@
 {
   "name": "frontend",
   "version": "0.1.0",
+  "license": "EUPL-1.2",
   "description": "Frontend UI for Simple Feedback App",
   "type": "module",
   "scripts": {
