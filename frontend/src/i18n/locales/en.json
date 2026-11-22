@@ -40,7 +40,11 @@
     "invalidCredentials": "Invalid credentials",
     "loginRequired": "Login Required",
     "enterPassword": "Enter location password",
-    "logoutConfirm": "Are you sure you want to logout from {{location}}?"
+    "logoutConfirm": "Are you sure you want to logout from {{location}}?",
+    "signInWithTunnus": "Sign in with Tunnus",
+    "or": "or",
+    "noRoleError": "Your user account does not have permissions to access the admin dashboard.",
+    "invalidStateError": "Login session expired or invalid. Please try again."
   },
   "qrFirst": {
     "scanPrompt": "Scan to give feedback on your phone or...",

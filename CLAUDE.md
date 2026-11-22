@@ -18,21 +18,27 @@ simple-feedback/
 │   ├── src/
 │   │   ├── app.js        # Express app config, middleware, route registration
 │   │   ├── server.js     # HTTP server entry point with graceful shutdown
+│   │   ├── config/
+│   │   │   └── auth.js       # Auth and OIDC configuration & group role mapping
 │   │   ├── db/
 │   │   │   ├── index.js      # pg connection pool (20 max, 30s idle, 2s connect timeout)
 │   │   │   ├── schema.sql    # Full PostgreSQL schema (source of truth)
 │   │   │   ├── migrate.js    # Migration runner (tracks via schema_migrations table)
-│   │   │   └── migrations/   # Versioned migration files (008–010 currently)
+│   │   │   └── migrations/   # Versioned migration files (008–017 currently)
 │   │   ├── middleware/
-│   │   │   ├── auth.js       # JWT authentication middleware (Bearer tokens)
+│   │   │   ├── auth.js       # JWT & session authentication middleware, role enforcement
+│   │   │   ├── csrf.js       # CSRF protection (double-submit cookie)
 │   │   │   └── rateLimiter.js # Rate limiting: apiLimiter 100/15min, loginLimiter 5/15min, feedbackLimiter 10/min
 │   │   └── routes/
-│   │       ├── admin.js      # Admin CRUD endpoints (requires JWT)
+│   │       ├── auth.js       # OIDC and authentication routes (/login, /callback, /logout, /backchannel)
+│   │       ├── admin.js      # Admin CRUD endpoints (requires auth & CSRF)
 │   │       ├── feedback.js   # Public feedback submission
 │   │       ├── locations.js  # Public questionnaire delivery
 │   │       └── images.js     # Image upload handling (multer, 5MB, JPEG/PNG/GIF/WebP)
 │   ├── tests/
 │   │   ├── app.test.js               # Health check & 404 tests
+│   │   ├── auth.test.js              # Password login & cookie CSRF tests
+│   │   ├── oidc.test.js              # OIDC flow, role mapping, PKCE, backchannel logout tests
 │   │   ├── continuous_scale.test.js  # Radar chart / continuous scale feature tests
 │   │   └── location-groups.test.js   # Location grouping feature tests
 │   ├── uploads/              # Uploaded image storage directory
@@ -100,7 +106,7 @@ simple-feedback/
 | Routing | React Router | ^7.13.0 |
 | Styling | Emotion + Material UI | ^11.14, ^7.3.8 |
 | Database | PostgreSQL | 16 |
-| Auth | JWT (jsonwebtoken) | ^9.0.3 |
+| Auth | JWT (jsonwebtoken) + OIDC (openid-client, jose) | ^9.0.3, ^6.9.1, ^6.0.0 |
 | Password hashing | bcryptjs | ^3.0.3 |
 | File uploads | multer | ^2.0.2 |
 | i18n | i18next + react-i18next | ^25.8.9 |
@@ -194,7 +200,17 @@ cd frontend && npm run preview  # Preview production build
 | POST | `/api/locations/:slug/login` | Authenticate with location password |
 | POST | `/api/feedback` | Submit feedback (rate-limited: 10/min) |
 
-### Admin Endpoints (JWT required)
+### Authentication & OIDC Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/auth/config` | Expose auth mode and login provider availability |
+| GET | `/api/auth/login` | Initiate OIDC Authorization Code Flow with PKCE |
+| GET | `/api/auth/callback` | Exchange authorization code for tokens & set session cookie |
+| GET/POST | `/api/auth/logout` | Clear session cookie and redirect to OIDC end session endpoint |
+| POST | `/api/auth/backchannel` | OIDC backchannel logout notification (invalidates sessions) |
+
+### Admin Endpoints (Auth required)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -271,9 +287,10 @@ Migrations in `backend/src/db/migrations/` are numbered and run in order by `mig
 
 - **Route files**: Grouped by domain (`admin.js`, `feedback.js`, `locations.js`, `images.js`). Routes are registered in `app.js`.
 - **Database queries**: Write raw SQL with `pool.query(sql, params)`. No ORM. Always parameterize.
-- **Authentication**: The `authenticateToken` middleware in `middleware/auth.js` must be applied to all admin routes.
+- **Authentication**: `authenticate` middleware in `middleware/auth.js` validates JWT bearer tokens and `adminToken` httpOnly session cookies. Supports `AUTH_MODE=dev` (local admin login) and `AUTH_MODE=oidc` (Tunnus OpenID Connect with PKCE, group-to-role mapping, and backchannel logout session invalidation).
+- **Role Enforcement**: `requireRole(minRole)` middleware enforces role rank: `viewer` < `manager` < `admin`.
 - **Error responses**: Use consistent shape `{ error: "message" }` with appropriate HTTP status codes.
-- **Environment variables**: Loaded via `dotenv` in `server.js`. Required vars: `DATABASE_URL` (or individual `DB_*` vars), `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
+- **Environment variables**: Loaded via `dotenv` in `server.js`. Required vars: `DATABASE_URL` (or individual `DB_*` vars), `JWT_SECRET` / `SESSION_SECRET`. In dev mode, `ADMIN_USERNAME` and `ADMIN_PASSWORD` are used; in OIDC mode, `OIDC_ISSUER` and `OIDC_CLIENT_ID` are required.
 - **Transactions**: Use `BEGIN`/`COMMIT`/`ROLLBACK` for multi-step writes (e.g., feedback submission creates a session and then answers atomically).
 
 ---
@@ -292,8 +309,25 @@ DB_NAME=feedback_db
 DB_USER=feedback_user
 DB_PASSWORD=<password>
 JWT_SECRET=<strong-random-secret>
+SESSION_SECRET=<strong-random-secret>
+
+# Authentication mode
+AUTH_MODE=dev                              # 'dev' (local admin credentials) or 'oidc' (Tunnus OIDC)
+ALLOW_LOCAL_ADMIN=false                    # whether local admin login is allowed when AUTH_MODE=oidc
+
+# Local admin credentials (used when AUTH_MODE=dev)
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<strong-password>
+
+# OIDC / Tunnus settings (required when AUTH_MODE=oidc)
+OIDC_ISSUER=https://id.riihimaenseurakunta.fi/tunnus
+OIDC_CLIENT_ID=simple-feedback
+OIDC_CLIENT_SECRET=<client-secret>
+OIDC_REDIRECT_URI=http://localhost:3000/api/auth/callback
+OIDC_SCOPES=openid profile email groups
+OIDC_BUTTON_LABEL=Kirjaudu Tunnuksella
+OIDC_GROUP_ROLE_MAP={"/feedback-admins":"admin","/feedback-managers":"manager","admin":"admin"}
+
 CORS_ORIGIN=http://localhost:5173   # comma-separated list for production
 
 # Frontend (root .env.example)

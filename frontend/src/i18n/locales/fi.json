@@ -40,7 +40,11 @@
     "invalidCredentials": "Virheelliset tunnukset",
     "loginRequired": "Kirjautuminen vaaditaan",
     "enterPassword": "Syötä sijainnin salasana",
-    "logoutConfirm": "Haluatko varmasti kirjautua ulos sijainnista {{location}}?"
+    "logoutConfirm": "Haluatko varmasti kirjautua ulos sijainnista {{location}}?",
+    "signInWithTunnus": "Kirjaudu Tunnuksella",
+    "or": "tai",
+    "noRoleError": "Käyttäjälläsi ei ole oikeuksia hallintapaneeliin.",
+    "invalidStateError": "Kirjautumisistunto vanhentui tai on virheellinen. Yritä uudelleen."
   },
   "qrFirst": {
     "scanPrompt": "Skannaa antaaksesi palautetta puhelimellasi tai...",

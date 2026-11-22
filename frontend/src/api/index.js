@@ -155,6 +155,25 @@ export const api = {
     });
   },
 
+  // Auth configuration and OIDC helpers
+  async getAuthConfig() {
+    try {
+      const response = await fetch(buildApiUrl('/auth/config'));
+      if (!response.ok) return { authMode: 'dev', oidc: { enabled: false }, local: { enabled: true } };
+      return response.json();
+    } catch {
+      return { authMode: 'dev', oidc: { enabled: false }, local: { enabled: true } };
+    }
+  },
+
+  getOidcLoginUrl(returnTo = '/admin') {
+    return buildApiUrl(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
+  },
+
+  getOidcLogoutUrl(returnTo = '/admin') {
+    return buildApiUrl(`/auth/logout?returnTo=${encodeURIComponent(returnTo)}`);
+  },
+
   // Get admin data with authentication — cookie is sent automatically
   adminRequest: adminFetch,
 };

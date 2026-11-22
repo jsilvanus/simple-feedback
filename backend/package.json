@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "jest --watch",
     "db:init": "psql -h localhost -U postgres -f src/db/schema.sql simple_feedback",
     "db:migrate": "node src/db/migrate.js"
@@ -23,8 +23,10 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
+    "jose": "^6.2.18",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
+    "openid-client": "^6.9.1",
     "pg": "^8.18.0"
   },
   "devDependencies": {

@@ -38,6 +38,7 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/locations', require('./routes/locations'));
 app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/admin', require('./routes/admin'));

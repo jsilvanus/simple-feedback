@@ -22,21 +22,41 @@ export default function AdminPage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [loggedIn, setLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [authConfig, setAuthConfig] = useState({ oidc: { enabled: false }, local: { enabled: true } });
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
 
-  // On mount, verify the httpOnly cookie is still valid if we previously logged in
+  // On mount, check URL error, fetch auth configuration, and verify current session
   useEffect(() => {
-    if (sessionStorage.getItem('adminLoggedIn') !== 'true') {
-      setAuthChecked(true);
-      return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'no_role') {
+      setLoginError(t('auth.noRoleError', 'Käyttäjälläsi ei ole oikeuksia hallintapaneeliin.'));
+    } else if (errorParam === 'invalid_state') {
+      setLoginError(t('auth.invalidStateError', 'Kirjautumisistunto vanhentui tai on virheellinen. Yritä uudelleen.'));
+    } else if (errorParam) {
+      setLoginError(errorParam);
     }
+
+    api.getAuthConfig().then((cfg) => {
+      if (cfg) setAuthConfig(cfg);
+    }).catch(() => {});
+
     api.adminMe()
-      .then(() => setLoggedIn(true))
-      .catch(() => sessionStorage.removeItem('adminLoggedIn'))
+      .then((userData) => {
+        setLoggedIn(true);
+        setCurrentUser(userData);
+        sessionStorage.setItem('adminLoggedIn', 'true');
+      })
+      .catch(() => {
+        sessionStorage.removeItem('adminLoggedIn');
+        setLoggedIn(false);
+        setCurrentUser(null);
+      })
       .finally(() => setAuthChecked(true));
-  }, []);
+  }, [t]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -45,47 +65,83 @@ export default function AdminPage() {
     try {
       await api.adminLogin(loginForm.username, loginForm.password);
       sessionStorage.setItem('adminLoggedIn', 'true');
+      const user = await api.adminMe().catch(() => null);
+      if (user) setCurrentUser(user);
       setLoggedIn(true);
     } catch (err) {
-      setLoginError('Invalid credentials');
+      setLoginError(t('auth.invalidCredentials', 'Invalid credentials'));
     }
   };
 
   const handleLogout = async () => {
-    await api.adminLogout();
+    try {
+      await api.adminLogout();
+    } catch {
+      // ignore
+    }
     sessionStorage.removeItem('adminLoggedIn');
     setLoggedIn(false);
+    setCurrentUser(null);
     setActiveTab('overview');
+    if (authConfig.oidc?.enabled) {
+      window.location.href = api.getOidcLogoutUrl();
+    }
   };
 
   // Show nothing while we verify the cookie to avoid flashing the login form
   if (!authChecked) return null;
 
   if (!loggedIn) {
+    const oidcEnabled = authConfig.oidc?.enabled;
+    const localEnabled = authConfig.local?.enabled !== false;
+
     return (
       <div className="admin-page">
         <div className="login-container">
-          <h1>{t('admin.login')}</h1>
-          <form onSubmit={handleLogin}>
+          <div className="login-card">
+            <h1>{t('admin.login')}</h1>
             {loginError && <div className="error-message">{loginError}</div>}
-            <input
-              type="text"
-              placeholder={t('auth.username')}
-              value={loginForm.username}
-              onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-              required
-            />
-            <input
-              type="password"
-              placeholder={t('auth.password')}
-              value={loginForm.password}
-              onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-              required
-            />
-            <button type="submit" className="btn btn-primary">{t('auth.login')}</button>
-          </form>
-          <div className="back-link">
-            <button onClick={() => navigate('/')}>← {t('admin.backToHome')}</button>
+
+            {oidcEnabled && (
+              <div className="oidc-login-section">
+                <a href={api.getOidcLoginUrl()} className="btn btn-oidc">
+                  <svg className="oidc-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                  </svg>
+                  {authConfig.oidc.buttonLabel || t('auth.signInWithTunnus', 'Kirjaudu Tunnuksella')}
+                </a>
+              </div>
+            )}
+
+            {oidcEnabled && localEnabled && (
+              <div className="login-divider">
+                <span>{t('auth.or', 'tai')}</span>
+              </div>
+            )}
+
+            {localEnabled && (
+              <form onSubmit={handleLogin}>
+                <input
+                  type="text"
+                  placeholder={t('auth.username')}
+                  value={loginForm.username}
+                  onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder={t('auth.password')}
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  required
+                />
+                <button type="submit" className="btn btn-primary">{t('auth.login')}</button>
+              </form>
+            )}
+
+            <div className="back-link">
+              <button onClick={() => navigate('/')}>← {t('admin.backToHome')}</button>
+            </div>
           </div>
         </div>
       </div>
@@ -96,7 +152,15 @@ export default function AdminPage() {
     <div className="admin-page">
       <div className="admin-container">
         <header className="admin-header">
-          <h1>{t('admin.dashboard')}</h1>
+          <div className="admin-header-title">
+            <h1>{t('admin.dashboard')}</h1>
+            {currentUser && (
+              <div className="admin-user-info">
+                <span className="user-name">{currentUser.name || currentUser.username}</span>
+                {currentUser.role && <span className="user-role-badge">{currentUser.role}</span>}
+              </div>
+            )}
+          </div>
           <div className="admin-header-actions">
             <LanguageSelector inline />
             <button onClick={handleLogout} className="btn btn-secondary">{t('auth.logout')}</button>

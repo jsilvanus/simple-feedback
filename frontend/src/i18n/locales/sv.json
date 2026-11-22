@@ -40,7 +40,11 @@
     "invalidCredentials": "Ogiltiga inloggningsuppgifter",
     "loginRequired": "Inloggning krävs",
     "enterPassword": "Ange platslösenord",
-    "logoutConfirm": "Är du säker på att du vill logga ut från {{location}}?"
+    "logoutConfirm": "Är du säker på att du vill logga ut från {{location}}?",
+    "signInWithTunnus": "Logga in med Tunnus",
+    "or": "eller",
+    "noRoleError": "Ditt konto har inte behörighet till administrationspanelen.",
+    "invalidStateError": "Inloggningssessionen har löpt ut eller är ogiltig. Försök igen."
   },
   "qrFirst": {
     "scanPrompt": "Scanna för att ge feedback på din telefon eller...",

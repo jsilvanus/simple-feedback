@@ -3,22 +3,35 @@ const { processNotificationQueue } = require('./workers/notificationWorker');
 
 // Validate critical environment variables before starting
 const isProduction = process.env.NODE_ENV === 'production';
-const DEFAULT_ADMIN_USERNAMES = ['admin'];
-const DEFAULT_ADMIN_PASSWORDS = ['admin123', 'password', 'changeme', ''];
+const authMode = process.env.AUTH_MODE || 'dev';
 
-const adminUsername = process.env.ADMIN_USERNAME;
-const adminPassword = process.env.ADMIN_PASSWORD;
+if (authMode === 'oidc') {
+  try {
+    const { getAuthConfig } = require('./config/auth');
+    getAuthConfig();
+    console.log('[AUTH] OIDC authentication mode active');
+  } catch (err) {
+    console.error(`[AUTH CONFIG ERROR] ${err.message}`);
+    if (isProduction) process.exit(1);
+  }
+} else {
+  const DEFAULT_ADMIN_USERNAMES = ['admin'];
+  const DEFAULT_ADMIN_PASSWORDS = ['admin123', 'password', 'changeme', ''];
 
-if (!adminUsername || DEFAULT_ADMIN_USERNAMES.includes(adminUsername)) {
-  const msg = '[SECURITY] ADMIN_USERNAME is missing or set to a default value. Set a strong ADMIN_USERNAME.';
-  if (isProduction) { console.error(msg); process.exit(1); }
-  else console.warn(msg);
-}
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
-if (!adminPassword || DEFAULT_ADMIN_PASSWORDS.includes(adminPassword)) {
-  const msg = '[SECURITY] ADMIN_PASSWORD is missing or set to a known default. Set a strong ADMIN_PASSWORD.';
-  if (isProduction) { console.error(msg); process.exit(1); }
-  else console.warn(msg);
+  if (!adminUsername || DEFAULT_ADMIN_USERNAMES.includes(adminUsername)) {
+    const msg = '[SECURITY] ADMIN_USERNAME is missing or set to a default value. Set a strong ADMIN_USERNAME.';
+    if (isProduction) { console.error(msg); process.exit(1); }
+    else console.warn(msg);
+  }
+
+  if (!adminPassword || DEFAULT_ADMIN_PASSWORDS.includes(adminPassword)) {
+    const msg = '[SECURITY] ADMIN_PASSWORD is missing or set to a known default. Set a strong ADMIN_PASSWORD.';
+    if (isProduction) { console.error(msg); process.exit(1); }
+    else console.warn(msg);
+  }
 }
 
 // Validate database configuration

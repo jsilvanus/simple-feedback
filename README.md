@@ -13,6 +13,7 @@ A configurable feedback application for tablets in kiosk mode and mobile browser
 - **Touch-Optimized UI**: Perfect for tablet kiosks
 - **Auto-Reset**: Automatic reset after submission for kiosk mode
 - **Anonymous by Design**: All feedback is anonymous — no personal data is collected
+- **Tunnus OIDC Single Sign-On**: Full OpenID Connect integration with Authorization Code Flow + PKCE, group-to-role mapping, and backchannel logout
 
 ## 🔒 Privacy & Anonymity
 
@@ -189,12 +190,48 @@ See the [API Specification](docs/api-spec.yaml) for complete documentation.
 - `GET /api/locations/:slug/questionnaire` - Get active questionnaire
 - `POST /api/feedback` - Submit feedback (rate-limited)
 
+### Authentication & OIDC Endpoints
+
+- `GET /api/auth/config` - Expose auth mode and login provider availability
+- `GET /api/auth/login` - Initiate OIDC Authorization Code Flow with PKCE
+- `GET /api/auth/callback` - OIDC callback: token exchange, role mapping & session cookie
+- `GET/POST /api/auth/logout` - Clear session cookies and redirect to OIDC end session URL
+- `POST /api/auth/backchannel` - OIDC backchannel logout notification (records user revocation)
+
 ### Key Admin Endpoints
 
-- `POST /api/admin/login` - Admin login (rate-limited)
+- `POST /api/admin/login` - Admin password login (dev mode / optional fallback)
+- `GET /api/admin/me` - Authenticated user details, groups, and role
 - `GET /api/admin/locations` - List locations
 - `GET /api/admin/results` - Get feedback results
 - `GET /api/admin/export` - Export results as CSV
+
+## 🔐 Authentication Modes
+
+Simple Feedback supports two authentication modes:
+
+1. **Development / Local Mode (`AUTH_MODE=dev`)** (default):
+   - Admin login uses local username and password (`ADMIN_USERNAME` and `ADMIN_PASSWORD`).
+   - Sessions are signed JWT tokens stored in `httpOnly` secure cookies.
+
+2. **OpenID Connect Mode (`AUTH_MODE=oidc`)**:
+   - Integrates with Tunnus (or any OIDC compliant provider) via standard Authorization Code Flow with PKCE.
+   - Configurable group-to-role mapping via `OIDC_GROUP_ROLE_MAP` maps user groups from `claims.groups` to app roles (`admin`, `manager`, `viewer`).
+   - Full support for single sign-on (SSO), single logout, and backchannel logout (`POST /api/auth/backchannel`) with token signature verification against the provider's JWKS.
+
+### OIDC Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `AUTH_MODE` | Auth mode: `dev` or `oidc` | `dev` |
+| `OIDC_ISSUER` | OIDC Issuer URL (e.g. `https://id.riihimaenseurakunta.fi/tunnus`) | `""` |
+| `OIDC_CLIENT_ID` | OIDC client ID registered with provider | `""` |
+| `OIDC_CLIENT_SECRET` | OIDC client secret | `""` |
+| `OIDC_REDIRECT_URI` | Full callback URL (e.g. `https://.../api/auth/callback`) | `${BASE_URL}/api/auth/callback` |
+| `OIDC_SCOPES` | Requested OAuth scopes | `openid profile email groups` |
+| `OIDC_BUTTON_LABEL` | Label for the OIDC login button | `Kirjaudu Tunnuksella` |
+| `OIDC_GROUP_ROLE_MAP` | JSON mapping of group names to roles | `{"admin":"admin","/admin":"admin"}` |
+| `ALLOW_LOCAL_ADMIN` | Allow password login when `AUTH_MODE=oidc` | `false` |
 
 ## 🔒 Security Notes
 

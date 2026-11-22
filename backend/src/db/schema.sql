@@ -174,6 +174,11 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS user_revocations (
+    sub VARCHAR(255) PRIMARY KEY,
+    revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_locations_slug ON locations(slug);
 CREATE INDEX IF NOT EXISTS idx_locations_active ON locations(active);
@@ -195,3 +200,4 @@ CREATE INDEX IF NOT EXISTS idx_questions_continuous_axes ON questions USING GIN(
 CREATE INDEX IF NOT EXISTS idx_questionnaires_archived ON questionnaires(archived);
 CREATE INDEX IF NOT EXISTS idx_question_scale_items_question ON question_scale_items(question_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_answers_scale_item ON feedback_answers(scale_item_id);
+CREATE INDEX IF NOT EXISTS idx_user_revocations_sub ON user_revocations(sub);

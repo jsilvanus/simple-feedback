@@ -20,6 +20,10 @@ const isValidDate = (str) => !isNaN(Date.parse(str));
  */
 router.post('/login', loginLimiter, async (req, res, next) => {
   try {
+    if (process.env.AUTH_MODE === 'oidc' && process.env.ALLOW_LOCAL_ADMIN !== 'true') {
+      return res.status(403).json({ error: { message: 'Password login is disabled when AUTH_MODE=oidc' } });
+    }
+
     const { username, password } = req.body;
 
     // Simple hardcoded admin credentials for now
@@ -77,7 +81,14 @@ if (process.env.NODE_ENV !== 'development') {
  * Return current authenticated user (used by frontend to validate cookie on page load)
  */
 router.get('/me', (req, res) => {
-  res.json({ username: req.user.username, role: req.user.role });
+  res.json({
+    username: req.user.username || req.user.name || req.user.sub || 'admin',
+    name: req.user.name || req.user.username || 'admin',
+    email: req.user.email || null,
+    sub: req.user.sub || null,
+    role: req.user.role || 'admin',
+    groups: req.user.groups || [],
+  });
 });
 
 /**
