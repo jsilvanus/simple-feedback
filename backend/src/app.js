@@ -70,7 +70,7 @@ function injectSubpathIntoHtml(html, subpath) {
 
 // Serve frontend static files (React build output)
 const publicPath = path.join(__dirname, '../public');
-app.use(express.static(publicPath));
+app.use(express.static(publicPath, { index: false }));
 
 // SPA fallback: serve index.html for client-side routes (React Router) with injected base path
 app.get(/^\/(?!api\/)/, (req, res) => {
