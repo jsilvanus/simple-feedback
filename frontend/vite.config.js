@@ -6,7 +6,7 @@ export default defineConfig({
   resolve: {
     preserveSymlinks: true,
   },
-  base: '/',
+  base: './',
   server: {
     port: 5173,
     proxy: {

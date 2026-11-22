@@ -14,14 +14,18 @@ const {
 const { generateCsrfToken, setCsrfCookie } = require('../middleware/csrf');
 
 /**
- * Validate that returnTo is a safe local relative path.
+ * Validate that returnTo is a safe local relative path, prefixing with subpath if needed.
  * @param {any} val
- * @param {string} defaultPath
+ * @param {string} [subpath]
  * @returns {string}
  */
-function safeReturnTo(val, defaultPath = '/admin') {
+function safeReturnTo(val, subpath = '') {
+  const defaultPath = subpath ? `${subpath}/admin` : '/admin';
   if (typeof val === 'string' && val.startsWith('/') && !val.startsWith('//') && !val.startsWith('/\\')) {
-    return val;
+    if (!subpath || val === subpath || val.startsWith(`${subpath}/`)) {
+      return val;
+    }
+    return `${subpath}${val}`;
   }
   return defaultPath;
 }
@@ -110,7 +114,7 @@ function createAuthRouter(options = {}) {
   // GET /api/auth/login — initiate Authorization Code Flow with PKCE
   router.get('/login', async (req, res, next) => {
     try {
-      const returnTo = safeReturnTo(req.query.returnTo, '/admin');
+      const returnTo = safeReturnTo(req.query.returnTo, config.subpath);
 
       if (config.authMode === 'dev' && !isProd && !config.oidcIssuer) {
         return res.redirect(returnTo);
@@ -234,7 +238,7 @@ function createAuthRouter(options = {}) {
       const csrfToken = generateCsrfToken();
       setCsrfCookie(res, csrfToken);
 
-      const returnUrl = safeReturnTo(saved.returnTo, '/admin');
+      const returnUrl = safeReturnTo(saved.returnTo, config.subpath);
       res.redirect(returnUrl);
     } catch (err) {
       next(err);
@@ -264,7 +268,7 @@ function createAuthRouter(options = {}) {
       }
     }
 
-    res.redirect(safeReturnTo(req.query.returnTo, '/admin'));
+    res.redirect(safeReturnTo(req.query.returnTo, config.subpath));
   };
 
   router.get('/logout', handleLogout);

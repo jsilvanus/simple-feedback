@@ -264,7 +264,7 @@ describe('OIDC Auth Endpoints Flow', () => {
       claims: () => ({
         sub: 'oidc-user-123',
         name: 'Matti Meikäläinen',
-        email: 'matti@seurakunta.fi',
+        email: 'matti@example.com',
         groups: ['/feedback-admins', '/other-group'],
       }),
     };
@@ -316,7 +316,7 @@ describe('OIDC Auth Endpoints Flow', () => {
     const sessionPayload = verifyToken(sessionToken, sessionSecret);
     expect(sessionPayload.sub).toBe('oidc-user-123');
     expect(sessionPayload.name).toBe('Matti Meikäläinen');
-    expect(sessionPayload.email).toBe('matti@seurakunta.fi');
+    expect(sessionPayload.email).toBe('matti@example.com');
     expect(sessionPayload.role).toBe('admin');
     expect(sessionPayload.groups).toEqual(['/feedback-admins', '/other-group']);
 
@@ -345,7 +345,7 @@ describe('OIDC Auth Endpoints Flow', () => {
         sub: 'tunnus-user-456',
         username: 'Liisa Lahtinen',
         name: 'Liisa Lahtinen',
-        email: 'liisa@seurakunta.fi',
+        email: 'liisa@example.com',
         role: 'manager',
         groups: ['/feedback-managers'],
       },
@@ -361,7 +361,7 @@ describe('OIDC Auth Endpoints Flow', () => {
     expect(res.body).toEqual({
       username: 'Liisa Lahtinen',
       name: 'Liisa Lahtinen',
-      email: 'liisa@seurakunta.fi',
+      email: 'liisa@example.com',
       sub: 'tunnus-user-456',
       role: 'manager',
       groups: ['/feedback-managers'],

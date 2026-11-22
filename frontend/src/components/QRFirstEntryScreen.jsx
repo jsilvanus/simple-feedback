@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button, Box, Typography, Container, CircularProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { withBasePath } from '../api';
 
 export default function QRFirstEntryScreen({ locationSlug, locationName, onContinue }) {
   const { t } = useTranslation();
   const [error, setError] = useState(null);
 
-  const feedbackUrl = `${window.location.origin}/locations/${locationSlug}`;
+  const feedbackUrl = `${window.location.origin}${withBasePath(`/${locationSlug}`)}`;
 
   const handleContinue = () => {
     try {

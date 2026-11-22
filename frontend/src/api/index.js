@@ -1,3 +1,20 @@
+export const getBasePath = () => {
+  if (typeof window !== 'undefined' && typeof window.__BASE_PATH__ === 'string') {
+    return window.__BASE_PATH__.replace(/\/+$/, '');
+  }
+  const viteBase = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+  return viteBase === '.' ? '' : viteBase;
+};
+
+export const withBasePath = (path) => {
+  if (!path || typeof path !== 'string') return path;
+  if (/^(https?:|data:|blob:)/i.test(path)) return path;
+  const base = getBasePath();
+  if (!base) return path;
+  if (path === base || path.startsWith(`${base}/`)) return path;
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
 const rawApiBase = import.meta.env.VITE_API_BASE;
 const rawApiTarget = import.meta.env.VITE_API_TARGET;
 
@@ -22,7 +39,7 @@ const getDefaultApiBase = () => {
     }
   }
 
-  return '/api';
+  return withBasePath('/api');
 };
 
 const API_BASE =

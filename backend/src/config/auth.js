@@ -33,6 +33,15 @@ function loadAuthConfig(env = process.env) {
   const oidcButtonLabel = (env.OIDC_BUTTON_LABEL || 'Kirjaudu Tunnuksella').trim();
   const allowLocalAdmin = env.ALLOW_LOCAL_ADMIN !== undefined ? env.ALLOW_LOCAL_ADMIN === 'true' : authMode !== 'oidc';
 
+  let subpath = '';
+  if (env.DOMAIN_PATH && env.DOMAIN_PATH !== '/') {
+    subpath = env.DOMAIN_PATH.replace(/\/+$/, '');
+  } else if (baseUrl) {
+    try {
+      subpath = new URL(baseUrl).pathname.replace(/\/+$/, '');
+    } catch {}
+  }
+
   let oidcGroupRoleMap = { ...DEFAULT_GROUP_ROLE_MAP };
   if (env.OIDC_GROUP_ROLE_MAP) {
     try {
@@ -71,6 +80,7 @@ function loadAuthConfig(env = process.env) {
     oidcGroupRoleMap,
     oidcButtonLabel,
     allowLocalAdmin,
+    subpath,
   };
 }
 

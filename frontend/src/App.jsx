@@ -4,11 +4,12 @@ import HomePage from './pages/HomePage';
 import FeedbackPage from './pages/FeedbackPage';
 import AdminPage from './pages/AdminPage';
 import AdminMapPage from './pages/AdminMapPage';
+import { getBasePath } from './api';
 import './i18n';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={getBasePath() || '/'}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/admin" element={<AdminPage />} />

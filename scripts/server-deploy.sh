@@ -18,7 +18,7 @@
 set -euo pipefail
 
 NAME=simple-feedback
-DEFAULT_DOMAIN=feedback.italeino.fi
+DEFAULT_DOMAIN=feedback.example.com
 BASE_DIR=${BASE_DIR:-/home/deploy/deploy}
 APP_DIR=$BASE_DIR/$NAME
 BRANCH=${DEPLOY_BRANCH:-main}

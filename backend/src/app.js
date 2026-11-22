@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
@@ -45,13 +46,42 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin/images', require('./routes/images'));
 app.use('/api/images', require('./routes/imagePublic'));
 
+function getSubpath() {
+  if (process.env.DOMAIN_PATH && process.env.DOMAIN_PATH !== '/') {
+    return process.env.DOMAIN_PATH.replace(/\/+$/, '');
+  }
+  if (process.env.BASE_URL) {
+    try {
+      const p = new URL(process.env.BASE_URL).pathname.replace(/\/+$/, '');
+      if (p) return p;
+    } catch {}
+  }
+  return '';
+}
+
+function injectSubpathIntoHtml(html, subpath) {
+  if (!subpath) return html;
+  const injection = `<base href="${subpath}/" /><script>window.__BASE_PATH__ = ${JSON.stringify(subpath)};</script>`;
+  if (html.includes('<head>')) {
+    return html.replace('<head>', `<head>\n  ${injection}`);
+  }
+  return html.replace(/<head([^>]*)>/i, `<head$1>\n  ${injection}`);
+}
+
 // Serve frontend static files (React build output)
 const publicPath = path.join(__dirname, '../public');
 app.use(express.static(publicPath));
 
-// SPA fallback: serve index.html for client-side routes (React Router)
+// SPA fallback: serve index.html for client-side routes (React Router) with injected base path
 app.get(/^\/(?!api\/)/, (req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'));
+  const indexPath = path.join(publicPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    const rawHtml = fs.readFileSync(indexPath, 'utf8');
+    const subpath = getSubpath();
+    const finalHtml = injectSubpathIntoHtml(rawHtml, subpath);
+    return res.type('html').send(finalHtml);
+  }
+  res.sendFile(indexPath);
 });
 
 // Error handling middleware

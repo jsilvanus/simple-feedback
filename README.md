@@ -224,7 +224,7 @@ Simple Feedback supports two authentication modes:
 | Variable | Description | Default |
 |---|---|---|
 | `AUTH_MODE` | Auth mode: `dev` or `oidc` | `dev` |
-| `OIDC_ISSUER` | OIDC Issuer URL (e.g. `https://id.riihimaenseurakunta.fi/tunnus`) | `""` |
+| `OIDC_ISSUER` | OIDC Issuer URL (e.g. `https://id.example.com/tunnus`) | `""` |
 | `OIDC_CLIENT_ID` | OIDC client ID registered with provider | `""` |
 | `OIDC_CLIENT_SECRET` | OIDC client secret | `""` |
 | `OIDC_REDIRECT_URI` | Full callback URL (e.g. `https://.../api/auth/callback`) | `${BASE_URL}/api/auth/callback` |

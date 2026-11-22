@@ -320,7 +320,7 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<strong-password>
 
 # OIDC / Tunnus settings (required when AUTH_MODE=oidc)
-OIDC_ISSUER=https://id.riihimaenseurakunta.fi/tunnus
+OIDC_ISSUER=https://id.example.com/tunnus
 OIDC_CLIENT_ID=simple-feedback
 OIDC_CLIENT_SECRET=<client-secret>
 OIDC_REDIRECT_URI=http://localhost:3000/api/auth/callback
