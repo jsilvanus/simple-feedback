@@ -6,6 +6,7 @@ const OIDC_STATE_COOKIE = 'sf_oidc_state';
 
 const ROLE_RANK = {
   viewer: 1,
+  member: 1,
   manager: 2,
   admin: 3,
 };

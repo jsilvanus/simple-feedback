@@ -179,9 +179,17 @@ function createAuthRouter(options = {}) {
         return res.status(400).json({ error: { message: 'Missing or expired OIDC login state', status: 400 } });
       }
 
+      if (req.query.error) {
+        const errorMsg = req.query.error_description || req.query.error;
+        return res.status(400).json({ error: { message: errorMsg, status: 400 } });
+      }
+
       const oidc = await import('openid-client');
       const oidcConfig = await getOidcConfig();
-      const currentUrl = new URL(req.originalUrl, config.baseUrl);
+      // Ensure currentUrl reflects the full public redirect URI (preserving subpath behind reverse proxies)
+      const currentUrl = new URL(config.oidcRedirectUri);
+      const parsedReqUrl = new URL(req.originalUrl, 'http://localhost');
+      currentUrl.search = parsedReqUrl.search;
       const grantFn = codeGrant || oidc.authorizationCodeGrant;
 
       const tokens = await grantFn(oidcConfig, currentUrl, {
@@ -241,6 +249,7 @@ function createAuthRouter(options = {}) {
       const returnUrl = safeReturnTo(saved.returnTo, config.subpath);
       res.redirect(returnUrl);
     } catch (err) {
+      console.error('[OIDC callback error]', err);
       next(err);
     }
   });
